@@ -131,7 +131,6 @@ def pull(model):
 
 
 def bench(model, tier="local"):
-    print(f"[autobench] bench {model}")
     subprocess.run(
         [
             sys.executable,
@@ -176,11 +175,11 @@ def main():
             print(f"[autobench] SKIP {model}: insufficient VRAM headroom (need ~{required}MiB)")
             return
         print(f"[autobench] VRAM check OK: {model} (~{required}MiB)")
+        print(f"[autobench] pull {model}")
+        pull(model)
     elif model_is_available_locally(model):
-        print(f"[autobench] model {model} already available locally, skipping VRAM check")
+        print(f"[autobench] model {model} already available locally, skipping pull")
 
-    print(f"[autobench] pull {model}")
-    pull(model)
     print(f"[autobench] bench {model}")
     bench(model)
     if not args.no_delete and watcher.get("delete_after_bench", True):
