@@ -1,0 +1,19 @@
+id: structured_output
+category: structured_output
+requires_frontier: false
+prompt: |
+  Extract the following fields from this text as a JSON object with exactly these keys:
+  project_name, deadline, budget_eur, team_size.
+  Text: "The Phoenix project is due on 2026-09-15 with a budget of €120,000 and
+  a team of 4 engineers."
+  Output ONLY the JSON object, no markdown, no extra text.
+expected:
+  answer: ""
+scoring:
+  method: exact
+  rubric: |
+    Award full marks ONLY if the response is a valid JSON object with exactly
+    the four keys (project_name, deadline, budget_eur, team_size) and correct
+    values. No markdown, no extra text, no missing keys. Any deviation = 0.
+max_tokens: 128
+tags: [structured_output, json]

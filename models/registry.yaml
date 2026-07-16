@@ -1,0 +1,40 @@
+# llm-autobench model registry
+# PUBLIC repo — no secrets, no private data. Only public models are benchmarked.
+#
+# Two sections:
+#   baseline: known models used as a comparison reference (run on every cycle)
+#   watcher:  config for autonomous discovery of NEW models to test
+
+baseline:
+  - id: custom:ollama/qwen3.5:9b
+    display_name: Qwen3.5 9B (local)
+    provider: custom:ollama
+    base_url: http://127.0.0.1:11434/v1
+    tier: local
+    context_window: 32000
+    tags: [reasoning, general, coding]
+    enabled: true
+
+  - id: custom:ollama/gemma4:e4b
+    display_name: Gemma4 e4b (local, vision)
+    provider: custom:ollama
+    base_url: http://127.0.0.1:11434/v1
+    tier: local
+    context_window: 128000
+    tags: [vision, general]
+    enabled: true
+
+watcher:
+  # Only models that FIT the local GPU are pulled. On 12GB VRAM, ~14B is the
+  # practical ceiling (qwen3.5:9b = 6.6GB leaves headroom for the judge on free cloud).
+  max_params_billions: 14
+  # Sources to poll for new tags. Ollama library is the primary public source.
+  sources:
+    - type: ollama
+      library: https://ollama.com/library
+      # poll cadence is set by the cron that invokes autobench_cycle.py
+  # Judge/reporter model = the autonomous agent itself. FREE tier keeps the local
+  # GPU free for the model-under-test. Public repo => free cloud allowed.
+  judge: tencent/hy3:free
+  # After benchmarking, the pulled model is DELETED to keep disk/VRAM free.
+  delete_after_bench: true

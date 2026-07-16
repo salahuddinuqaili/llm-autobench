@@ -1,0 +1,21 @@
+id: summarization
+category: summarization
+requires_frontier: false
+prompt: |
+  Summarize this technical incident in 3 sentences for a non-technical stakeholder:
+  "PostgreSQL primary failed at 14:23 UTC due to disk full on /var/lib/postgresql.
+  WAL archives hadn't rotated for 48h (cron disabled). Replica promoted at 14:31.
+  8min downtime. Root cause: monitoring alert for disk space was silenced during
+  maintenance window and never re-enabled. Fix: re-enable alert, add disk-space
+  check to post-maintenance checklist."
+expected:
+  answer: ""
+scoring:
+  method: rubric-llm
+  rubric: |
+    Award full marks for exactly 3 sentences that convey: (1) what happened
+    (DB went down briefly), (2) why (disk full, alert off), (3) impact (8min
+    downtime) and fix (alert back on + checklist). No technical jargon. Deduct
+    for missing elements, jargon, or wrong sentence count.
+max_tokens: 256
+tags: [summarization, communication]

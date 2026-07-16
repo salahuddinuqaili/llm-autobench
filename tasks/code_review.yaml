@@ -1,0 +1,26 @@
+id: code_review
+category: coding
+requires_frontier: false
+prompt: |
+  Review this Python code for bugs, security issues, and style. Be concise.
+  ```python
+  import sqlite3
+
+  def get_user(user_id):
+      conn = sqlite3.connect('users.db')
+      cursor = conn.cursor()
+      query = f"SELECT * FROM users WHERE id = {user_id}"
+      cursor.execute(query)
+      return cursor.fetchone()
+  ```
+expected:
+  answer: ""
+scoring:
+  method: rubric-llm
+  rubric: |
+    Award full marks if the review identifies: (1) SQL injection vulnerability
+    (f-string in query), (2) missing connection close / context manager, (3)
+    no error handling. Partial for catching 1-2 issues. Zero if it misses the
+    injection or calls the code "fine".
+max_tokens: 512
+tags: [coding, security]

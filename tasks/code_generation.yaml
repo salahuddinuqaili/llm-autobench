@@ -1,0 +1,20 @@
+id: code_generation
+category: coding
+requires_frontier: false
+prompt: |
+  Write a Python function `def chunk_text(text: str, max_chars: int) -> list[str]`
+  that splits text into chunks of at most max_chars, preferring to break on
+  sentence boundaries ('.', '!', '?'), never cutting a word. Include a docstring
+  and one assert test.
+expected:
+  answer: ""
+scoring:
+  method: rubric-llm
+  rubric: |
+    Award full marks if the function: (1) respects max_chars, (2) breaks on
+    sentence boundaries when possible, (3) never splits a word, (4) has a
+    docstring and one assert test. Deduct for missing any requirement.
+    Partial if the logic is correct but edge cases (empty string, single long
+    word) are not handled.
+max_tokens: 512
+tags: [coding, python]

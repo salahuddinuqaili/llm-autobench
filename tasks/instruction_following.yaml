@@ -1,0 +1,16 @@
+id: instruction_following
+category: instruction_following
+requires_frontier: false
+prompt: |
+  List exactly three fruits, one per line, with NO punctuation, NO numbering,
+  and NO extra words. Just the fruit names.
+expected:
+  answer: ""
+scoring:
+  method: exact
+  rubric: |
+    Award full marks ONLY if the response contains exactly three lines, each
+    a fruit name with no punctuation, no numbers, no extra text. Any deviation
+    (numbering, commas, extra words, more/less than 3 lines) = 0.
+max_tokens: 128
+tags: [instruction_following]

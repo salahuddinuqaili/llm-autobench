@@ -1,0 +1,2 @@
+# Raw per-run JSON results live here. One file per run_id (YYYYMMDD_HHMMSS.json).
+# Committed so runs are diffable over time.

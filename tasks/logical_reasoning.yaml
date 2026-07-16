@@ -1,0 +1,16 @@
+id: logical_reasoning
+category: reasoning
+requires_frontier: false
+prompt: |
+  A warehouse has 12 shelves. Each shelf holds 8 boxes. Each box holds 10 items.
+  If 1/4 of the items are removed for shipping, how many items remain?
+  Show your steps and give the final number.
+expected:
+  answer: "720"
+scoring:
+  method: exact
+  rubric: |
+    Award full marks if the final answer is 720 and the working is correct.
+    Partial for correct method with arithmetic error. Zero for wrong approach.
+max_tokens: 512
+tags: [reasoning]

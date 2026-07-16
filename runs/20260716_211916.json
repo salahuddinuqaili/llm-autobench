@@ -1,0 +1,21 @@
+{
+  "run_id": "20260716_211916",
+  "results": [
+    {
+      "model": "tencent/hy3:free",
+      "task": "arithmetic_word_problem",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "provider nous not wired in skeleton"
+    },
+    {
+      "model": "custom:ollama/qwenlocal",
+      "task": "arithmetic_word_problem",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "custom endpoint error: No module named 'pydantic_core._pydantic_core'"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+id: sprint_narrative
+category: writing
+requires_frontier: false
+prompt: |
+  Write a 3-sentence sprint retrospective narrative for a team lead, based on:
+  - Completed: user auth revamp, billing webhook retries
+  - Blocked: SSO integration (vendor API downtime 3 days)
+  - Risk: flaky CI on the mobile pipeline
+  Tone: honest, concise, no fluff.
+expected:
+  answer: ""
+scoring:
+  method: rubric-llm
+  rubric: |
+    Award full marks for exactly 3 sentences that cover all three points (completed,
+    blocked, risk) in an honest, professional tone. Deduct for fluff, missing
+    points, or overly casual language.
+max_tokens: 512
+tags: [writing, summarization]

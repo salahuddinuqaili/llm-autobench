@@ -1,0 +1,22 @@
+id: changelog_generation
+category: writing
+requires_frontier: false
+prompt: |
+  You maintain a SaaS changelog. Turn these raw git commits into a user-facing
+  "Improvements" section (markdown bullets, concise, benefit-focused, no tech jargon):
+  - fix: retry logic on OAuth token refresh (handles 401 mid-request)
+  - feat: export sprint report to CSV from the dashboard
+  - refactor: moved rate-limiter into its own service
+  - fix: crash when webhook payload missing 'user_id'
+expected:
+  answer: ""
+scoring:
+  method: rubric-llm
+  rubric: |
+    Award full marks if the output is a clean markdown bullet list that translates
+    each commit into a user benefit (what changed for the user), not technical
+    implementation. Deduct for: technical jargon, missing commits, or incorrect
+    categorization. Partial marks if most bullets are user-facing but some slip
+    into implementation detail.
+max_tokens: 512
+tags: [writing, summarization]
