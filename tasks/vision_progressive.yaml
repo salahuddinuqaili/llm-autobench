@@ -1,0 +1,25 @@
+id: vision_progressive
+category: vision
+requires_frontier: false
+# This is a PROGRESSIVE JPEG (tasks/images/progressive_scene.jpg) — the exact
+# format that some vision models fail to decode (they return "no image provided"
+# or a blank read). A model that correctly ingests it will describe the scene
+# (blue sky, green ground, yellow sun, red house, "PROGRESSIVE TEST" label).
+# Public-repo safe: synthetic CC0 image, saved as progressive JPEG on purpose.
+image: tasks/images/progressive_scene.jpg
+prompt: |
+  Describe this image in one sentence: what is in the scene (sky, ground, sun,
+  any building, and any text label)?
+expected:
+  answer: ""
+scoring:
+  method: rubric-llm
+  rubric: |
+    Award 1.0 if the response clearly describes actual scene content (e.g.
+    mentions a sky/blue, ground/green, a sun/yellow circle, a red house/building,
+    and/or the "PROGRESSIVE TEST" label). Award 0.0 if the model says no image
+    was provided, cannot see an image, or returns content-free boilerplate. This
+    task specifically tests whether the model can DECODE A PROGRESSIVE JPEG — a
+    known failure mode for some vision models.
+max_tokens: 256
+tags: [vision, progressive]
