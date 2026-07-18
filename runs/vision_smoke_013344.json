@@ -6,14 +6,20 @@
       "task": "vision_ocr",
       "response": "I cannot answer this question because no image was provided. Please upload the image you would like me to analyze.",
       "error": null,
-      "latency_s": 2.5
+      "latency_s": 2.5,
+      "score": 0.0,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.0"
     },
     {
       "model": "custom:ollama/minicpm-v:latest",
       "task": "vision_ocr",
       "response": "HELLO 123 red.",
       "error": null,
-      "latency_s": 0.3
+      "latency_s": 0.3,
+      "score": 1.0,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     }
   ]
 }

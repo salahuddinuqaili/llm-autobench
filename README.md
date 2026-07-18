@@ -51,6 +51,28 @@ python scripts/autobench_cycle.py --model qwen3.5:9b
 - `scripts/run_bench.py` — the benchmark runner (calls Ollama directly).
 - `scripts/autobench_cycle.py` — the lifecycle orchestrator (pull/bench/delete/commit).
 
+## Vision section
+
+Autobench can benchmark **vision models**, not just text. A task with an
+`image:` field (path relative to repo root, committed CC0 asset under
+`tasks/images/`) is sent to vision-capable models with the image attached; the
+text response is then judged by the rubric-llm judge like any other task.
+
+- Vision tasks are tagged `vision`; only models tagged `vision` in the registry
+  run them (tag-based matching in `run_bench.py`).
+- `run_bench.py` attaches the base64 image **inside the Ollama chat message**
+  (Ollama's `/api/chat` expects `images` per-message, not at the payload root).
+- Baselines registered: `gemma4:e4b` and `minicpm-v` (both local Ollama).
+- Example: `tasks/vision_ocr.yaml` asks the model to read printed text + name
+  the color of a square. Verified result (RTX 5070): `minicpm-v` scores 1.00,
+  `gemma4:e4b` cannot ingest the image via Ollama and scores 0.00.
+
+```bash
+# run only vision models x vision tasks (fast smoke)
+python scripts/run_bench.py --tier local   # vision tasks auto-matched by tag
+python scripts/nvidia_judge.py runs/<vision_run>.json   # scores the text output
+```
+
 ## Constraints (by design)
 - **12GB VRAM ceiling** — the watcher only pulls models ≤ `max_params_billions` (default 14).
 - **Public only** — no per-x / private-repo data ever enters this repo.
