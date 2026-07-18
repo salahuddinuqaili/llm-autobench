@@ -5,59 +5,99 @@ Reads a run JSON, scores all rubric-llm tasks via meta/llama-3.3-70b-instruct
 (NVIDIA NIM, free 40 RPM), then writes a markdown report.
 
 Uses direct curl to NVIDIA's OpenAI-compatible endpoint (bypasses the slow
-`hermes -z` agent loop). API key is read from Hermes's .env file.
+`hermes -z` agent loop). The API key is resolved with this precedence:
+  1. env var NVIDIA_API_KEY
+  2. Hermes .env (cross-platform: ~/AppData/Local/hermes/.env on Windows,
+     ~/.local/share/hermes/.env or ~/.config/hermes/.env on Linux/macOS)
+  3. --key CLI arg
+
+Hardened vs v1: cross-platform key load, exponential backoff retry, larger
+token budget for judge reasoning, robust float parsing, incremental write-back.
 
 Usage:
-  python scripts/nvidia_judge.py runs/<run>.json
+  python scripts/nvidia_judge.py runs/<run>.json [--key SK] [--max-retries 4]
 """
 import json
 import os
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 JUDGE_MODEL = "meta/llama-3.3-70b-instruct"
 NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 REPO = Path(__file__).resolve().parent.parent
 
-# Load NVIDIA key from Hermes .env (not in shell env)
-_ENV_PATH = Path.home() / "AppData/Local/hermes/.env"
-NVIDIA_API_KEY = ""
-if _ENV_PATH.exists():
-    for line in _ENV_PATH.read_text().splitlines():
-        if line.startswith("NVIDIA_API_KEY="):
-            NVIDIA_API_KEY = line.split("=", 1)[1].strip()
-            break
+
+def find_nvidia_key() -> str:
+    """Resolve the NVIDIA API key cross-platform."""
+    env_key = os.environ.get("NVIDIA_API_KEY")
+    if env_key:
+        return env_key.strip()
+
+    # Candidate .env locations (Hermes stores it gitignored, not in shell env).
+    candidates = [
+        Path.home() / "AppData" / "Local" / "hermes" / ".env",       # Windows
+        Path.home() / ".local" / "share" / "hermes" / ".env",         # Linux XDG
+        Path.home() / ".config" / "hermes" / ".env",                  # Linux alt
+        Path.home() / ".hermes" / ".env",                             # generic
+    ]
+    for cand in candidates:
+        if cand.exists():
+            for line in cand.read_text(encoding="utf-8", errors="ignore").splitlines():
+                if line.startswith("NVIDIA_API_KEY="):
+                    return line.split("=", 1)[1].strip()
+    return ""
 
 
-def call_judge(prompt: str) -> str:
-    """Call NVIDIA directly via curl. Returns raw response text."""
+def call_judge(prompt: str, api_key: str, max_retries: int = 4,
+               max_tokens: int = 256) -> str:
+    """Call NVIDIA directly via curl with exponential backoff retry."""
     payload = json.dumps({
         "model": JUDGE_MODEL,
         "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 20,
+        "max_tokens": max_tokens,
         "temperature": 0.0,
     })
-    cmd = [
-        "curl", "-s", "--max-time", "180", NVIDIA_URL,
-        "-H", f"Authorization: Bearer {NVIDIA_API_KEY}",
-        "-H", "Content-Type: application/json",
-        "-d", payload,
-    ]
-    res = subprocess.run(cmd, capture_output=True, text=True, timeout=200)
-    try:
-        data = json.loads(res.stdout)
-        return data["choices"][0]["message"]["content"].strip()
-    except Exception as e:
-        return f"ERROR: {res.stdout[:200]} ({e})"
+    last_err = ""
+    for attempt in range(1, max_retries + 1):
+        try:
+            cmd = [
+                "curl", "-s", "--max-time", "180", NVIDIA_URL,
+                "-H", f"Authorization: Bearer {api_key}",
+                "-H", "Content-Type: application/json",
+                "-d", payload,
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=200)
+            out = res.stdout.strip()
+            if not out:
+                last_err = f"empty response (HTTP {res.returncode})"
+                raise RuntimeError(last_err)
+            data = json.loads(out)
+            return data["choices"][0]["message"]["content"].strip()
+        except Exception as e:  # noqa: BLE001
+            last_err = str(e)
+            if attempt < max_retries:
+                backoff = 2 ** attempt
+                print(f"    retry {attempt}/{max_retries} after {backoff}s ({last_err})",
+                      file=sys.stderr, flush=True)
+                time.sleep(backoff)
+    return f"ERROR: {last_err}"
 
 
 def parse_score(text: str):
-    m = re.search(r"0(?:\.\d+)?|1(?:\.0+)?", text)
-    if not m:
-        return None
-    return max(0.0, min(1.0, float(m.group(0))))
+    # Prefer an explicit "score: 0.85" or "0.85/1.0" form, else first float 0..1.
+    m = re.search(r"score[\"']?\s*[:=]\s*(0(?:\.\d+)?|1(?:\.0+)?)", text, re.I)
+    if m:
+        return max(0.0, min(1.0, float(m.group(1))))
+    m = re.search(r"(0(?:\.\d+)?|1(?:\.0+)?)\s*/\s*1", text)
+    if m:
+        return max(0.0, min(1.0, float(m.group(1))))
+    m = re.search(r"\b(0(?:\.\d+)?|1(?:\.0+)?)\b", text)
+    if m:
+        return max(0.0, min(1.0, float(m.group(1))))
+    return None
 
 
 def build_judge_prompt(task_id, rubric, response):
@@ -78,7 +118,7 @@ def load_rubric(task_id):
     p = REPO / "tasks" / f"{task_id}.yaml"
     if not p.exists():
         return ""
-    text = p.read_text()
+    text = p.read_text(encoding="utf-8")
     m = re.search(r"rubric:\s*\|?\s*\n((?:[ \t]+.*\n?)+)", text)
     if not m:
         return ""
@@ -86,15 +126,20 @@ def load_rubric(task_id):
 
 
 def main():
-    if not NVIDIA_API_KEY:
-        print("ERROR: NVIDIA_API_KEY not found in Hermes .env")
-        sys.exit(1)
-    if len(sys.argv) < 2:
-        print("usage: nvidia_judge.py <run.json>")
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("run_file")
+    ap.add_argument("--key", help="NVIDIA API key (else env/.env)")
+    ap.add_argument("--max-retries", type=int, default=4)
+    args = ap.parse_args()
+
+    api_key = args.key or find_nvidia_key()
+    if not api_key:
+        print("ERROR: NVIDIA_API_KEY not found (env, Hermes .env, or --key)", file=sys.stderr)
         sys.exit(1)
 
-    run_path = Path(sys.argv[1])
-    data = json.loads(run_path.read_text())
+    run_path = Path(args.run_file)
+    data = json.loads(run_path.read_text(encoding="utf-8"))
     results = data["results"]
     scored = []
 
@@ -105,24 +150,25 @@ def main():
         task_id = r["task"]
         rubric = load_rubric(task_id)
         if not rubric:
-            print(f"  [skip] no rubric for {task_id}")
+            print(f"  [skip] no rubric for {task_id}", file=sys.stderr)
             scored.append(r)
             continue
         prompt = build_judge_prompt(task_id, rubric, r.get("response", ""))
         print(f"  [judge] {task_id} ...", end=" ", flush=True)
-        out = call_judge(prompt)
+        out = call_judge(prompt, api_key, max_retries=args.max_retries)
         score = parse_score(out)
         r["score"] = score
         r["judge"] = f"nvidia/{JUDGE_MODEL}"
         r["judge_raw"] = out[:300]
-        print(score)
+        print(score, file=sys.stderr, flush=True)
         scored.append(r)
-        # write back incrementally so partial progress survives timeouts
-        data["results"] = scored + [x for x in results if x not in scored and x.get("score") is None]
-        run_path.write_text(json.dumps(data, indent=2))
+        # Incremental write-back so partial progress survives timeouts.
+        pending = [x for x in results if x.get("score") is None]
+        data["results"] = scored + pending
+        run_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     data["results"] = scored
-    run_path.write_text(json.dumps(data, indent=2))
+    run_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     model = scored[0]["model"] if scored else "unknown"
     scores = [r["score"] for r in scored if r.get("score") is not None]
@@ -153,7 +199,7 @@ def main():
     lines.append("")
 
     out_path = REPO / "reports" / f"{run_path.stem}.md"
-    out_path.write_text("\n".join(lines))
+    out_path.write_text("\n".join(lines), encoding="utf-8")
     print(f"\nReport written: {out_path}")
     print(f"Average score: {avg:.2f}")
 
