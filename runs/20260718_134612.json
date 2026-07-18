@@ -1,0 +1,77 @@
+{
+  "run_id": "20260718_134612",
+  "results": [
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "arithmetic_reasoning",
+      "response": "I'll solve this step-by-step.\n\n**Given:**\n- Train 1: departs 2:00, speed = 60 km/h\n- Train 2: departs 3:00, speed = 90 km/h (same route)\n\n**Solution:**\n\nWhen Train 2 starts at 3:00, Train 1 has already traveled for 1 hour:\n- Train 1's head start = 60 km/h \u00d7 1 hour = **60 km**\n\nLet **t** = hours after 3:00 when they meet.\n\nAt that time:\n- Train 1's distance = 60 + 60t  (head start + continued travel)\n- Train 2's distance = 90t\n\nThey meet when distances are equal:\n```\n60 + 60t = 90t\n60 = 30t\nt = 2 hours\n```\n\n**Answer: 5:00**\n\n**Verification:**\n- Train 1 at 5:00: 3 hours traveled \u00d7 60 km/h = 180 km \u2713\n- Train 2 at 5:00: 2 hours traveled \u00d7 90 km/h = 180 km \u2713",
+      "latency_s": 16.769297,
+      "score": 1.0,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "changelog_generation",
+      "response": "Here's your user-facing changelog:\n\n## Improvements\n\n- **Export sprint reports** \u2014 You can now download sprint reports as CSV files directly from the dashboard\n- **More reliable sessions** \u2014 Fixed an issue that could unexpectedly log you out during active work\n- **Improved webhook stability** \u2014 Resolved a crash that could occur when receiving certain webhook notifications",
+      "latency_s": 9.358496,
+      "score": null,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "code_generation",
+      "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most max_chars, preferring sentence boundaries.\n    \n    Breaks on '.', '!', or '?' when possible, otherwise on word boundaries.\n    Never cuts a word mid-way.\n    \n    Args:\n        text: The text to chunk\n        max_chars: Maximum characters per chunk\n        \n    Returns:\n        List of text chunks, each <= max_chars\n    \"\"\"\n    if not text or max_chars <= 0:\n        return []\n    \n    chunks = []\n    start = 0\n    \n    while start < len(text):\n        # If remaining text fits in one chunk\n        if start + max_chars >= len(text):\n            chunks.append(text[start:].strip())\n            break\n        \n        end = start + max_chars\n        chunk = text[start:end]\n        \n        # Look for sentence boundary\n        sentence_ends = [chunk.rfind(c) for c in '.!?']\n        last_sentence = max(sentence_ends)\n        \n        if last_sentence > 0:\n            # Break after sentence boundary\n            end = start + last_sentence + 1\n        else:\n            # Fall back to word boundary\n            last_space = chunk.rfind(' ')\n            if last_space > 0:\n                end = start + last_space\n            # If no space found, we're forced to use max_chars (single long word)\n        \n        chunks.append(text[start:end].strip())\n        start = end\n    \n    return [c for c in chunks if c]  # Filter empty chunks\n\n\n# Test\nassert chunk_text(\"Hello world. This is a test! How are you?\", 20) == [\n    \"Hello world.\", \"This is a test!\", \"How are you?\"\n]\n```",
+      "latency_s": 14.431508,
+      "score": null,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "code_review",
+      "response": "**Critical issues:**\n\n1. **SQL Injection vulnerability** \u2014 Using f-string interpolation (`f\"SELECT * FROM users WHERE id = {user_id}\"`) allows arbitrary SQL execution. An attacker could pass `\"1 OR 1=1\"` or `\"1; DROP TABLE users--\"`. Use parameterized queries instead:\n   ```python\n   cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))\n   ```\n\n2. **Resource leak** \u2014 Database connection never closed. Use a context manager:\n   ```python\n   with sqlite3.connect('users.db') as conn:\n       cursor = conn.cursor()\n       # ...\n   ```\n\n3. **No error handling** \u2014 Will crash silently if DB doesn't exist or query fails.\n\n**Fixed version:**\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    try:\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))\n            return cursor.fetchone()\n    except sqlite3.Error as e:\n        # Log error appropriately\n        raise\n```\n\nThe SQL injection is the blocker \u2014 ship the parameterized query fix immediately before this touches production.",
+      "latency_s": 12.532815,
+      "score": null,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "instruction_following",
+      "response": "Apple\nBanana\nOrange",
+      "latency_s": 5.431149,
+      "score": 0.0,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "logical_reasoning",
+      "response": "I'll solve this step by step:\n\n**Step 1: Calculate total boxes**\n- 12 shelves \u00d7 8 boxes per shelf = 96 boxes\n\n**Step 2: Calculate total items**\n- 96 boxes \u00d7 10 items per box = 960 items\n\n**Step 3: Calculate items removed**\n- 1/4 of 960 = 960 \u00f7 4 = 240 items removed\n\n**Step 4: Calculate items remaining**\n- 960 - 240 = 720 items\n\n**Final answer: 720 items remain**",
+      "latency_s": 7.279415,
+      "score": 1.0,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "sprint_narrative",
+      "response": "We shipped the user auth revamp and billing webhook retries as planned. SSO integration remains blocked \u2014 the vendor's API has been down for three days with no ETA, and we need to decide whether to escalate or pivot to the fallback. Mobile CI is showing intermittent failures that aren't tied to code changes, which will slow velocity next sprint if we don't allocate time to stabilize it.",
+      "latency_s": 8.795716,
+      "score": null,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "structured_output",
+      "response": "{\"project_name\": \"Phoenix\", \"deadline\": \"2026-09-15\", \"budget_eur\": 120000, \"team_size\": 4}",
+      "latency_s": 5.836577,
+      "score": 0.0,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "summarization",
+      "response": "Our main database ran out of storage space at 2:23 PM and went offline for 8 minutes while we switched to a backup system. The underlying issue was that automated file cleanup had stopped running two days earlier, and the safety alarm that should have warned us about low disk space had been turned off during routine maintenance and was never turned back on. We've re-enabled the alarm and added a mandatory checklist step after every maintenance to prevent this from happening again.",
+      "latency_s": 11.333299,
+      "score": null,
+      "error": null
+    }
+  ]
+}
