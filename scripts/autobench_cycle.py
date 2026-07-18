@@ -75,10 +75,22 @@ def has_vram_headroom(required_mib, buffer_mib=1024):
 
 
 def model_is_available_locally(model_tag):
-    """Check if the model tag exists in Ollama (already pulled)."""
+    """Check if the model tag exists in Ollama (already pulled).
+    Handles tag mismatches — e.g. 'qwen2.5:7b' matches 'qwen2.5:7b-instruct'.
+    Returns the actual local tag name if found, or False.
+    """
     try:
         out = subprocess.check_output(["ollama", "list"], text=True, stderr=subprocess.DEVNULL)
-        return model_tag in out
+        # Exact match first
+        if model_tag in out:
+            return model_tag
+        # Fuzzy: strip the version suffix and match on base name
+        base = model_tag.split(":")[0]
+        for line in out.splitlines():
+            col = line.split()[0] if line.split() else ""
+            if col.startswith(base + ":"):
+                return col  # return actual local tag
+        return False
     except Exception:
         return False
 
@@ -276,8 +288,13 @@ def main():
         return
 
     # VRAM guard before pulling (skip if already available locally)
+    already_local = model_is_available_locally(model)
     match = re.search(r":(\d+(?:\.\d+)?)b?$", model, re.IGNORECASE)
-    if match and not model_is_available_locally(model):
+    pulled = False
+    if already_local and already_local != model:
+        print(f"[autobench] tag mismatch: '{model}' resolved to local '{already_local}'")
+        model = already_local  # use the actual local tag for benchmarking
+    if match and not already_local:
         param_b = float(match.group(1))
         required = estimate_model_vram_mib(param_b)
         if not has_vram_headroom(required):
@@ -286,14 +303,18 @@ def main():
         print(f"[autobench] VRAM check OK: {model} (~{required}MiB)")
         print(f"[autobench] pull {model}")
         pull(model)
-    elif model_is_available_locally(model):
+        pulled = True
+    elif already_local:
         print(f"[autobench] model {model} already available locally, skipping pull")
 
     print(f"[autobench] bench {model}")
     bench(model)
-    if not args.no_delete and watcher.get("delete_after_bench", True):
+    # Only delete models we pulled — never delete pre-existing local models
+    if pulled and not args.no_delete and watcher.get("delete_after_bench", True):
         print(f"[autobench] delete {model}")
         delete(model)
+    elif not pulled:
+        print(f"[autobench] skipping delete — model was pre-existing locally")
     commit(f"autobench: {model} @ {dt.datetime.now():%Y%m%d_%H%M%S}")
 
 
