@@ -81,15 +81,16 @@ def model_is_available_locally(model_tag):
     """
     try:
         out = subprocess.check_output(["ollama", "list"], text=True, stderr=subprocess.DEVNULL)
+        # Check against actual first-column tags (not substring match)
+        local_tags = [line.split()[0] for line in out.splitlines() if line.split()]
         # Exact match first
-        if model_tag in out:
+        if model_tag in local_tags:
             return model_tag
-        # Fuzzy: strip the version suffix and match on base name
+        # Fuzzy: base name match (e.g. 'qwen2.5:7b' -> 'qwen2.5:7b-instruct')
         base = model_tag.split(":")[0]
-        for line in out.splitlines():
-            col = line.split()[0] if line.split() else ""
-            if col.startswith(base + ":"):
-                return col  # return actual local tag
+        for tag in local_tags:
+            if tag.startswith(base + ":"):
+                return tag  # return actual local tag
         return False
     except Exception:
         return False
