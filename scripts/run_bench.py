@@ -189,6 +189,7 @@ def main():
                 "model": model["id"], "task": task["id"],
                 "response": text, "latency_s": latency,
                 "score": sc, "error": err,
+                "image": task.get("image"),
             })
             print(f"[{run_id}] {model['id']} x {task['id']}: "
                   f"{'ERR' if err else ('score='+str(sc) if sc is not None else 'unscored')}")

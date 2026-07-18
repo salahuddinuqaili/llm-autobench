@@ -23,9 +23,14 @@ import re
 import subprocess
 import sys
 import time
+import base64
 from pathlib import Path
 
 JUDGE_MODEL = "meta/llama-3.3-70b-instruct"
+# Vision judge: a multimodal NVIDIA NIM model used for tasks that carry an
+# `image:`. It actually SEES the image and scores the model's response against
+# what is really in the picture (stronger than inferring from text alone).
+VISION_JUDGE_MODEL = "meta/llama-3.2-11b-vision-instruct"
 NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 REPO = Path(__file__).resolve().parent.parent
 
@@ -86,6 +91,64 @@ def call_judge(prompt: str, api_key: str, max_retries: int = 4,
     return f"ERROR: {last_err}"
 
 
+def call_vision_judge(prompt: str, image_b64: str, image_media: str,
+                      api_key: str, max_retries: int = 4,
+                      max_tokens: int = 256) -> str:
+    """Multimodal judge: sends the image + prompt to the vision judge model.
+    `image_media` is e.g. 'image/png' or 'image/jpeg'."""
+    content = [
+        {"type": "text", "text": prompt},
+        {"type": "image_url",
+         "image_url": {"url": f"data:{image_media};base64,{image_b64}"}},
+    ]
+    payload = json.dumps({
+        "model": VISION_JUDGE_MODEL,
+        "messages": [{"role": "user", "content": content}],
+        "max_tokens": max_tokens,
+        "temperature": 0.0,
+    })
+    last_err = ""
+    for attempt in range(1, max_retries + 1):
+        try:
+            cmd = [
+                "curl", "-s", "--max-time", "180", NVIDIA_URL,
+                "-H", f"Authorization: Bearer {api_key}",
+                "-H", "Content-Type: application/json",
+                "-d", payload,
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=200)
+            out = res.stdout.strip()
+            if not out:
+                last_err = f"empty response (HTTP {res.returncode})"
+                raise RuntimeError(last_err)
+            data = json.loads(out)
+            return data["choices"][0]["message"]["content"].strip()
+        except Exception as e:  # noqa: BLE001
+            last_err = str(e)
+            if attempt < max_retries:
+                backoff = 2 ** attempt
+                print(f"    retry {attempt}/{max_retries} after {backoff}s ({last_err})",
+                      file=sys.stderr, flush=True)
+                time.sleep(backoff)
+    return f"ERROR: {last_err}"
+
+
+def build_vision_judge_prompt(task_id, rubric, response):
+    return f"""You are an objective benchmark judge WITH VISION. You can see the image.
+
+TASK: {task_id}
+
+RUBRIC (what the image actually contains / what a correct answer looks like):
+{rubric}
+
+MODEL RESPONSE (a vision model's description of the image):
+{response}
+
+Look at the image yourself. Does the MODEL RESPONSE correctly describe what is
+actually in the image, per the rubric? Return ONLY a single float between 0.0
+and 1.0 (e.g. 0.85). Do not explain."""
+
+
 def parse_score(text: str):
     # Prefer an explicit "score: 0.85" or "0.85/1.0" form, else first float 0..1.
     m = re.search(r"score[\"']?\s*[:=]\s*(0(?:\.\d+)?|1(?:\.0+)?)", text, re.I)
@@ -125,6 +188,13 @@ def load_rubric(task_id):
     return re.sub(r"^[ \t]+", "", m.group(1), flags=re.MULTILINE)
 
 
+def _writeback(results, scored, run_path):
+    """Incremental write-back so partial progress survives timeouts."""
+    pending = [x for x in results if x.get("score") is None]
+    data = {"results": scored + pending}
+    run_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
 def main():
     import argparse
     ap = argparse.ArgumentParser()
@@ -153,6 +223,29 @@ def main():
             print(f"  [skip] no rubric for {task_id}", file=sys.stderr)
             scored.append(r)
             continue
+        # Vision tasks: the judge SEES the image (multimodal judge).
+        img = r.get("image")
+        if img:
+            img_path = img if os.path.isabs(img) else str(REPO / img)
+            try:
+                with open(img_path, "rb") as fh:
+                    img_b64 = base64.b64encode(fh.read()).decode("utf-8")
+                media = "image/png" if img_path.lower().endswith(".png") else "image/jpeg"
+                prompt = build_vision_judge_prompt(task_id, rubric, r.get("response", ""))
+                print(f"  [vision-judge] {task_id} ...", end=" ", flush=True)
+                out = call_vision_judge(prompt, img_b64, media, api_key,
+                                        max_retries=args.max_retries)
+                score = parse_score(out)
+                r["score"] = score
+                r["judge"] = f"nvidia/{VISION_JUDGE_MODEL}"
+                r["judge_raw"] = out[:300]
+                print(score, file=sys.stderr, flush=True)
+                scored.append(r)
+                _writeback(results, scored, run_path)
+                continue
+            except Exception as e:  # noqa: BLE001
+                print(f"  [warn] vision-judge failed ({e}); falling back to text judge",
+                      file=sys.stderr)
         prompt = build_judge_prompt(task_id, rubric, r.get("response", ""))
         print(f"  [judge] {task_id} ...", end=" ", flush=True)
         out = call_judge(prompt, api_key, max_retries=args.max_retries)
@@ -162,10 +255,7 @@ def main():
         r["judge_raw"] = out[:300]
         print(score, file=sys.stderr, flush=True)
         scored.append(r)
-        # Incremental write-back so partial progress survives timeouts.
-        pending = [x for x in results if x.get("score") is None]
-        data["results"] = scored + pending
-        run_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        _writeback(results, scored, run_path)
 
     data["results"] = scored
     run_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
