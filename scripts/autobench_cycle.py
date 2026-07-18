@@ -137,6 +137,15 @@ def discover(watcher):
     cands = []
 
     def consider(full, param_b):
+        # Embedding/multimodal models (e.g. bge-m3) have no ":Xb" size tag and
+        # are tiny — always eligible for pull/bench regardless of param budget.
+        if "embedding" in full.lower() or "bge" in full.lower() or "clip" in full.lower():
+            if full in tested:
+                return
+            if not has_vram_headroom(estimate_model_vram_mib(2)):  # ~1-2GB estimate
+                return
+            cands.append((999, full))  # sort key keeps them considered but not "largest"
+            return
         if param_b is None or param_b > max_b:
             return
         if full in tested:

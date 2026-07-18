@@ -24,6 +24,18 @@ baseline:
     tags: [vision, general]
     enabled: true
 
+  # Embedding model used for semantic-category work (OLYMPUS-style). Multimodal:
+  # bge-m3 embeds text AND images, so it covers future image/audio eval too
+  # (audio is transcribed to text first, then embedded). Already pulled locally.
+  - id: custom:ollama/bge-m3
+    display_name: bge-m3 (local, embedding/multimodal)
+    provider: custom:ollama
+    base_url: http://127.0.0.1:11434/v1
+    tier: local
+    context_window: 8192
+    tags: [embedding, vision, multimodal]
+    enabled: true
+
 watcher:
   # Only models that FIT the local GPU are pulled. On 12GB VRAM, ~14B is the
   # practical ceiling (qwen3.5:9b = 6.6GB leaves headroom for the judge on free cloud).

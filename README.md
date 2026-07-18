@@ -7,8 +7,9 @@ local GPU, **benchmarks** them against a fixed task battery, **reports** the res
 then **deletes** the model to keep the machine free. The whole cycle runs unattended.
 
 > Public repo. No secrets, no private data. Only **public** models are benchmarked,
-> and the judge/reporting model is a **free** tier (keeps the local GPU for the
-> model-under-test). This satisfies the "free cloud = public repos only" rule by design.
+> and the judge is a **free NVIDIA NIM model** (Llama 3.3 70B, 40 RPM) — keeps the
+> local GPU free for the model-under-test. This satisfies the "free cloud = public
+> repos only" rule by design.
 
 ## The autonomous lifecycle
 
@@ -18,7 +19,7 @@ then **deletes** the model to keep the machine free. The whole cycle runs unatte
    │  1. discover   find a new model tag (watcher) ── fits 12GB? (≤ ~14B) ── yes ─┐               │
    │  2. pull       `ollama pull <model>`                                         │               │
    │  3. bench      run_bench.py → Ollama runs the model locally (heavy compute)  │               │
-   │  4. judge      free Hermes model scores outputs vs task rubrics             │               │
+   │  4. judge      free NVIDIA NIM model scores outputs vs task rubrics (Llama 3.3 70B)     │               │
    │  5. report     write reports/<run_id>.md (leaderboard + cost)               │               │
    │  6. delete     `ollama rm <model>`  (free disk/VRAM)                          │               │
    │  7. commit     git commit runs/ + reports/  → push to public GitHub          │               │
@@ -27,9 +28,11 @@ then **deletes** the model to keep the machine free. The whole cycle runs unatte
    Local Ollama (127.0.0.1:11434) does stages 3 only. Everything else is light enough for FREE.  │
 ```
 
-The **free Hermes model is the orchestrator** (steps 1, 4, 5, 7). The **local GPU does
+The **free NVIDIA NIM model is the judge** (steps 1, 4, 5, 7). The **local GPU does
 only step 3** (running the model-under-test). That separation is the point: a 12GB box
-can't host a judge *and* a model-under-test, so the judge lives on free cloud.
+can't host a judge *and* a model-under-test, so the judge lives on free cloud (NVIDIA
+Llama 3.3 70B, 40 RPM — no credit cap). The orchestrating cron agent itself runs on the
+same free NVIDIA model.
 
 ## Quick start (manual)
 ```bash
@@ -51,7 +54,7 @@ python scripts/autobench_cycle.py --model qwen3.5:9b
 ## Constraints (by design)
 - **12GB VRAM ceiling** — the watcher only pulls models ≤ `max_params_billions` (default 14).
 - **Public only** — no per-x / private-repo data ever enters this repo.
-- **Free judge** — reporting uses a free model; no paid spend on this public pipeline.
+- **Free judge** — scoring uses a free NVIDIA NIM model (Llama 3.3 70B, 40 RPM); no paid spend on this public pipeline.
 
 ## Conventions
 See `CLAUDE.md` (Claude Code) and `AGENTS.md` (generic agents) for operating rules.
