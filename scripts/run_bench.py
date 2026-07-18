@@ -22,6 +22,7 @@ import datetime as dt
 import json
 import os
 import sys
+import urllib.request
 
 import yaml
 
@@ -50,35 +51,43 @@ def load_tasks(task_dir):
 
 def call_model(model, prompt, max_tokens):
     """Call a model. Returns (text, latency_s, error)."""
-    # Local / custom OpenAI-compatible endpoint (verified path).
+    # Local / custom Ollama endpoint. We call Ollama's NATIVE /api/chat REST
+    # endpoint directly (no OpenAI SDK) so the harness has zero third-party
+    # dependencies and never breaks on a missing/broken `pydantic_core`.
     if model.get("provider", "").startswith("custom"):
         try:
-            from openai import OpenAI
-            client = OpenAI(
-                base_url=model["base_url"],
-                api_key=model.get("api_key", "ollama"),
-            )
-            t0 = dt.datetime.now()
             ollama_model = model["id"]
             if ollama_model.startswith("custom:ollama/"):
                 ollama_model = ollama_model.split("/", 1)[1]
-            t0 = dt.datetime.now()
-            resp = client.chat.completions.create(
-                model=ollama_model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=max_tokens,
+            base = model.get("base_url", "http://127.0.0.1:11434/v1")
+            # registry base_url ends in /v1 (OpenAI-style); Ollama's native API
+            # lives at the root. Normalise either form.
+            base = base.replace("/v1", "").rstrip("/")
+            url = base + "/api/chat"
+            payload = {
+                "model": ollama_model,
+                "messages": [{"role": "user", "content": prompt}],
+                "stream": False,
+                "options": {"num_predict": max_tokens},
+            }
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
             )
+            t0 = dt.datetime.now()
+            raw = urllib.request.urlopen(req, timeout=600).read().decode("utf-8")
             latency = (dt.datetime.now() - t0).total_seconds()
-            msg = resp.choices[0].message
-            # Qwen3.x reasoning models emit thinking tokens in `reasoning`
-            # (or `reasoning_content`) and may leave `content` empty.
-            text = msg.content or ""
+            resp = json.loads(raw)
+            msg = resp.get("message", {})
+            # Qwen3.x / DeepSeek reasoning models may emit thinking tokens in a
+            # separate `thinking` field and leave `content` empty.
+            text = msg.get("content") or ""
             if not text.strip():
-                text = getattr(msg, "reasoning", None) or getattr(
-                    msg, "reasoning_content", None) or ""
+                text = msg.get("thinking") or ""
             return text, latency, None
         except Exception as e:
-            return None, 0.0, f"custom endpoint error: {e}"
+            return None, 0.0, f"ollama api error: {e}"
     # Nous free / Anthropic premium: route through Hermes's auth, not raw keys.
     # TODO: integrate with Hermes gateway client (OAuth for anthropic).
     return None, 0.0, f"provider {model.get('provider')} not wired in skeleton"

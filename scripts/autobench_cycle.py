@@ -5,9 +5,9 @@ llm-autobench autonomous lifecycle (the "autobench" pipeline).
 Stages — the FREE Hermes agent orchestrating the cron does discovery decisions,
 judging, and reporting. This script does the mechanical LOCAL work:
 
-  1. discover()  -> find a new model tag not yet benchmarked
+  1. discover()  -> find a new model tag not yet benchmarked (VRAM-aware)
   2. pull()      -> `ollama pull <model>` if it fits VRAM
-  3. bench()     -> calls run_bench.py for that model (Ollama does the compute)
+  3. bench()     -> calls run_bench.py for the discovered model (+ baselines)
   4. judge/report-> done by the agent reading runs/<id>.json (see CLAUDE.md)
   5. delete()    -> `ollama rm <model>` to free disk/VRAM
   6. commit()    -> git add runs/ reports/ && commit
@@ -17,6 +17,7 @@ Run manually:
     python autobench_cycle.py --model qwen3.5:9b --no-delete   # keep for inspection
 """
 import argparse
+import concurrent.futures
 import datetime as dt
 import json
 import os
@@ -28,6 +29,15 @@ import urllib.request
 import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Curated fallback models (untested, VRAM-friendly) used only if the live
+# library scrape fails entirely. These are full "name:tag" strings.
+FALLBACK_MODELS = [
+    "llama3.2:3b", "qwen2.5:7b", "mistral:7b",
+    "cogito:14b", "deepcoder:14b", "gemma2:9b",
+]
+
+_UA = {"User-Agent": "llm-autobench/1.0"}
 
 
 def load_watcher():
@@ -73,11 +83,20 @@ def model_is_available_locally(model_tag):
         return False
 
 
+def _param_from_tag(tag):
+    m = re.search(r"(\d+(?:\.\d+)?)b?$", tag, re.IGNORECASE)
+    return float(m.group(1)) if m else None
+
+
 def discover(watcher):
     """Return a new model tag to test, or None.
 
-    Strategy: query Ollama library for popular tags, filter by size <= max_params_billions,
-    exclude already-benchmarked models (present in runs/ or baseline).
+    Strategy: scrape the Ollama library for model names, resolve each model's
+    available tags (concurrent), filter by size <= max_params_billions, exclude
+    already-benchmarked models (present in runs/ or baseline), and require that
+    the model fits the CURRENT free VRAM (so the later pull gate will not skip
+    it). Prefer the largest remaining model. Long-CoT models (deepseek-r1) are
+    excluded because the task battery uses fixed small token budgets.
     """
     max_b = watcher.get("max_params_billions", 14)
 
@@ -102,27 +121,107 @@ def discover(watcher):
         if b.get("id", "").startswith("custom:ollama/"):
             tested.add(b["id"].split("/", 1)[1])
 
-    # Query Ollama library (simple HTML scrape)
+    cands = []
+
+    def consider(full, param_b):
+        if param_b is None or param_b > max_b:
+            return
+        if full in tested:
+            return
+        if "r1" in full.lower():  # skip long-CoT deepseek-r1 (fixed token budgets)
+            return
+        if not has_vram_headroom(estimate_model_vram_mib(param_b)):
+            return
+        cands.append((param_b, full))
+
+    # Live scrape of the Ollama library.
+    names = []
     try:
-        url = "https://ollama.com/library"
-        req = urllib.request.Request(url, headers={"User-Agent": "llm-autobench/1.0"})
+        req = urllib.request.Request("https://ollama.com/library", headers=_UA)
         html = urllib.request.urlopen(req, timeout=15).read().decode("utf-8", errors="ignore")
-        # Find model tags like /library/qwen3.5:9b
-        model_tags = re.findall(r'/library/([a-z0-9_.-]+:[a-z0-9_.-]+)', html)
-        candidates = []
-        for tag in sorted(set(model_tags)):
-            # Heuristic: tag like qwen3.5:9b -> extract param count
-            match = re.search(r':(\d+(?:\.\d+)?)b?$', tag, re.IGNORECASE)
-            if match:
-                param_b = float(match.group(1))
-                if param_b <= max_b and tag not in tested:
-                    candidates.append((param_b, tag))
-        if candidates:
-            candidates.sort(reverse=True)  # prefer larger models
-            return candidates[0][1]
+        names = sorted(set(re.findall(r"/library/([a-z0-9_.-]+)", html)))
     except Exception as e:
         print(f"[discover] warning: library query failed: {e}", file=sys.stderr)
+
+    def fetch_tags(name):
+        try:
+            h = urllib.request.urlopen(
+                urllib.request.Request("https://ollama.com/library/" + name, headers=_UA),
+                timeout=15,
+            ).read().decode("utf-8", errors="ignore")
+        except Exception:
+            return []
+        out = []
+        for tg in re.findall(r"/library/" + re.escape(name) + r":([a-z0-9_.-]+)", h):
+            pb = _param_from_tag(tg)
+            if pb is not None:
+                out.append((pb, name + ":" + tg))
+        return out
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
+        futs = [ex.submit(fetch_tags, n) for n in names[:80]]
+        for f in concurrent.futures.as_completed(futs):
+            try:
+                for pb, full in f.result():
+                    consider(full, pb)
+            except Exception:
+                pass
+
+    # Always consider curated fallbacks (they are full "name:tag" strings).
+    for full in FALLBACK_MODELS:
+        consider(full, _param_from_tag(full))
+
+    if cands:
+        cands.sort(reverse=True)  # prefer larger models
+        print(f"[discover] {len(cands)} candidate(s); picking largest fitting VRAM: {cands[0][1]}",
+              file=sys.stderr)
+        return cands[0][1]
     return None
+
+
+def build_temp_registry(model, watcher):
+    """Build a temporary registry containing the discovered model + baselines,
+    VRAM-trimmed so the run stays within available memory. Returns (path, kept_ids).
+    """
+    cfg = yaml.safe_load(open(os.path.join(REPO, "models", "registry.yaml")))
+    baselines = [b for b in cfg.get("baseline", []) if b.get("enabled", True)]
+    # The vision baseline (gemma4) is large and irrelevant to the text battery;
+    # drop it from discovered-model runs to save VRAM.
+    baselines = [b for b in baselines if "gemma4" not in b.get("id", "")]
+
+    disc = {
+        "id": "custom:ollama/" + model,
+        "display_name": model + " (local, discovered)",
+        "provider": "custom:ollama",
+        "base_url": "http://127.0.0.1:11434/v1",
+        "tier": "local",
+        "context_window": 8000,
+        # Broad tags so the discovered model is attempted on the full task battery.
+        "tags": [
+            "general", "reasoning", "coding", "writing", "summarization",
+            "instruction_following", "structured_output", "communication",
+            "security", "python", "json",
+        ],
+        "enabled": True,
+    }
+
+    def est_of(entry):
+        m = re.search(r":(\d+(?:\.\d+)?)b?$", entry["id"], re.IGNORECASE)
+        return estimate_model_vram_mib(float(m.group(1))) if m else 2048
+
+    keep = [disc]
+    free = get_vram_free_mib() or 0
+    budget = free - est_of(disc) - 1024  # keep discovered model always
+    # Include baselines (largest first) only if they fit alongside the discovered model.
+    for b in sorted(baselines, key=est_of, reverse=True):
+        if est_of(b) <= budget:
+            keep.append(b)
+            budget -= est_of(b)
+
+    tmp = os.path.join(REPO, ".autobench_tmp_registry.yaml")
+    with open(tmp, "w") as f:
+        yaml.safe_dump({"baseline": keep}, f)
+    return tmp, [e["id"] for e in keep]
 
 
 def pull(model):
@@ -131,17 +230,27 @@ def pull(model):
 
 
 def bench(model, tier="local"):
-    subprocess.run(
-        [
-            sys.executable,
-            os.path.join(REPO, "scripts", "run_bench.py"),
-            "--tier",
-            tier,
-            "--out",
-            os.path.join(REPO, "runs"),
-        ],
-        check=True,
-    )
+    tmp, kept = build_temp_registry(model, load_watcher()[0])
+    try:
+        print(f"[autobench] bench {model} (registry includes {kept})")
+        subprocess.run(
+            [
+                sys.executable,
+                os.path.join(REPO, "scripts", "run_bench.py"),
+                "--tier",
+                tier,
+                "--registry",
+                tmp,
+                "--out",
+                os.path.join(REPO, "runs"),
+            ],
+            check=True,
+        )
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
 
 
 def delete(model):
@@ -167,7 +276,7 @@ def main():
         return
 
     # VRAM guard before pulling (skip if already available locally)
-    match = re.search(r':(\d+(?:\.\d+)?)b?$', model, re.IGNORECASE)
+    match = re.search(r":(\d+(?:\.\d+)?)b?$", model, re.IGNORECASE)
     if match and not model_is_available_locally(model):
         param_b = float(match.group(1))
         required = estimate_model_vram_mib(param_b)
