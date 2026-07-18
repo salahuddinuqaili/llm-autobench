@@ -44,6 +44,7 @@ watcher:
       # poll cadence is set by the cron that invokes autobench_cycle.py
   # Judge/reporter model = the autonomous agent itself. FREE tier keeps the local
   # GPU free for the model-under-test. Public repo => free cloud allowed.
-  judge: tencent/hy3:free
+  judge: gemini-3.5-flash
+  judge_provider: gemini
   # After benchmarking, the pulled model is DELETED to keep disk/VRAM free.
   delete_after_bench: true
