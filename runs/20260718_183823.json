@@ -14,32 +14,40 @@
       "task": "changelog_generation",
       "response": "Here are the improvements for this release, in user-facing language:\n\n* OAuth token refresh now retry logic to handle 401 mid-request.\nThis ensures that your authentication process is seamless and reliable.\n\n* Export sprint report to CSV from the dashboard for easy tracking and analysis.\nThis feature provides a convenient way to review and evaluate your team's progress.\n\n* Rate-limiter moved into its own service, improving system performance and stability.\nOur dedicated rate-limiter ensures that your application operates within optimal limits.\n\n* Fixed crash when webhook payload missing 'user_id', preventing errors and maintaining a smooth user experience.\nThis improvement guarantees that your webhook notifications are delivered reliably and accurately.",
       "latency_s": 3.635404,
-      "score": null,
-      "error": null
+      "score": 0.7,
+      "error": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.7"
     },
     {
       "model": "custom:ollama/codeup:13b",
       "task": "code_generation",
       "response": "```\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most max_chars, preferring to break on sentence boundaries.\n    \n    Args:\n        text (str): The text to be chunked.\n        max_chars (int): The maximum number of characters per chunk.\n    \n    Returns:\n        list[str]: A list of chunks, where each chunk is a sub-sequence of the original text.\n    \n    Raises:\n        AssertionError: If any word is cut in half during chunking.\n    \n    \"\"\"\n    assert max_chars > 0, \"Maximum number of characters must be positive.\"\n    \n    def _is_sentence_boundary(char):\n        return char == '.' or char == '!' or char == '?'\n    \n    chunks = []\n    current_chunk = []\n    for char in text:\n        if len(current_chunk) >= max_chars or _is_sentence_boundary(char):\n            chunks.append(''.join(current_chunk))\n            current_chunk = []\n        current_chunk.append(char)\n    \n    if current_chunk:\n        chunks.append(''.join(current_chunk))\n    \n    return chunks\n```\n\nHere's a docstring for the function and an assertion test to ensure that no words are cut in half during chunking. The function takes a string `text` and an integer `max_chars`, and returns a list of chunks, where each chunk is a sub-sequence of the original text.\n\nTo use this function, you can call it with a string and an integer as arguments, like so: `chunks = chunk_text(\"The quick brown fox jumps over the lazy dog.\", 10)`. This will return a list of chunks, where each chunk is a sub-sequence of the original text, with no words cut in half.",
       "latency_s": 9.341307,
-      "score": null,
-      "error": null
+      "score": 0.85,
+      "error": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/codeup:13b",
       "task": "code_review",
       "response": "I have reviewed the code you provided and did not find any bugs or security issues. However, there are a few style suggestions I would like to make:\n\n1. Consistent naming conventions: The variable `conn` is assigned in one place as `sqlite3.connect('users.db')`, but later it is referred to as `cursor.execute(query)`. It's better to use consistent naming conventions throughout the code.\n2. Use context manager for connections: Instead of explicitly closing the connection, consider using a context manager to manage the connection and ensure it's properly closed. Here's an example:\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    with sqlite3.connect('users.db') as conn:\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n```\n3. Use parameterized queries: Instead of injecting user data directly into the SQL query, consider using parameterized queries to avoid SQL injection attacks. Here's an example:\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    with sqlite3.connect('users.db') as conn:\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = :user_id\"\n        cursor.execute(query, user_id=user_id)\n        return cursor.fetchone()\n```\nThese suggestions will help improve the code's readability and security.",
       "latency_s": 7.089426,
-      "score": null,
-      "error": null
+      "score": 0.0,
+      "error": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.0"
     },
     {
       "model": "custom:ollama/codeup:13b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nOrange",
       "latency_s": 0.325663,
-      "score": null,
-      "error": null
+      "score": 1.0,
+      "error": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/codeup:13b",
@@ -54,8 +62,10 @@
       "task": "sprint_narrative",
       "response": "During this sprint, our team made significant progress on the user auth revamp and billing webhook retries, completing both tasks successfully. However, we were met with unexpected challenges in the form of vendor API downtime that blocked our SSO integration efforts for three days. Moving forward, we will need to address the issue of flaky CI on the mobile pipeline to ensure smooth project progression.",
       "latency_s": 1.783109,
-      "score": null,
-      "error": null
+      "score": 0.95,
+      "error": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/codeup:13b",
@@ -70,8 +80,10 @@
       "task": "summarization",
       "response": "At 14:23 UTC on [insert date], our PostgreSQL primary server experienced a failure due to a full disk on /var/lib/postgresql. This caused an outage that lasted for approximately 8 minutes, during which time the replica was promoted to take over as the primary server. The root cause of the issue was a silenced monitoring alert for disk space, which was never re-enabled after a maintenance window. To prevent similar issues in the future, we have added a disk-space check to our post-maintencement checklist.",
       "latency_s": 2.460927,
-      "score": null,
-      "error": null
+      "score": 0.67,
+      "error": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.67"
     }
   ]
 }
