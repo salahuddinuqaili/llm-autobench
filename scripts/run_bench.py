@@ -93,17 +93,53 @@ def call_model(model, prompt, max_tokens):
             return text, latency, None
         except Exception as e:
             return None, 0.0, f"ollama api error: {e}"
-    # Nous free / Anthropic premium: route through Hermes's auth, not raw keys.
-    # TODO: integrate with Hermes gateway client (OAuth for anthropic).
+    # Anthropic models: call via `claude -p` CLI which uses OAuth / Claude Max
+    # quota — no ANTHROPIC_API_KEY env var needed or wanted.
+    if model.get("provider") == "anthropic":
+        try:
+            import subprocess as _sp
+            model_name = model.get("model_name", "claude-sonnet-4-5")
+            cmd = [
+                "claude", "-p", prompt,
+                "--model", model_name,
+                "--max-turns", "1",
+                "--output-format", "json",
+            ]
+            t0 = dt.datetime.now()
+            result = _sp.run(cmd, capture_output=True, text=True, timeout=120)
+            latency = (dt.datetime.now() - t0).total_seconds()
+            if result.returncode != 0:
+                return None, latency, f"claude cli error: {result.stderr.strip()}"
+            data = json.loads(result.stdout)
+            text = data.get("result", "") or ""
+            # Strip CoT thinking blocks if any
+            text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+            return text, latency, None
+        except Exception as e:
+            return None, 0.0, f"claude cli error: {e}"
     return None, 0.0, f"provider {model.get('provider')} not wired in skeleton"
 
 
 def score(task, response):
-    """Placeholder scorer. Implement exact/reference-compare/rubric-llm."""
+    """Score a response. Handles exact, json-exact, and rubric-llm methods."""
     method = task.get("scoring", {}).get("method", "rubric-llm")
+    expected = task.get("expected", {}).get("answer", "")
+
     if method == "exact":
-        expected = task.get("expected", {}).get("answer")
-        return 1.0 if response and expected and expected in response else 0.0
+        if not expected:
+            # No expected answer string — fall through to rubric-llm
+            return None
+        return 1.0 if response and expected in response else 0.0
+
+    if method == "json-exact":
+        # Parse both sides and compare dicts (key order / whitespace insensitive)
+        try:
+            exp = json.loads(expected)
+            got = json.loads(response)
+            return 1.0 if got == exp else 0.0
+        except Exception:
+            return 0.0
+
     # rubric-llm / reference-compare: implement with a scorer model.
     return None  # None = unscored (report as ±)
 
