@@ -18,5 +18,5 @@ scoring:
     implementation. Deduct for: technical jargon, missing commits, or incorrect
     categorization. Partial marks if most bullets are user-facing but some slip
     into implementation detail.
-max_tokens: 512
+max_tokens: 768
 tags: [writing, summarization]

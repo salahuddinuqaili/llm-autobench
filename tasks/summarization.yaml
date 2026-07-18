@@ -17,5 +17,5 @@ scoring:
     (DB went down briefly), (2) why (disk full, alert off), (3) impact (8min
     downtime) and fix (alert back on + checklist). No technical jargon. Deduct
     for missing elements, jargon, or wrong sentence count.
-max_tokens: 256
+max_tokens: 512
 tags: [summarization, communication]

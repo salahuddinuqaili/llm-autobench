@@ -21,6 +21,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import sys
 import urllib.request
 
@@ -85,6 +86,10 @@ def call_model(model, prompt, max_tokens):
             text = msg.get("content") or ""
             if not text.strip():
                 text = msg.get("thinking") or ""
+            # Strip inline <think>...</think> blocks that CoT models (deepcoder,
+            # qwen3, deepseek-r1) emit before the actual answer. Score only the
+            # deliverable, not the reasoning trace.
+            text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
             return text, latency, None
         except Exception as e:
             return None, 0.0, f"ollama api error: {e}"
