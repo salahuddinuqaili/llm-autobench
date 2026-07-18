@@ -1,0 +1,19 @@
+{
+  "run_id": "vision_smoke_013344",
+  "results": [
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "vision_ocr",
+      "response": "I cannot answer this question because no image was provided. Please upload the image you would like me to analyze.",
+      "error": null,
+      "latency_s": 2.5
+    },
+    {
+      "model": "custom:ollama/minicpm-v:latest",
+      "task": "vision_ocr",
+      "response": "HELLO 123 red.",
+      "error": null,
+      "latency_s": 0.3
+    }
+  ]
+}

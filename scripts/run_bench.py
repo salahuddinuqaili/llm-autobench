@@ -50,7 +50,7 @@ def load_tasks(task_dir):
     return tasks
 
 
-def call_model(model, prompt, max_tokens):
+def call_model(model, prompt, max_tokens, image_path=None):
     """Call a model. Returns (text, latency_s, error)."""
     # Local / custom Ollama endpoint. We call Ollama's NATIVE /api/chat REST
     # endpoint directly (no OpenAI SDK) so the harness has zero third-party
@@ -65,12 +65,27 @@ def call_model(model, prompt, max_tokens):
             # lives at the root. Normalise either form.
             base = base.replace("/v1", "").rstrip("/")
             url = base + "/api/chat"
+            message = {"role": "user", "content": prompt}
             payload = {
                 "model": ollama_model,
-                "messages": [{"role": "user", "content": prompt}],
+                "messages": [message],
                 "stream": False,
                 "options": {"num_predict": max_tokens},
             }
+            # Vision tasks carry an `image:` path (relative to REPO). Ollama's
+            # /api/chat expects `images` INSIDE the message that carries the
+            # image (not at the payload root). Models without vision simply
+            # ignore it / error -> reported via the error path.
+            if image_path:
+                img_path = image_path if os.path.isabs(image_path) else os.path.join(REPO, image_path)
+                try:
+                    with open(img_path, "rb") as fh:
+                        import base64
+                        message["images"] = [base64.b64encode(fh.read()).decode("utf-8")]
+                except Exception:
+                    # image missing -> let the model answer without it; the
+                    # judge will score the (likely wrong) response.
+                    pass
             req = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode("utf-8"),
@@ -167,7 +182,8 @@ def main():
             ttags = set(task.get("tags", []))
             if not (mtags & ttags) and not task.get("requires_frontier"):
                 continue
-            text, latency, err = call_model(model, task["prompt"], task.get("max_tokens", 512))
+            text, latency, err = call_model(model, task["prompt"], task.get("max_tokens", 512),
+                                          image_path=task.get("image"))
             sc = score(task, text) if text else None
             results.append({
                 "model": model["id"], "task": task["id"],

@@ -24,6 +24,15 @@ baseline:
     tags: [vision, general]
     enabled: true
 
+  - id: custom:ollama/minicpm-v:latest
+    display_name: MiniCPM-V (local, vision)
+    provider: custom:ollama
+    base_url: http://127.0.0.1:11434/v1
+    tier: local
+    context_window: 128000
+    tags: [vision, ocr]
+    enabled: true
+
 watcher:
   # Only models that FIT the local GPU are pulled. On 12GB VRAM, ~14B is the
   # practical ceiling (qwen3.5:9b = 6.6GB leaves headroom for the judge on free cloud).
