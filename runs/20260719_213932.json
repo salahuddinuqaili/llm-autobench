@@ -15,36 +15,44 @@
       "task": "changelog_generation",
       "response": "### Improvements\n\n- **Strengthened Security**: Improved OAuth token refresh handling to prevent crashes during authentication issues.\n- **Enhanced Reporting**: Added CSV export functionality for sprint reports directly from the dashboard, making data more accessible and easier to analyze.\n- **Optimized Performance**: Refactored rate-limiting processes to improve overall system efficiency and reliability.\n- **Bug Fixes**: Resolved an issue causing the application to crash when webhook payloads were missing user IDs.",
       "latency_s": 1.725256,
-      "score": null,
+      "score": 0.7,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.7"
     },
     {
       "model": "custom:ollama/qwen2.5-coder:14b",
       "task": "code_generation",
       "response": "```python\nimport re\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits the input text into chunks of at most max_chars characters,\n    preferring to break on sentence boundaries ('.', '!', '?'), and never\n    cutting a word.\n\n    :param text: The input text to be split.\n    :param max_chars: The maximum number of characters per chunk.\n    :return: A list of text chunks.\n    \"\"\"\n    \n    # Use regex to find sentence boundaries\n    sentences = re.split(r'(?<=[.!?]) +', text)\n    chunks = []\n    current_chunk = \"\"\n    \n    for sentence in sentences:\n        if len(current_chunk) + len(sentence) <= max_chars:\n            current_chunk += \" \" + sentence\n        else:\n            if current_chunk.strip():\n                chunks.append(current_chunk.strip())\n            current_chunk = sentence\n    \n    if current_chunk.strip():\n        chunks.append(current_chunk.strip())\n    \n    return chunks\n\n# Test case\nassert chunk_text(\"This is a test. This is only a test.\", 10) == [\"This is a\", \"test. This is\", \"only a test.\"]\n```",
       "latency_s": 4.160854,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/qwen2.5-coder:14b",
       "task": "code_review",
       "response": "The provided Python code has a few issues that need to be addressed for better performance, security, and adherence to best practices. Here's a concise review:\n\n1. **SQL Injection Risk**: The query is constructed using string formatting, which can lead to SQL injection if `user_id` is not properly validated or sanitized. Use parameterized queries instead.\n\n2. **Resource Management**: The database connection (`conn`) is opened but not closed. This can lead to resource leaks. Ensure that the connection is always closed after use, even if an error occurs.\n\n3. **Exception Handling**: The code does not handle exceptions, which could occur during database operations. Adding exception handling will make the code more robust.\n\n4. **Code Style**: While not a critical issue, following PEP 8 guidelines can improve readability. For example, adding spaces around operators and after commas.\n\nHere is a revised version of the code with these improvements:\n\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    conn = None\n    try:\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = \"SELECT * FROM users WHERE id = ?\"\n        cursor.execute(query, (user_id,))\n        return cursor.fetchone()\n    except sqlite3.Error as e:\n        print(f\"An error occurred: {e}\")\n        return None\n    finally:\n        if conn:\n            conn.close()\n```\n\n### Key Changes:\n- **Parameterized Query**: Used `?` as a placeholder for the `user_id` and passed it as a tuple to `cursor.execute()`.\n- **Exception Handling**: Added a try-except block to catch and handle any database errors.\n- **Resource Management**: Used a `finally` block to ensure the database connection is closed, regardless of whether an error occurs.",
       "latency_s": 6.138812,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen2.5-coder:14b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nCherry",
       "latency_s": 0.293706,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen2.5-coder:14b",
@@ -60,9 +68,11 @@
       "task": "sprint_narrative",
       "response": "This sprint, our team successfully revamped user authentication and implemented robust retry mechanisms for billing webhooks. However, we faced significant delays due to a vendor's API downtime affecting SSO integration. Moving forward, we need to address the recurring issue of flaky CI in our mobile pipeline to ensure smoother development cycles.",
       "latency_s": 1.167484,
-      "score": null,
+      "score": 0.95,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen2.5-coder:14b",
@@ -78,9 +88,11 @@
       "task": "summarization",
       "response": "The primary database server went down at 14:23 UTC because the hard drive ran out of space. The backup server took over as the main one at 14:31, causing a short 8-minute downtime. This happened because someone turned off an important warning about low disk space during routine maintenance and forgot to turn it back on afterward. To fix this, they need to make sure all such warnings are re-enabled and add checks for enough disk space to their list of things to do after maintenance is done.",
       "latency_s": 1.914587,
-      "score": null,
+      "score": 0.75,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.75"
     }
   ]
 }
