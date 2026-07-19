@@ -1,0 +1,122 @@
+{
+  "run_id": "20260719_210836",
+  "results": [
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "arithmetic_reasoning",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 500: Internal Server Error",
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "changelog_generation",
+      "response": "## \u2728 Improvements\n\n*   **Export Reports:** You can now export your complete sprint reports directly to CSV for easy data analysis and integration into spreadsheets.\n*   **Enhanced Stability:** We've improved how the system handles expiring connections, ensuring seamless and reliable access even when tokens need refreshing in the background.\n*",
+      "latency_s": 14.242718,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "code_generation",
+      "response": "This solution uses a robust, greedy approach: it accumulates text while preferring natural breaks (sentences). If the accumulated text would hit the limit without passing a natural break, it continues accumulating until either the end of the current segment or a safe word boundary is found.\n\n```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most max_chars.\n\n    It prioritizes breaking on natural sentence boundaries ('.', '!', '?'). \n    If a natural break is not available or if the segment exceeds the limit, \n    it breaks at word boundaries to ensure no words are cut.\n\n    Args:\n        text: The input string to be chunked.\n        max_chars: The maximum number of characters allowed per chunk.\n\n    Returns:\n        A list of strings, where each string is a text chunk \n        of length <= max_chars.\n\n    Raises:\n        ValueError: If max_chars is less than the average word length (safety check).\n    \"\"\"\n    if not isinstance(text, str) or not text:\n        return []\n    if not isinstance(max_chars, int) or max_chars <= 0:\n        raise ValueError(\"max_chars must be a positive integer.\")\n\n    # Split the text into potential \"sentence-like\" blocks. \n    # The regex captures the separator (., !, ?) so it can be kept with the chunk.\n    sentence_candidates = re.split(r'([.!?]\\s*|\\n)', text)\n    \n    chunks: list[str] = []\n    current_chunk: str = \"\"\n    \n    # Filter out empty strings resulting from the split\n    segments = [s for s in sentence_candidates if s and not (s.isspace() and len(s) == 1)]\n\n    for segment in segments:\n        segment = segment.strip()\n        if not segment:\n            continue\n\n        # --- Scenario 1: Starting a new chunk or appending non-boundary text ---\n        if not current_chunk:\n            current_chunk = segment\n            continue\n\n        # Calculate the potential new length\n        potential_new_chunk = current_chunk +",
+      "latency_s": 8.648197,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "code_review",
+      "response": "This code has critical bugs, severe security vulnerabilities, and several style issues.\n\n### \ud83d\udc1b Bugs & Logic Issues\n\n*   **Resource Leak:** The database connection (`conn`) is opened but never explicitly closed, even if an error occurs. This can lead to resource exhaustion over time.\n*   **Missing Error Handling:** If the connection fails or the query executes poorly, the function will crash without graceful handling.\n\n### \ud83d\udee1\ufe0f Security Issues (Critical)\n\n*   **SQL Injection Vulnerability:** **This is the most severe issue.** Using an f-string (`f\"SELECT * FROM users WHERE id = {user_id}\"`) to construct the SQL query directly with user input allows a malicious attacker to manipulate the `user_id` input to execute arbitrary SQL code (e.g., passing `' OR '1'='1` or `; DROP TABLE users;`).\n\n### \u2728 Style & Best Practices\n\n*   **Context Managers (`with` statement):** Database connections should always be managed using `with sqlite3.connect(...) as conn:` to ensure they are automatically closed, even if exceptions occur.\n*   **Function Signature:** The function assumes the database file is always present and accessible.\n\n***\n\n### \u2705 Suggested Refactoring\n\nTo fix all issues, you must use parameter substitution provided by `sqlite3` instead of f-strings:\n\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    # Use 'with' for automatic connection management\n    try:\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            # Use ? placeholders and pass the input as a tuple",
+      "latency_s": 4.484868,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "instruction_following",
+      "response": "Apple\nBanana\nGrape",
+      "latency_s": 0.394969,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "logical_reasoning",
+      "response": "This problem can be solved in three main steps: first finding the total number of boxes, second finding the total number of items, and third calculating the remaining items after removal.\n\n### Step 1: Calculate the Total Number of Boxes\n$$\\text{Total Shelves} \\times \\text{Boxes per Shelf} = \\text{Total Boxes}$$\n$$12 \\times 8 = 96 \\text{ boxes}$$\n\n### Step 2: Calculate the Total Number of Items\n$$\\text{Total Boxes} \\times \\text{Items per Box} = \\text{Total Items}$$\n$$96 \\times 10 = 960 \\text{ items}$$\n\n### Step 3: Calculate the Remaining Items\nIf $\\frac{1}{4}$ of the items are removed, then $1 - \\frac{1}{4} = \\frac{3}{4}$ (or three-quarters) of the items remain.\n\n**Method A: Find the fraction removed and subtract it.**\n$$\\text{Items Removed}: \\frac{1}{4} \\times 960$$\n$$960 \\div 4 = 240 \\text{ items removed}$$\n$$\\text{Remaining Items}: 960 - 240 = 720 \\text{ items}$$\n\n**Method B: Calculate the remaining fraction directly.**\n$$\\text{Remaining Items}: \\frac{3}{4} \\times 960$$\n$$(960 \\div 4) \\times 3$$\n$$240 \\times 3 = 720 \\text{ items}$$\n\n---\n**The final number of items remaining is 720.**",
+      "latency_s": 6.759712,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "sprint_narrative",
+      "response": "We successfully finalized major components this sprint with the user auth revamp and stable billing webhook retries now live. Progress on SSO was completely halted by a three-day vendor API downtime, impacting our integration timeline significantly. Our immediate priority must be diagnosing and stabilizing the flaky CI build within the mobile pipeline to prevent future deployment risks.",
+      "latency_s": 3.310639,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "structured_output",
+      "response": "{\"project_name\": \"Phoenix\", \"deadline\": \"2026-09-15\", \"budget_eur\": 120000, \"team_size\": 4}",
+      "latency_s": 0.694697,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "summarization",
+      "response": "Thinking Process:\n\n1.  **Analyze the Request:** Summarize a highly technical incident report in exactly 3 sentences for a *non-technical stakeholder*.\n2.  **Analyze the Source Material (Key Facts):**\n    *   *Problem:* PostgreSQL primary failed at 14:23 UTC.\n    *   *Immediate Cause:* Disk full on /var/lib/postgresql.\n    *   *Contributing Failure:* WAL archives hadn't rotated for 48h (cron disabled).\n    *   *Resolution Action:* Replica promoted at 14:31.\n    *   *Impact:* 8 minutes downtime.\n    *   *Root Cause (Why did it happen?):* Monitoring alert for disk space was silenced during maintenance and never re-enabled.\n    *   *Fixes/Preventative Measures:* Re-enable the alert; add a disk-space check to post-maintenance checklists.\n3.  **Determine Stakeholder Focus (Non-Technical Language):** Non-technical stakeholders care about *what happened*, *how long it took*, and *how we fixed it so it doesn't happen again*. They don't care about \"WAL archives,\" \"PostgreSQL primary,\" or \"cron disabled.\"\n4.  **Drafting - Sentence by Sentence (Structuring the narrative):**\n    *   *Sentence 1: What happened and what was the impact?* (Focus on the service disruption.)\n    *   *Sentence 2: Why did it happen?* (Explain the root cause simply, avoiding jargon like 'monitoring alert.')\n    *   *Sentence 3: What are we doing to prevent it from happening again?* (Focus on concrete process improvements/fixes.)\n\n5.  **Refining the Draft (Self-Correction/Tone Check):**\n    *   *(Drafting S1):* The primary database failed because the disk filled up, causing an 8-minute service outage. (Good.)\n    *   *(Drafting S2):* This occurred because a critical monitoring alert for disk space was accidentally left disabled after maintenance. (Clear and non-jargony.)\n    *   *(Drafting S3):* To prevent recurrence, we have re-enabled the alert system and are updating our standard post-maintenance checklist to include mandatory disk capacity verification. (Actionable steps taken.)\n\n6.  **Final Review:** The three sentences flow logically",
+      "latency_s": 4.470216,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "arithmetic_reasoning",
+      "response": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Problem:**\n    *   Train A leaves at $T_{A,0} = 2:00$ (which is usually interpreted as time on a clock).\n    *   Speed of Train A ($v_A$) = $60 \\text{ km/h}$.\n    *   Train B leaves the same station at $3:00$. Let's call this departure time for Train B. So, there is an hour gap between their departures. Note that \"another\" usually implies a different train leaving from the same origin in the direction of travel (since it says \"same route\").\n    *   Speed of Train B ($v_B$) = $90 \\text{ km/h}$.\n    *   Goal: Find the time when Train B catches up to Train A.\n\n2.  **Set up a Coordinate System/Time Variable:**\n    *   Let $t$ be the number of hours elapsed since the first train left (since $T_{A,0}$). Or simpler, let's just define an absolute reference point for time.\n    *   Let position ($d$) = speed $\\times$ time.\n\n3.  **Define Variables and Times:**\n    *   Let $t_1$ be the departure time of Train A (2:00 PM).\n    *   Let $t_2$ be the departure time of Train B (3:00 PM). Note that usually, in these problems, it's assumed they travel during daylight or a standard 24-hour cycle. I'll treat \"PM\" as implied for simplicity unless AM is specified, but since we are looking at a specific duration later today, PM makes the most sense to avoid crossing midnight issues (though mathematically irrelevant if hours just pass).\n    *   Let $t$ be the number of hours after 3:00 PM.\n\n4.  **Analyze Distances:**\n    *   Train A has a \"head start\".\n        *   Time difference ($\\Delta t_{start}$) = 1 hour (from 2:00 to 3:00).\n    *   Distance traveled by Train B ($d_B$): $v_B \\times t$. Since it leaves at the time we are measuring from. So, if we measure $t$ hours past 3:00 PM:\n        $$d_B = 90 \\cdot t$$\n    *   Distance traveled by Train A ($d_A$) relative to position at catch-up point (measured from station):\n        *   Total time Air has been traveling when caught up is the initial hour + $t$.\n        *   So, total time for A = $(1 + t)$ hours.\n    $$d_A = 60 \\cdot (1 + t)$$\n\n5.  **Set up the Equation:**\n    *   They catch each other when their distances from the station are equal: $d_B = d_A$.\n    $$90t = 60(1 + t)$$\n\n6.  **Solve for $t$:**\n    *   Distribute on RHS:\n        $$90t = 60 + 60t$$\n    *   Subtract $60t$ from both sides:\n        $$30t = 60$$\n    *   Divide by 30:\n        $$t = 2 \\text{ hours}$$\n\n7.  **Interpret the Result:**\n    *   The variable $t$ was defined as time elapsed since Train B left at 3:00 PM.\n    *   So, catch-up happens 2 hours after 3:00 PM.\n    *   Calculation: $3:00 + 2 \\text{ hours} = 5:00$.\n\n8.  **Alternative Approach (Relativity/Rate of approach):**\n    *   Train A is ahead by some distance at the moment B leaves ($t=0$ relative to start). Let's check this logic again carefully. No, easier way: Relative speed.\n    *   At exactly 3:00 PM:\n        *   Train A has traveled for 1 hour (from 2:00) at $60 \\text{ km/h}$.\n        *   Distance head start = $60 \\times 1 = 60 \\text{ km}$.\n    *   The gap between the trains needs to be closed.\n    *   Relative speed ($v_{rel}$): Since they are moving in the same direction, it's Speed of Faster - Speed of Slower.\n        $$V_{gap\\_closing} = 90 \\text{ km/h} - 60 \\text",
+      "latency_s": 17.045057,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "code_generation",
+      "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits the input `text` into chunks of at most `max_chars` characters.\n\n    The function prefers to break on sentence boundaries ('.', '!', '?') when possible,\n    while ensuring that no word is ever cut in half unless absolutely necessary due\n    character limits. If a chunk exceeds max_chars even after breaking at sentence \n    ends or spaces between words, it will be trimmed by splitting at the last space before the limit.\n\n    Args:\n        text (str): The input string to split into chunks.\n        max_chars (int): Maximum allowed characters per chunk.\n\n    Returns:\n        list[str]: A list of non-empty strings where each has length <= max_chars and \n                   no internal word is cut in half unless forced by constraints.\n\n    Raises:\n        ValueError: If `max_chars` < 1 or if the text cannot be processed validly due to character limits (e.g., words longer than `max_chars`).\n        \n    Examples:\n        >>> chunk_text(\"Hello world! How are you? I am fine.\", 15)\n        ['Hello wor', 'ld!', ...] # Note this shows how it breaks down by max length\n\n    \"\"\"\n    if not isinstance(text, str):\n        raise TypeError(\"text must be a string\")\n    if not isinstance(max_chars, int) or max_chars < 1:\n        raise ValueError(f\"max_chars must be an integer >= 1, got {type(max_chars).__name__}: {max_chars}\")\n\n    chunks = []\n    pos = 0\n    \n    while pos < len(text):\n        if text[pos] == '\\n': # Handle newline as a break point before starting chunk analysis.\n            start = next((i for i in range(pos, min(len(text), pos + max_chars)) \n                          if text[i] not in ' \\",
+      "latency_s": 11.181411,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "code_review",
+      "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Review Python code for bugs, security issues, and style.\n    *   Constraint: Be concise.\n    *   Input Code: A simple SQLite query function using f-string formatting with user input (implied variable `user_id`).\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n\n    *   **Security (Critical):** SQL Injection vulnerability. The `query` string is constructed using an f-string, directly inserting the variable `{user_id}` into the query without sanitization or parameterization. If `user_id` contains malicious input (e.g., `' OR '1'='1`), it could bypass authentication or access unauthorized data.\n    *   **Style/Best Practice:** Resource leak potential. The connection and cursor are created but not closed explicitly in a context manager (`with`). In Python, this usually returns to garbage collection eventually on normal exit, but if an exception occurs before cleanup (though `sqlite3` connections tend to stay open until close), it's better practice to use a context manager or try/finally block. Also, returning raw rows/tuples might be intentional for ORM-like behavior, but raising exceptions if no row exists is standard instead of potentially returning None implicitly without checking count/types, though here fetching one is fine.\n    *   **Style:** Variable naming (`user_id` function arg) is okay. `users.db` hardcode path (minor).\n    *   **Functionality:** No error handling for query execution or database errors.\n\n4.  **Draft the Review:**\n    *   Focus on SQL Injection first (Critical).\n    *   Mention resource management (Connection/Cursor leak risks).\n    *   Suggest parameterized queries.\n    *   Keep it brief.\n\n5.  **Refine Conciseness:**\n    *   Combine points into bullet points or a short paragraph.\n    *   Provide the fixed code snippet as part of the solution for clarity (optional but helpful in \"Review\" tasks). The prompt asks to review, not necessarily fix, but showing",
+      "latency_s": 5.78294,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "logical_reasoning",
+      "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Warehouse structure: 12 shelves per warehouse (Wait, is it one warehouse with 12 shelves total, or something else? The prompt says \"A warehouse has 12 shelves\".)\n    *   Shelf capacity: Each shelf holds 8 boxes.\n    *   Box capacity: Each box holds 10 items.\n    *   Event: 1/4 of the items are removed for shipping.\n    *   Goal: Calculate how many items remain.\n    *   Requirement: Show steps and give the final number.\n\n2.  **Step-by-Step Calculation:**\n\n    *   **Step 1: Calculate total shelves.**\n        Given directly as 12 shelves? Or does it mean a warehouse with multiple levels? The prompt says \"A warehouse has 12 shelves\". I will treat this as the total count of shelves available for storage in question context. Wait, let me re-read carefully: \"A warehouse has 12 shelves.\" Okay, simple enough.\n        *Total Shelves = 12*\n\n    *   **Step 2: Calculate total boxes.**\n        Each shelf holds 8 boxes.\n        Total Boxes = Total Shelves \u00d7 Boxes per Shelf\n        Total Boxes = $12 \\times 8$\n        Calculation: $10 \\times 8 = 80$, $2 \\times 8 = 16$. $80 + 16 = 96$.\n\n    *   **Step 3: Calculate total items.**\n        Each box holds 10 items.\n        Total Items = Total Boxes \u00d7 Items per Box\n        Total Items = $96 \\times 10$\n        Calculation: Add a zero to the end of 96 -> 960.\n\n    *   **Step 4: Calculate removed items.**\n        1/4 of the items are removed.\n        Removed Items = $\\frac{1}{4} \\times \\text{Total Items}$\n        Removed Items = $960 / 4$\n        Calculation: $80 / 4 = 20$, remainder $16$. So $20 + (16/4) = 35$? No. Let's do long division or halving twice.\n        Halve once: $960 / 2 = 480$.\n        Halve again: $480 / 2 = 240$.\n        So, removed items = 240.\n\n    *   **Step 5: Calculate remaining items.**\n        Remaining Items = Total Items - Removed Items\n        Alternatively, if 1/4 are removed, then 3/4 remain.\n        Calculation A (Subtraction): $960 - 240$.\n        $960 - 200 = 760$. $760 - 40 = 720$.\n        Calculation B (Fraction remaining): $\\frac{3}{4} \\times 960$.\n          First, find the value of one part ($1/4$) which is 240. Multiply by 3: $240 \\times 3 = 720$.\n\n    *   **Verification:**\n        Shelves: 12\n        Boxes/Shelf: 8 -> Total boxes: 96\n        Items/Box: 10 -> Total items: 960\n        Removed: $1/4$ of 960 = 240.\n        Remaining: $960 - 240 = 720$.\n\n    *   **Double Check interpretation:** \"A warehouse has 12 shelves.\" Usually, warehouses have aisles and levels, but in math word problems like this, the wording usually defines the total unit to be used for calculation. Unless it implies multiple floors? No context given implies just use the numbers provided.\n        So: Total capacity = $12 \\text{ (shelves)} \\times 8 \\text{ (boxes/shelf)} \\times 10 \\text{ (items/box)}$.\n\n3.  **Formatting the Output:**\n    *   State the steps clearly (Total boxes, Total items, Removed count).\n    *   Show final subtraction or fraction multiplication.\n    *   Bold the final answer.\n\n4.  **Drafting the response:**\n    *   Start with total shelves: 12.\n    *   Multiply by boxes per shelf to get total boxes: $12 \\times 8 = 96$.\n    *   Multiply by items per box to get total items: $96 \\times 10 = 960$.\n    *   Calculate",
+      "latency_s": 11.218066,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    }
+  ]
+}
