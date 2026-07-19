@@ -1,0 +1,49 @@
+{
+  "run_id": "vision_claudefree_023712",
+  "results": [
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "vision_ocr",
+      "response": null,
+      "error": "ollama api error: HTTP Error 500: Internal Server Error",
+      "latency_s": 0.0,
+      "image": "tasks/images/ocr_card.png",
+      "score": 0.0,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.0"
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "vision_progressive",
+      "response": null,
+      "error": "ollama api error: HTTP Error 500: Internal Server Error",
+      "latency_s": 0.0,
+      "image": "tasks/images/private_fixtures/progressive_photo_user.jpg",
+      "score": 0.0,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.0"
+    },
+    {
+      "model": "custom:ollama/minicpm-v:latest",
+      "task": "vision_ocr",
+      "response": "The text \"HELLO\" with a red square above. The words are black, all uppercase letters of varying sizes to emphasize certain characters.",
+      "error": null,
+      "latency_s": 4.1,
+      "image": "tasks/images/ocr_card.png",
+      "score": 0.5,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.5"
+    },
+    {
+      "model": "custom:ollama/minicpm-v:latest",
+      "task": "vision_progressive",
+      "response": "In the picture I can see green grass on the ground. There are flowers to the plants and there are few people sitting at a distance from here. In the background I can see some water which looks like river or lake, many trees around this place with white clouds in blue sky above it.",
+      "error": null,
+      "latency_s": 1.2,
+      "image": "tasks/images/private_fixtures/progressive_photo_user.jpg",
+      "score": 0.4,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.4"
+    }
+  ]
+}
