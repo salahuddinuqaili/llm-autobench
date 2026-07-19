@@ -1,0 +1,86 @@
+{
+  "run_id": "20260719_130622",
+  "results": [
+    {
+      "model": "custom:ollama/codellama:13b",
+      "task": "arithmetic_reasoning",
+      "response": "Let's assume that the distance between the two trains is x kilometers, and we want to find out when they will meet.\n\nWe know that the first train travels 60 km/h, so it covers a distance of $x \\cdot 60$ kilometers in one hour. Therefore, its time of arrival can be found using the formula:\n\n$$t = {x \\cdot 60 \\over 3600} $$\n\nwhere t is the time in hours and x is the distance between the two trains in kilometers.\n\nWe also know that the second train travels 90 km/h, so it covers a distance of $x \\cdot 90$ kilometers in one hour. Therefore, its time of arrival can be found using the formula:\n\n$$t = {x \\cdot 90 \\over 3600} $$\n\nWe want to find out when the two trains will meet, so we set these two expressions equal to each other and solve for x:\n\n$${x \\cdot 60 \\over 3600} = {x \\cdot 90 \\over 3600}$$\n\nSimplifying, we get:\n\n$${x \\over 120} = {x \\over 360}$$\n\nSolving for x, we find that the trains will meet when they are x kilometers apart. In this case, $x = 300$ kilometers.\n\nTo find out when the second train will catch up to the first, we need to know how long it takes for the second train to cover the distance between them. We know that the second train travels at a speed of 90 km/h, so it covers a distance of $x \\cdot 90$ kilometers in one hour. Therefore, its time of arrival can be found using the formula:\n\n$$t = {x \\cdot 90 \\over 3600} $$\n\nSubstituting x = 300 km, we find that it takes the second train 45 minutes to catch up to the first. Therefore, the answer is $11:45$.",
+      "latency_s": 30.570967,
+      "score": 0.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/codellama:13b",
+      "task": "changelog_generation",
+      "response": "Here are user-facing \"Improvements\" sections (markdown bullets, concise, benefit-focused, no tech jargon) based on the raw git commits you provided:\n\n* Improved OAuth token refresh handling to prevent crashes when 401s occur in the middle of a request.\n* Added export functionality for sprint reports in CSV format from the dashboard.\n* Refactored rate-limiter into its own service to improve performance and reliability.\n* Fixed crashing issue caused by missing 'user_id' field in webhook payloads.",
+      "latency_s": 6.420038,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/codellama:13b",
+      "task": "code_generation",
+      "response": "def chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"Split text into chunks of at most max_chars, preferring to break on\n    sentence boundaries ('.', '!', '?'), never cutting a word.\n    \n    Args:\n        text (str): The text to split.\n        max_chars (int): The maximum number of characters per chunk.\n        \n    Returns:\n        list[str]: A list of chunks of at most max_chars, with each chunk containing\n            the beginning of a sentence or a complete word.\n    \n    \"\"\"\n    # Split text into sentences using regular expressions\n    sentences = re.split(r'[\\.\\?!][\\s]+', text)\n    \n    # Initialize list to store chunks\n    chunks = []\n    \n    # Iterate over sentences and add them to the chunks list\n    for sentence in sentences:\n        # If the sentence is too long, split it into multiple chunks\n        if len(sentence) > max_chars:\n            # Split sentence on whitespace\n            words = sentence.split()\n            \n            # Initialize a new chunk with the first word\n            current_chunk = words[0] + ' '\n            \n            # Iterate over the remaining words and add them to the chunk,\n            # breaking if the chunk length exceeds max_chars\n            for i in range(1, len(words)):\n                if len(current_chunk) + len(words[i]) > max_chars:\n                    chunks.append(current_chunk)\n                    current_chunk = ''\n                current_chunk += words[i] + ' '\n            \n            # Add the final chunk to the list\n            chunks.append(current_chunk.strip())\n        else:\n            # If the sentence is short enough, add it as a single chunk\n            chunks.append(sentence)\n    \n    return chunks\n\nassert chunk_text('This is a sample text. It has multiple sentences.', 15) == ['This is a sample text.\\n', 'It has multiple sentences.\\n']",
+      "latency_s": 24.359416,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/codellama:13b",
+      "task": "code_review",
+      "response": "The code looks fine and is well-structured. However, there are a few potential issues to consider:\n\n* The use of `f\"SELECT * FROM users WHERE id = {user_id}\"` is not secure because it allows an attacker to inject malicious SQL code into the query by providing a `user_id` that contains special characters or syntax. To prevent this, you should consider using parameterized queries with SQLite's built-in support for prepared statements.\n* The function does not close the connection to the database after it is finished with it. This can cause issues if the program runs long enough and multiple connections are opened simultaneously. It is a good practice to use `try...finally` blocks or context managers (`with sqlite3.connect('users.db') as conn:`) to ensure that the connection is always properly closed, even if an exception occurs.\n* The function does not handle errors when the query fails or no results are found. It would be better to catch and handle these cases explicitly rather than returning `None` in all cases.\n\nOverall, the code looks well-structured and organized, but there are some potential issues to consider when it comes to security and error handling.",
+      "latency_s": 12.721322,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/codellama:13b",
+      "task": "instruction_following",
+      "response": "apple\nbanana\norange",
+      "latency_s": 0.548945,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/codellama:13b",
+      "task": "logical_reasoning",
+      "response": "To find out how many items will be left after removing 25% (1/4) of all items, you need to calculate the total number of items in the warehouse first. To do this, multiply the number of shelves by the boxes per shelf and then multiply that result by the items per box:\n\n12 shelves x 8 boxes/shelf = 96 boxes\n96 boxes x 10 items/box = 960 items\nNow you can calculate how many items will be left after removing 25% of all items, which is 240 items:\n960 - (960 x .25) = 720 items\nTherefore, there will be 720 items remaining in the warehouse.",
+      "latency_s": 8.300967,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/codellama:13b",
+      "task": "sprint_narrative",
+      "response": "During our last sprint, we completed several important tasks, including revamping user auth and implementing billing webhook retries. However, progress was hampered by a vendor API downtime that blocked us from completing the SSO integration. Additionally, we discovered a risk with flaky CI on the mobile pipeline. It's crucial to address these issues promptly and focus our efforts on finding solutions in future sprints.",
+      "latency_s": 4.557698,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/codellama:13b",
+      "task": "structured_output",
+      "response": "{\n\"project_name\": \"Phoenix\",\n\"deadline\": \"2026-09-15\",\n\"budget_eur\": 120000,\n\"team_size\": 4\n}",
+      "latency_s": 2.756111,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/codellama:13b",
+      "task": "summarization",
+      "response": "A PostgreSQL primary database failed at 2:23 PM UTC due to a full disk on /var/lib/postgresql. The WAL (write ahead log) archives had not been rotated for 48 hours, and the replica was promoted at 2:31 PM. There was an 8-minute downtime. The root cause of the incident was a silenced monitoring alert for disk space during a maintenance window. The fix involved re-enabling the alert and adding a check for disk space to the post-maintenance checklist.",
+      "latency_s": 5.979989,
+      "score": null,
+      "error": null,
+      "image": null
+    }
+  ]
+}
