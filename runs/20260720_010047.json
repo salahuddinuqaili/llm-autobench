@@ -15,36 +15,44 @@
       "task": "changelog_generation",
       "response": "### \ud83d\ude80 Improvements\n\n*   You can now export your sprint reports directly as CSV files from the dashboard, making data sharing easier than ever.\n*   We've improved our authentication system to ensure reliable connections and seamless background operations.\n*   Webhooks are more resilient and will no longer crash if certain user details are missing in the payload.",
       "latency_s": 2.493226,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits a given string of text into chunks, ensuring that each chunk \n    is at most `max_chars` long.\n\n    The function prioritizes the following breaking rules in order:\n    1. Prefer to break on sentence boundaries ('.', '!', '?').\n    2. Never cut a word.\n\n    Args:\n        text: The input string to be chunked.\n        max_chars: The maximum allowable length of any single chunk.\n\n    Returns:\n        A list of strings, where each string is a chunk of the original text.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n    \"\"\"\n    if max_chars < 1:\n        raise ValueError(\"max_chars must be at least 1.\")\n    if not text:\n        return []\n\n    # Clean up common spacing issues and ensure sentences are properly delimited\n    text = text.strip()\n\n    # Use regex to split the text into chunks, ideally preserving delimiters.\n    # This pattern captures full sentences or groups of words separated by punctuation.\n    # The 're.findall' approach helps maintain context when splitting:\n    # 1. Splits based on major boundaries (.!?).\n    sentences = re.split(r'([.?!]\\s*)', text)\n\n    # The split results in a list where delimiters (the groups matched by the regex) \n    # appear as separate elements, e.g., ['Sentence one.', ' ', 'Sentence two!', ' ']\n    \n    units = []\n    i = 0\n    while i < len(sentences):\n        unit = sentences[i]\n        if unit:\n            # Check if the current element is a delimiter (punctuation + optional space)\n            is_delimiter = re.match(r'([.?!]\\s*)', unit) or re.match(r'[.?!]', unit)\n            if is_delimiter and i > 0 and sentences[i-1] not in [unit, '']:\n                # If it's a delimiter immediately following content, treat it as part of the preceding sentence/unit\n                units[-1] += unit\n            else:\n                units.append(unit)\n        i += 1\n\n    if not units:\n        return []\n\n    result_chunks = []\n    current_chunk_parts = []\n    current_size = 0\n\n    for unit in units:\n        # If the unit is an empty string or just whitespace, skip it unless we have nothing else.\n        if not unit.strip():\n            continue\n            \n        unit_len = len(unit)\n\n        # --- Chunking Logic ---\n\n        # Case 1: Starting a new chunk\n        if not current_chunk_parts:\n            current_chunk_parts.append(unit)\n            current_size = unit_len\n            continue\n\n        # Calculate the size if we add this unit (plus minimum spacing)\n        potential_new_size = current_size + len(",
       "latency_s": 8.532748,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "Here's a thinking process for reviewing the provided Python code:\n\n1.  **Understand the Goal:** The function `get_user(user_id)` aims to retrieve a user record from an SQLite database (`users.db`) based on a given `user_id`.\n\n2.  **Review Criteria Check:**\n    *   Bugs (Functional correctness, handling exceptions).\n    *   Security Issues (Injection, improper data handling).\n    *   Style (Pythonic conventions, readability, best practices).\n    *   Conciseness (Keep the feedback sharp and actionable).\n\n3.  **Analyze the Code Line by Line:**\n\n    *   `import sqlite3`: Standard library import. Fine.\n    *   `def get_user(user_id):`: Function definition. Fine.\n    *   `conn = sqlite3.connect('users.db')`: **Issue 1 (Resource Management/Bug Risk):** The connection is opened but never explicitly closed, even if an error occurs. This leads to resource leaks. *Fix: Use a `with` statement.*\n    *   `cursor = conn.cursor()`: Standard cursor creation. Fine.\n    *   `query = f\"SELECT * FROM users WHERE id = {user_id}\"`: **CRITICAL ISSUE 2 (Security):** This uses an f-string to build the SQL query by directly embedding the user input (`{user_id}`). This is a classic SQL Injection vulnerability. If `user_id` was malicious (e.g., `' OR '1'='1`), the query would execute it. *Fix: Use parameterized queries (`?`).*\n    *   `cursor.execute(query)`: Executes the potentially vulnerable query.\n    *   `return cursor.fetchone()`: Returns the result. This works, but if an exception occurs before this line (e.g., connection failure), the database resources are leaked.\n\n4.  **Synthesize Findings & Structure the Review:**\n\n    *   **Security (Highest Priority):** The SQL Injection vulnerability is paramount. Must be addressed first.\n    *   **Bugs/Robustness (High Priority):** Resource leaks (connection management) must be fixed using `with`.\n    *   **Style/Best Practices (Medium Priority):** Add type hinting and docstrings for professional code quality.\n\n5.  **Draft the Feedback (Ensuring Conciseness):",
       "latency_s": 4.633571,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "Mango\nApple\nGrape",
       "latency_s": 0.401939,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -60,9 +68,11 @@
       "task": "sprint_narrative",
       "response": "We successfully delivered the user auth revamp and hardened billing webhook retries this sprint, significantly improving core system reliability. Development stalled on SSO integration for three days due to external vendor API instability, highlighting a dependency risk we must account for next quarter. Moving forward, our highest priority is stabilizing the mobile CI pipeline, as flakiness continues to impede deployment velocity.",
       "latency_s": 1.99619,
-      "score": null,
+      "score": 0.95,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -78,9 +88,11 @@
       "task": "summarization",
       "response": "The core database system experienced an unplanned outage today because the server ran out of disk space, resulting in approximately eight minutes of service interruption. The root cause was a process failure: monitoring alerts for crucial storage capacity were mistakenly left disabled after a",
       "latency_s": 4.398023,
-      "score": null,
+      "score": 0.4,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.4"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -96,18 +108,22 @@
       "task": "code_generation",
       "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most `max_chars` characters per chunk.\n    \n    The function prefers to break chunks at sentence boundaries ('.', '!', '?') \n    rather than splitting words or cutting mid-sentence fragments. Each returned \n    chunk will not contain any substring longer than one word from the original text,\n    and no word is split between chunks.\n\n    Args:\n        text (str): The input string to be split into smaller pieces.\n        max_chars (int): Maximum number of characters allowed in each chunk.\n\n    Returns:\n        list[str]: A list of strings where each has a length \u2264 `max_chars`.\n\n    Raises:\n        ValueError: If `max_chars` is less than 1 or contains spaces that could cause \n                    unintended splits.\n        \n    Examples:\n        >>> chunk_text(\"Hello, world! This is another sentence.\", 20)\n        ['Hello, world!', 'This', 'is', 'another', ...]\n\n        Note: The above example may vary slightly depending on exact implementation logic; actual results depend on whitespace and word-length considerations.\n    \"\"\"\n    \n    if max_chars <= 1 or any(c in text for c in [\" \"]):\n        raise ValueError(\"max_chars must be > 0, no spaces allowed in input\")\n\n    # Tokenize: split by one or more whitespaces to preserve punctuation attached to words\n    import re\n    \n    tokens = [token.strip() for token in re.split(r'\\s+', text) if token]\n    \n    chunks = []\n    current_chunk = \"\"\n    used_space_count = 0\n\n    def chunk_size(chunk: str, space_needed: int = None):\n        return len(chunk.replace(\"\\n\", \"\").replace(\" \", \"\", replace=\"\\\\\")) - 1\n\n    for i in range(len(tokens)):\n        token = tokens[i]\n\n        # Determine how many spaces to include after current content if possible\n        needed_space_after = 0\n        available_chars_in_chunk = max_chars - len(current_chunk)\n\n        if not (token + \" \"):\n            continue\n        \n        test_string_with_one_space = current_chunk + token[1:] \n        length_test_needed = min(len(test_string), max_chars) \n\n    # Simplified version for clarity: build each chunk greedily while checking character count and preferred breaks.  \n```\n\n### Final clean implementation below (corrected):\n</think>",
       "latency_s": 10.757304,
-      "score": null,
+      "score": 0.7,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.7"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A snippet of Python code using SQLite to fetch a user by ID.\n    *   Task: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n    *   **Security (SQL Injection):** The most critical issue is the use of an f-string to construct the SQL query with `user_id`. This allows direct injection attacks if `user_id` comes from user input without proper sanitization or parameterized queries.\n        *   *Fix:* Use parameter binding (`?`).\n    *   **Resource Management:** The connection and cursor are opened inside a function but never closed explicitly (no context manager). If an exception occurs, resources might leak. In this specific case, if `fetchone()` is called without errors, the DB file handle stays open until garbage collection or script end in some cases, which isn't ideal for long-running processes.\n        *   *Fix:* Use a context manager (`with`) to ensure cleanup. Alternatively, create one connection object outside and use it across calls (though less common now). Best practice: `with` block per call if the DB is single-user/shared file or close properly at end of function. However, creating/closing inside a utility function like this usually implies short-lived usage.\n    *   **Data Type Assumption:** The query assumes `user_id` fits into an integer field. While SQL Injection happens with strings too, passing IDs directly might fail if they are floats (SQLite auto-converts) or None types, leading to errors. Parameterized queries handle type safety better but the underlying assumption still exists in logic.\n    *   **Style:** Variable naming is okay (`user_id`, `conn`). No docstring explains what it returns or how it fails on missing rows (returns `None` implicitly).\n\n4.  **Drafting the Review:**\n    *   *Security:* Critical SQL Injection vulnerability via string formatting. Use placeholders `%?`.\n    *   *Resource Management:*",
       "latency_s": 5.515924,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
