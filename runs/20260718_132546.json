@@ -1,0 +1,77 @@
+{
+  "run_id": "20260718_132546",
+  "results": [
+    {
+      "model": "custom:ollama/cogito:14b",
+      "task": "arithmetic_reasoning",
+      "response": "Let me solve this step by step.\n\n1) First, let's understand what happens in the first hour (from 2:00 to 3:00):\n   * The first train travels at 60 km/h for 1 hour = 60 km\n\n2) After 3:00:\n   * Train 1 continues at 60 km/h\n   * Train 2 starts at 90 km/h\n   * Let's call the time needed after 3:00 as 't' hours\n\n3) We can write an equation based on when they meet:\n   * Distance traveled by Train 1 = 60 + (60 \u00d7 t)\n   * Distance traveled by Train 2 = 90 \u00d7 t\n   * When they meet, these distances are equal:\n     60 + 60t = 90t\n\n4) Solve the equation:\n   * 60 = 90t - 60t\n   * 60 = 30t\n   * t = 2 hours\n\n5) So, Train 2 catches up with Train 1 2 hours after it starts (at 3:00)\n   * 3:00 + 2:00 = 5:00\n\nTherefore, the trains meet at 5:00.\n\nAnswer: 05:00",
+      "latency_s": 7.363431,
+      "score": 1.0,
+      "error": null
+    },
+    {
+      "model": "custom:ollama/cogito:14b",
+      "task": "changelog_generation",
+      "response": "Here's a user-focused Improvements section:\n\n* Improved reliability during OAuth authentication interruptions\n* Added Sprint Report CSV exports for easier data sharing and analysis\n* Enhanced system stability with improved request handling\n* Fixed potential crashes from incomplete webhook data\n\nEach point focuses on the benefit to users, avoids technical terms, and uses present tense.",
+      "latency_s": 1.210228,
+      "score": null,
+      "error": null
+    },
+    {
+      "model": "custom:ollama/cogito:14b",
+      "task": "code_generation",
+      "response": "Here's the requested Python function with a docstring and an assertion test:\n\n```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most max_chars characters,\n    preferring to break on sentence boundaries ('.', '!', '?'),\n    never cutting a word.\n    \n    Args:\n        text (str): The input text to be chunked\n        max_chars (int): Maximum number of characters allowed in each chunk\n    \n    Returns:\n        list[str]: List of chunks, where each chunk is at most max_chars characters long\n        \n    Examples:\n        >>> chunk_text(\"Hello world! How are you?\", 7)\n        ['Hello wor', 'ld!', ' How ar', 'e yo', 'u?']\n    \"\"\"\n    if not text or max_chars <= 0:\n        return []\n    \n    chunks = []\n    current_chunk = \"\"\n    \n    # Split the text into sentences\n    words = text.replace('!', '.').replace('?', '.').split('.')\n    for sentence in words:\n        sentence += '.'  # Add back the period that was split\n        \n        for word in sentence.split():\n            if len(current_chunk) + len(word) <= max_chars and current_chunk != \"\":\n                # If adding this word would exceed max_chars,\n                # finish the current chunk before starting a new one\n                chunks.append(current_chunk)\n                current_chunk = \"\"\n            \n            current_chunk += \" \" + word\n            \n        if current_chunk:\n            chunks.append(current_chunk.strip())\n            current_chunk = \"\"\n    \n    return chunks\n\n# Test case\nassert chunk_text(\"Hello world! How are you?\", 7) == ['Hello wor', 'ld!', ' How ar', 'e yo', 'u?']\n```\n\nThis function works by:\n\n1. First handling edge cases (empty text or invalid max_chars)\n2. Splitting the input text into sentences by replacing punctuation with periods and splitting on those points\n3. Then, for each sentence, splitting it into words\n4. Building up chunks until adding another word would exceed `max_chars`\n5. When a new chunk starts, keeping any remaining partial content from before\n\nThe function ensures that:\n- Each chunk is at most `max_chars` characters long\n- Sentences are preserved (breaks occur at sentence boundaries when possible)\n- Words are never cut in the middle\n- The output is always returned as a list of strings\n\nNote that the example test case shows how the function handles splitting words when necessary to stay within the max_chars limit, while still maintaining complete sentences where possible.",
+      "latency_s": 8.554516,
+      "score": null,
+      "error": null
+    },
+    {
+      "model": "custom:ollama/cogito:14b",
+      "task": "code_review",
+      "response": "Here's the analysis:\n\nBugs:\n- No error handling for database connection failures\n- SQL injection vulnerability using string formatting\n\nSecurity Issues:\n- Query vulnerable to SQL injection (should use parameterized queries)\n\nStyle:\n- Missing docstring and type hints\n- Inconsistent spacing around operators\n\nFixed version:\n```python\nimport sqlite3\n\ndef get_user(user_id: int) -> tuple | None:\n    \"\"\"Fetches user data by ID.\n    \n    Args:\n        user_id: User's database ID\n        \n    Returns:\n        Tuple of user data or None if not found\n    \"\"\"\n    conn = sqlite3.connect('users.db')\n    try:\n        with conn.cursor() as cursor:\n            query = \"SELECT * FROM users WHERE id = ?\"\n            return cursor.execute(query, (user_id,)).fetchone()\n    except Exception as e:\n        print(f\"Error fetching user {user_id}: {e}\")\n        return None\n```",
+      "latency_s": 3.20308,
+      "score": null,
+      "error": null
+    },
+    {
+      "model": "custom:ollama/cogito:14b",
+      "task": "instruction_following",
+      "response": "apple\nbanana\norange",
+      "latency_s": 0.250272,
+      "score": 0.0,
+      "error": null
+    },
+    {
+      "model": "custom:ollama/cogito:14b",
+      "task": "logical_reasoning",
+      "response": "Let me solve this step by step.\n\n1. First, let's find the total number of items:\n* Number of shelves = 12\n* Boxes per shelf = 8\n* Items per box = 10\n\nTotal boxes = 12 \u00d7 8 = 96 boxes\nTotal items = 96 \u00d7 10 = 960 items\n\n2. If 1/4 (or 25%) of the items are removed:\n* Number of items removed = 960 \u00f7 4 = 240 items\n* Remaining items = Total items - Items removed\n* Remaining items = 960 - 240 = 720 items\n\nTherefore, 720 items remain in the warehouse.",
+      "latency_s": 2.682515,
+      "score": 1.0,
+      "error": null
+    },
+    {
+      "model": "custom:ollama/cogito:14b",
+      "task": "sprint_narrative",
+      "response": "We completed our major user authentication overhaul and implemented robust retry logic for billing webhooks. Unfortunately, vendor API downtimes caused us to fall behind schedule on the SSO integration, but we're still targeting a reasonable timeline for its completion next sprint. We need to address CI flakiness in our mobile pipeline before it causes more delays - I'll work with QA to prioritize stability improvements in our upcoming planning session.",
+      "latency_s": 1.455193,
+      "score": null,
+      "error": null
+    },
+    {
+      "model": "custom:ollama/cogito:14b",
+      "task": "structured_output",
+      "response": "{\n    \"project_name\": \"Phoenix\",\n    \"deadline\": \"2026-09-15\",\n    \"budget_eur\": 120000,\n    \"team_size\": 4\n}",
+      "latency_s": 0.946601,
+      "score": 0.0,
+      "error": null
+    },
+    {
+      "model": "custom:ollama/cogito:14b",
+      "task": "summarization",
+      "response": "Our primary database server went down due to running out of storage space at 2:30 PM UTC. We quickly switched to our backup system (replica) in 8 minutes to restore service. The issue happened because a warning about low storage space was accidentally turned off during routine maintenance and wasn't reactivated afterward, so we're adding this as an important check item for future maintenance tasks.",
+      "latency_s": 1.439701,
+      "score": null,
+      "error": null
+    }
+  ]
+}

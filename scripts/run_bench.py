@@ -21,7 +21,9 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import sys
+import urllib.request
 
 import yaml
 
@@ -48,48 +50,111 @@ def load_tasks(task_dir):
     return tasks
 
 
-def call_model(model, prompt, max_tokens):
+def call_model(model, prompt, max_tokens, image_path=None):
     """Call a model. Returns (text, latency_s, error)."""
-    # Local / custom OpenAI-compatible endpoint (verified path).
+    # Local / custom Ollama endpoint. We call Ollama's NATIVE /api/chat REST
+    # endpoint directly (no OpenAI SDK) so the harness has zero third-party
+    # dependencies and never breaks on a missing/broken `pydantic_core`.
     if model.get("provider", "").startswith("custom"):
         try:
-            from openai import OpenAI
-            client = OpenAI(
-                base_url=model["base_url"],
-                api_key=model.get("api_key", "ollama"),
-            )
-            t0 = dt.datetime.now()
             ollama_model = model["id"]
             if ollama_model.startswith("custom:ollama/"):
                 ollama_model = ollama_model.split("/", 1)[1]
-            t0 = dt.datetime.now()
-            resp = client.chat.completions.create(
-                model=ollama_model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=max_tokens,
+            base = model.get("base_url", "http://127.0.0.1:11434/v1")
+            # registry base_url ends in /v1 (OpenAI-style); Ollama's native API
+            # lives at the root. Normalise either form.
+            base = base.replace("/v1", "").rstrip("/")
+            url = base + "/api/chat"
+            message = {"role": "user", "content": prompt}
+            payload = {
+                "model": ollama_model,
+                "messages": [message],
+                "stream": False,
+                "options": {"num_predict": max_tokens},
+            }
+            # Vision tasks carry an `image:` path (relative to REPO). Ollama's
+            # /api/chat expects `images` INSIDE the message that carries the
+            # image (not at the payload root). Models without vision simply
+            # ignore it / error -> reported via the error path.
+            if image_path:
+                img_path = image_path if os.path.isabs(image_path) else os.path.join(REPO, image_path)
+                try:
+                    with open(img_path, "rb") as fh:
+                        import base64
+                        message["images"] = [base64.b64encode(fh.read()).decode("utf-8")]
+                except Exception:
+                    # image missing -> let the model answer without it; the
+                    # judge will score the (likely wrong) response.
+                    pass
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"},
             )
+            t0 = dt.datetime.now()
+            raw = urllib.request.urlopen(req, timeout=600).read().decode("utf-8")
             latency = (dt.datetime.now() - t0).total_seconds()
-            msg = resp.choices[0].message
-            # Qwen3.x reasoning models emit thinking tokens in `reasoning`
-            # (or `reasoning_content`) and may leave `content` empty.
-            text = msg.content or ""
+            resp = json.loads(raw)
+            msg = resp.get("message", {})
+            # Qwen3.x / DeepSeek reasoning models may emit thinking tokens in a
+            # separate `thinking` field and leave `content` empty.
+            text = msg.get("content") or ""
             if not text.strip():
-                text = getattr(msg, "reasoning", None) or getattr(
-                    msg, "reasoning_content", None) or ""
+                text = msg.get("thinking") or ""
+            # Strip inline <think>...</think> blocks that CoT models (deepcoder,
+            # qwen3, deepseek-r1) emit before the actual answer. Score only the
+            # deliverable, not the reasoning trace.
+            text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
             return text, latency, None
         except Exception as e:
-            return None, 0.0, f"custom endpoint error: {e}"
-    # Nous free / Anthropic premium: route through Hermes's auth, not raw keys.
-    # TODO: integrate with Hermes gateway client (OAuth for anthropic).
+            return None, 0.0, f"ollama api error: {e}"
+    # Anthropic models: call via `claude -p` CLI which uses OAuth / Claude Max
+    # quota — no ANTHROPIC_API_KEY env var needed or wanted.
+    if model.get("provider") == "anthropic":
+        try:
+            import subprocess as _sp
+            model_name = model.get("model_name", "claude-sonnet-4-5")
+            cmd = [
+                "claude", "-p", prompt,
+                "--model", model_name,
+                "--max-turns", "1",
+                "--output-format", "json",
+            ]
+            t0 = dt.datetime.now()
+            result = _sp.run(cmd, capture_output=True, text=True, timeout=120)
+            latency = (dt.datetime.now() - t0).total_seconds()
+            if result.returncode != 0:
+                return None, latency, f"claude cli error: {result.stderr.strip()}"
+            data = json.loads(result.stdout)
+            text = data.get("result", "") or ""
+            # Strip CoT thinking blocks if any
+            text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+            return text, latency, None
+        except Exception as e:
+            return None, 0.0, f"claude cli error: {e}"
     return None, 0.0, f"provider {model.get('provider')} not wired in skeleton"
 
 
 def score(task, response):
-    """Placeholder scorer. Implement exact/reference-compare/rubric-llm."""
+    """Score a response. Handles exact, json-exact, and rubric-llm methods."""
     method = task.get("scoring", {}).get("method", "rubric-llm")
+    expected = task.get("expected", {}).get("answer", "")
+
     if method == "exact":
-        expected = task.get("expected", {}).get("answer")
-        return 1.0 if response and expected and expected in response else 0.0
+        if not expected:
+            # No expected answer string — fall through to rubric-llm
+            return None
+        return 1.0 if response and expected in response else 0.0
+
+    if method == "json-exact":
+        # Parse both sides and compare dicts (key order / whitespace insensitive)
+        try:
+            exp = json.loads(expected)
+            got = json.loads(response)
+            return 1.0 if got == exp else 0.0
+        except Exception:
+            return 0.0
+
     # rubric-llm / reference-compare: implement with a scorer model.
     return None  # None = unscored (report as ±)
 
@@ -117,12 +182,14 @@ def main():
             ttags = set(task.get("tags", []))
             if not (mtags & ttags) and not task.get("requires_frontier"):
                 continue
-            text, latency, err = call_model(model, task["prompt"], task.get("max_tokens", 512))
+            text, latency, err = call_model(model, task["prompt"], task.get("max_tokens", 512),
+                                          image_path=task.get("image"))
             sc = score(task, text) if text else None
             results.append({
                 "model": model["id"], "task": task["id"],
                 "response": text, "latency_s": latency,
                 "score": sc, "error": err,
+                "image": task.get("image"),
             })
             print(f"[{run_id}] {model['id']} x {task['id']}: "
                   f"{'ERR' if err else ('score='+str(sc) if sc is not None else 'unscored')}")

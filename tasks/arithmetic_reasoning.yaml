@@ -13,5 +13,5 @@ scoring:
     Award full marks if the final answer is 5:00 (or 05:00) and the working is
     correct. Award partial marks for the correct method but a small arithmetic
     slip. Award zero if the approach is wrong.
-max_tokens: 512
+max_tokens: 1024
 tags: [reasoning]

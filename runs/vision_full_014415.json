@@ -1,0 +1,45 @@
+{
+  "run_id": "vision_full_014415",
+  "results": [
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "vision_ocr",
+      "response": "I cannot answer your question because no image was provided. Please upload the image you would like me to look",
+      "error": null,
+      "latency_s": 2.5,
+      "score": 0.0,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.0"
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "vision_progressive",
+      "response": "I apologize, but no image was provided for me to describe. Please upload the picture you would like me to analyze!",
+      "error": null,
+      "latency_s": 2.3,
+      "score": 0.0,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.0"
+    },
+    {
+      "model": "custom:ollama/minicpm-v:latest",
+      "task": "vision_ocr",
+      "response": "The text \"HELLO\" and \"123\", with a red square. The red square has no specific meaning; it's just part of the design. There are other elements to this image as well: some English words like 'Hello' along with numbers such as '1', '2', and '3'. However, these do not form any complete sentences or phrases that make sense in isolation. The overall layout is simple - a white background containing text items and a red square on the upper right side of it.",
+      "error": null,
+      "latency_s": 1.2,
+      "score": 1.0,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
+    },
+    {
+      "model": "custom:ollama/minicpm-v:latest",
+      "task": "vision_progressive",
+      "response": "The scene includes a blue sky with a yellow sun above it, green ground below, a red house to the left of the frame, black 'PROGRESSIVE TEST' text at the bottom.",
+      "error": null,
+      "latency_s": 0.5,
+      "score": 1.0,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
+    }
+  ]
+}

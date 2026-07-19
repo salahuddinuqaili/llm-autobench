@@ -1,6 +1,6 @@
 # llm-autobench — Specification
 
-**Version:** 0.2 (draft) · **Status:** Tier A shipped, world-class hardening planned
+**Version:** 0.3 (draft) · **Status:** Tier A shipped **but flagship run misreports scores** — see §11–§12
 **Owner:** Salahuddin Uqaili · **Visibility:** PUBLIC (portfolio piece)
 
 ---
@@ -186,5 +186,86 @@ usage. For free, rely on local tracking. No external call needed.
 | **C** | Full suite (MMLU, BBH, MT-Bench, SWE-lite); judge panel + κ; dashboard | ~1 week |
 | **D** | Contamination hashing; regression alerts; public GitHub Actions run | ~3 days |
 
-**Next action:** Phase B — add `benchmarks/humaneval/`, wire `telemetry.track()` into
-`run_bench.py`, and replace the heuristic scorer with the local reward model.
+**Next action:** ⚠️ **Superseded by §12.** A 2026-07-18 audit found the flagship run misreports its
+scores (a false-positive `1.00`). Do **Phase 0 (credibility)** before Phase B. See §11–§12 and
+`DECISIONS.md`.
+
+---
+
+## 11. Audit findings (2026-07-18) — the flagship run is not trustworthy
+
+A four-lens self-audit (methodology · robustness · autonomy · positioning) with adversarial
+verification (10 findings confirmed, 4 partial, 0 refuted) found that the committed
+"verified end-to-end" run (`runs/20260716_214839.json`, `reports/20260716_214839.md`)
+**misreports its results.** Confirmed defects, most severe first:
+
+| # | Sev | Defect | Evidence |
+|---|-----|--------|----------|
+| **D1** | 🔴 | Leaderboard `1.00` is a **false positive**. Exact scorer is raw substring containment; expected `5:00` matched inside `15:00` on an arithmetic response **truncated before any answer**. | `run_bench.py:92`; response ends "…= 30 km/h", `score: 1.0` |
+| **D2** | 🔴 | Autonomous `bench(model)` **ignores its arg** and re-runs the static baseline via `--tier local`; the pulled model is never benchmarked, then deleted (pull+delete = wasted work). | `autobench_cycle.py:133-144, 184`; committed run has only the baseline id |
+| **D3** | 🟠 | Judge **never ran** (no `OPENROUTER_API_KEY` → `JUDGE_ERROR` on 2/4 tasks), yet report hard-codes `Free judge: yes` and `Failures: None` (Failures scans `error`; judge errors live in `score_reason`). | `judge_report.py:47, 150-151, 156` |
+| **D4** | 🟠 | `max_tokens: 512` is the **entire** budget for thinking-token models → truncation before the final answer on every task. | `*.yaml` max_tokens; all 4 responses cut mid-thought |
+| **D5** | 🟠 | **No real comparison**: 2nd baseline `gemma4:e4b` tags `[vision, general]` intersect **zero** tasks → 0/9 attempted, every run effectively **N=1**. | `registry.yaml:24`; gate at `run_bench.py:118` |
+| **D6** | 🟠 | `telemetry.py` is **dead code** — never imported by any script (SPEC §7/§10 "next action" already admits this). | grep: only self-references; `telemetry/` never written |
+| **D7** | 🟠 | VRAM guard **fails open**: `nvidia-smi` error → `return True` → pull proceeds; `discover()` "prefer larger" biases toward the 14B ceiling. | `autobench_cycle.py:62-63, 121` |
+| **D8** | 🟠 | `discover()` regex `:(\d+…)b?$` **silently drops** most real tags (`:latest`, `:instruct`, quantized, MoE `8x7b`). | `autobench_cycle.py:115` |
+| **D9** | 🟡 | `judge_report.py` **never called** from the cycle; no cron job actually scheduled (`CronList` empty); `commit()` is local-only (no push) with no empty-index guard. | `autobench_cycle.py:main`, `:152-154`; README step 7 |
+
+**Honesty nuance (verified):** the *second* `1.00` (logical_reasoning → `720`) is **legitimate** —
+the model genuinely derived it. Only the **arithmetic** `1.00` is a false positive. One
+demonstrably-fake headline number is still enough to violate the "Honesty in reporting" rule
+(CLAUDE.md §9). Do not overstate the case: the harness is fixable, not fraudulent.
+
+---
+
+## 12. Remediation plan (credibility-first) — supersedes §10 Phase B as the next action
+
+**Principle:** a benchmark that reports wrong scores must be made *trustworthy* before it is made
+*bigger*. Fix scoring / loop / reporting (Phase 0–1) before porting suites (Phase 2).
+Every fix ships with the acceptance test below **run against the real failing case** (CLAUDE.md
+"run the actual failing case" rule).
+
+### Phase 0 — Credibility (fix the lie; ~0.5 day, all S)
+- **F0.1 Answer-extraction scorer.** Replace `expected in response` (`run_bench.py:92`) with
+  final-answer extraction (last line / labelled answer / per-task regex) + word-boundary match.
+  *Accept:* the arithmetic response that ends at "30 km/h" scores **0.0**, not 1.0. **(D1)**
+- **F0.2 Reject truncated output.** In `call_model`, read `finish_reason`; if `length`, mark the
+  result truncated and score 0.0 (or re-run with a larger budget). *Accept:* all 4 flagship
+  responses flagged truncated. **(D1/D4)**
+- **F0.3 Token budget for reasoners.** Raise `max_tokens` (≥1536) or split think/answer budgets so
+  a final answer can appear. *Accept:* qwen emits a final `5:00` / `720`, not just scratch-work. **(D4)**
+- **F0.4 Loud judge failures.** Failures section reads `score_reason` too; count `JUDGE_ERROR` as a
+  failure. *Accept:* a keyless run shows the 2 judge failures under Failures, not "None." **(D3)**
+- **F0.5 Honest judge status.** Derive "judge ran / didn't" from actual outcomes; drop the
+  hard-coded `Free judge: yes`. *Accept:* a keyless run's report states the judge did not run. **(D3)**
+- **F0.6 Regenerate the flagship run.** Re-run + re-commit with the fixed scorer and honest report.
+  *Accept:* the committed leaderboard contains **no unearned 1.00.** **(D1)**
+
+### Phase 1 — Make the loop real (~1 day)
+- **F1.1** `bench()` benchmarks the **pulled** model (inject the discovered tag into the run set —
+  temp registry entry or a `--model` flag on `run_bench.py`). *Accept:* a discovered model appears
+  in `runs/…json` and the report. **(D2)**
+- **F1.2** Call `judge_report.py` from `autobench_cycle.py` so unattended runs score + report.
+  *Accept:* one cycle produces `reports/<id>.md` with no manual step. **(D9)**
+- **F1.3** Fix `discover()` regex to parse real tags; drop non-sized tags **explicitly**, not
+  silently. *Accept:* a unit test over sample tags (`qwen:latest`, `codellama:7b-instruct`,
+  `mixtral:8x7b`, `qwen:110b`). **(D8)**
+- **F1.4** VRAM guard **fail closed** (skip on `nvidia-smi` error) + stop biasing to the ceiling.
+  *Accept:* a simulated `nvidia-smi` failure → pull skipped and logged. **(D7)**
+- **F1.5** Give the 2nd baseline task-intersecting tags (a leaderboard of two). *Accept:* both
+  baselines appear in the report. **(D5)**
+- **F1.6** Disclose skipped `(model, task)` pairs in the report. *Accept:* the report lists what it
+  did **not** run and why.
+
+### Phase 2 — Scale (only after 0–1 are green)  *(was §10 Phase B/C)*
+Wire `telemetry.py` into `run_bench.py` **(D6)** · adopt a GSM8K + HumanEval slice with
+**execution-based** code scoring (SPEC §5.3) · N=3–5 seeded runs with mean ± 95% CI (SPEC §6).
+
+### Phase 3 — Portfolio
+"**What I found auditing my own benchmark**" post-mortem (the strongest Technical-PM signal here) ·
+reconcile SPEC/README with code state (telemetry = skeleton, judge panel + κ = planned, push + cron
+= not wired) · add a real scheduler + `git push` so "while I sleep" is genuinely wired **(D9)**.
+
+**Next action (revised):** start **Phase 0** in a fresh session. Locked-in choices are in
+`DECISIONS.md`; each fix must run its acceptance test against the real failing case before it's
+called done.

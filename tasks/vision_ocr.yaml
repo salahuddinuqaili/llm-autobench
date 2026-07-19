@@ -1,0 +1,23 @@
+id: vision_ocr
+category: vision
+requires_frontier: false
+# Image is a committed CC0 test asset (tasks/images/ocr_card.png). PUBLIC repo:
+# no private screenshots. The vision model receives the image + question and must
+# read the embedded text. Scored by the rubric-llm judge (NVIDIA 70B) against the
+# rubric below. Tags drive matching: only models tagged `vision` run this task.
+image: tasks/images/ocr_card.png
+prompt: |
+  Look at this image and answer: what text is printed on it, and what color is
+  the square in the top-left corner? Be concise.
+expected:
+  answer: ""
+scoring:
+  method: rubric-llm
+  rubric: |
+    Award full marks if the response identifies BOTH: (1) the printed text
+    contains "HELLO" and "123" (case-insensitive; "READ-THE-TEXT" is a bonus),
+    and (2) the top-left square is red. Partial credit (0.5) if it gets the text
+    but wrong/missing color, or color but wrong/missing text. Zero if it says
+    there is no text or cannot read the image.
+max_tokens: 256
+tags: [vision, ocr]

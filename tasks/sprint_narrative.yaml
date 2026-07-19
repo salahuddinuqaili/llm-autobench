@@ -15,5 +15,5 @@ scoring:
     Award full marks for exactly 3 sentences that cover all three points (completed,
     blocked, risk) in an honest, professional tone. Deduct for fluff, missing
     points, or overly casual language.
-max_tokens: 512
+max_tokens: 768
 tags: [writing, summarization]

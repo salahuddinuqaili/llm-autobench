@@ -1,0 +1,77 @@
+{
+  "run_id": "20260718_160208",
+  "results": [
+    {
+      "model": "custom:ollama/qwen2.5:7b",
+      "task": "arithmetic_reasoning",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found"
+    },
+    {
+      "model": "custom:ollama/qwen2.5:7b",
+      "task": "changelog_generation",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found"
+    },
+    {
+      "model": "custom:ollama/qwen2.5:7b",
+      "task": "code_generation",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found"
+    },
+    {
+      "model": "custom:ollama/qwen2.5:7b",
+      "task": "code_review",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found"
+    },
+    {
+      "model": "custom:ollama/qwen2.5:7b",
+      "task": "instruction_following",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found"
+    },
+    {
+      "model": "custom:ollama/qwen2.5:7b",
+      "task": "logical_reasoning",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found"
+    },
+    {
+      "model": "custom:ollama/qwen2.5:7b",
+      "task": "sprint_narrative",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found"
+    },
+    {
+      "model": "custom:ollama/qwen2.5:7b",
+      "task": "structured_output",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found"
+    },
+    {
+      "model": "custom:ollama/qwen2.5:7b",
+      "task": "summarization",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found"
+    }
+  ]
+}

@@ -8,9 +8,9 @@ prompt: |
   a team of 4 engineers."
   Output ONLY the JSON object, no markdown, no extra text.
 expected:
-  answer: ""
+  answer: '{"project_name": "Phoenix", "deadline": "2026-09-15", "budget_eur": 120000, "team_size": 4}'
 scoring:
-  method: exact
+  method: json-exact
   rubric: |
     Award full marks ONLY if the response is a valid JSON object with exactly
     the four keys (project_name, deadline, budget_eur, team_size) and correct

@@ -1,0 +1,77 @@
+{
+  "run_id": "20260718_134825",
+  "results": [
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "arithmetic_reasoning",
+      "response": "**Answer: 5:00**\n\n## Work:\n\n**Setup:**\n- Train 1: leaves at 2:00, traveling at 60 km/h\n- Train 2: leaves at 3:00, traveling at 90 km/h\n\n**When train 2 starts (3:00):**\n- Train 1 has already traveled for 1 hour\n- Train 1's head start = 60 km/h \u00d7 1 h = 60 km\n\n**Finding when train 2 catches up:**\n\nLet *t* = hours after 3:00 when they meet\n\nDistance traveled by train 1 after 3:00: `60t`  \nDistance traveled by train 2 after 3:00: `90t`\n\nTrain 2 must cover the 60 km head start:\n\n```\n60 + 60t = 90t\n60 = 30t\nt = 2 hours\n```\n\n**Time they meet:** 3:00 + 2:00 = **5:00**\n\n**Verification:**\n- Train 1 total distance (2:00 \u2192 5:00): 3 hours \u00d7 60 km/h = 180 km \u2713\n- Train 2 total distance (3:00 \u2192 5:00): 2 hours \u00d7 90 km/h = 180 km \u2713",
+      "latency_s": 14.091413,
+      "score": 1.0,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "changelog_generation",
+      "response": "## Improvements\n\n- **More reliable sessions** \u2014 You'll stay logged in longer without interruptions, even during extended work sessions\n- **Export sprint reports to CSV** \u2014 Download your sprint data directly from the dashboard for further analysis in Excel or Sheets\n- **Webhook stability improvements** \u2014 Fixed an issue that could cause webhook processing to fail in certain edge cases",
+      "latency_s": 9.338602,
+      "score": null,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "code_generation",
+      "response": "I'll write a clean text chunking function that respects sentence and word boundaries.\n\n```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most max_chars characters.\n    \n    Prefers to break on sentence boundaries ('.', '!', '?'), then word\n    boundaries. Never cuts a word in the middle.\n    \n    Args:\n        text: The text to split\n        max_chars: Maximum characters per chunk\n        \n    Returns:\n        List of text chunks, each at most max_chars long\n    \"\"\"\n    if not text:\n        return []\n    \n    chunks = []\n    remaining = text\n    \n    while remaining:\n        # If remaining text fits in one chunk\n        if len(remaining) <= max_chars:\n            chunks.append(remaining.strip())\n            break\n        \n        # Find break point within max_chars\n        segment = remaining[:max_chars]\n        \n        # Look for sentence boundary (rightmost)\n        break_pos = -1\n        for delim in '.!?':\n            pos = segment.rfind(delim)\n            if pos != -1:\n                break_pos = max(break_pos, pos + 1)\n        \n        # If sentence boundary found, use it\n        if break_pos > 0:\n            chunks.append(remaining[:break_pos].strip())\n            remaining = remaining[break_pos:].lstrip()\n            continue\n        \n        # No sentence boundary, look for word boundary (rightmost space)\n        break_pos = segment.rfind(' ')\n        \n        if break_pos > 0:\n            chunks.append(remaining[:break_pos].strip())\n            remaining = remaining[break_pos:].lstrip()\n        else:\n            # No space found (single long word), take max_chars\n            chunks.append(remaining[:max_chars].strip())\n            remaining = remaining[max_chars:]\n    \n    return [c for c in chunks if c]  # Filter empty chunks\n\n\n# Test\nassert chunk_text(\"Hello world. This is a test. More text here!\", 20) == [\n    \"Hello world.\",\n    \"This is a test.\",\n    \"More text here!\"\n]\n```\n\nThe function:\n1. Prioritizes sentence boundaries (`.!?`) when possible\n2. Falls back to word boundaries (spaces) if no sentence break exists\n3. Only breaks mid-word as a last resort (single word longer than max_chars)\n4. Strips whitespace from chunks and filters empty results",
+      "latency_s": 36.714267,
+      "score": null,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "code_review",
+      "response": "## Critical Issues\n\n**\ud83d\udd34 SQL Injection** \u2014 Line 5: f-string directly embeds `user_id` into the query. If `user_id` is `\"1 OR 1=1\"`, this dumps the entire table.  \n**Fix:** Use parameterized queries: `cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))`\n\n**\ud83d\udfe0 Resource leak** \u2014 Connection never closes. If called repeatedly, exhausts file descriptors.  \n**Fix:** Wrap in `with sqlite3.connect('users.db') as conn:` or add `conn.close()`\n\n## Minor\n\n- No error handling \u2014 DB errors bubble up uncaught\n- No type hints (`user_id: int`, `-> Optional[tuple]`)\n- Returns raw tuple \u2014 consider dataclass/dict for clearer field access\n\n**Secure version:**\n```python\nfrom typing import Optional\n\ndef get_user(user_id: int) -> Optional[tuple]:\n    with sqlite3.connect('users.db') as conn:\n        cursor = conn.cursor()\n        cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))\n        return cursor.fetchone()\n```",
+      "latency_s": 11.921266,
+      "score": null,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "instruction_following",
+      "response": "Apple\nBanana\nOrange",
+      "latency_s": 7.371718,
+      "score": null,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "logical_reasoning",
+      "response": "I'll solve this step by step:\n\n**Step 1: Calculate total boxes**\n- 12 shelves \u00d7 8 boxes per shelf = 96 boxes\n\n**Step 2: Calculate total items**\n- 96 boxes \u00d7 10 items per box = 960 items\n\n**Step 3: Calculate items removed**\n- 1/4 of 960 = 960 \u00f7 4 = 240 items removed\n\n**Step 4: Calculate items remaining**\n- 960 - 240 = 720 items\n\n**Final answer: 720 items remain**",
+      "latency_s": 7.328763,
+      "score": 1.0,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "sprint_narrative",
+      "response": "We shipped the user auth revamp and billing webhook retry logic on schedule, both are stable in production. SSO integration is blocked \u2014 the vendor's API has been down for three days and we're waiting on their SRE team, no workaround available. The mobile CI pipeline has flaky tests that are masking real failures; we need to dedicate time next sprint to stabilize it before it blocks releases.",
+      "latency_s": 8.420486,
+      "score": null,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "structured_output",
+      "response": "{\"project_name\": \"Phoenix\", \"deadline\": \"2026-09-15\", \"budget_eur\": 120000, \"team_size\": 4}",
+      "latency_s": 6.902039,
+      "score": 1.0,
+      "error": null
+    },
+    {
+      "model": "anthropic/claude-sonnet-4-5",
+      "task": "summarization",
+      "response": "Our main database stopped working for 8 minutes because it ran out of storage space. The system that normally alerts us to storage issues had been turned off during a maintenance window and was never re-enabled, so we didn't get advance warning. We've now restored the alert and added a mandatory checklist step after maintenance to ensure critical monitoring stays active.",
+      "latency_s": 9.012222,
+      "score": null,
+      "error": null
+    }
+  ]
+}

@@ -16,5 +16,5 @@ scoring:
     docstring and one assert test. Deduct for missing any requirement.
     Partial if the logic is correct but edge cases (empty string, single long
     word) are not handled.
-max_tokens: 512
+max_tokens: 1024
 tags: [coding, python]

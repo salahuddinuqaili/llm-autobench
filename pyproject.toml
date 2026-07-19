@@ -1,0 +1,4 @@
+[tool.llm_autobench]
+generated_by = "Hermes Agent (autonomous)"
+human_reviewed = false
+build_date = "2026-07-16"

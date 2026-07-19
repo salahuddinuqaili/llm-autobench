@@ -12,5 +12,5 @@ scoring:
   rubric: |
     Award full marks if the final answer is 720 and the working is correct.
     Partial for correct method with arithmetic error. Zero for wrong approach.
-max_tokens: 512
+max_tokens: 1024
 tags: [reasoning]

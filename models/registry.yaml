@@ -24,6 +24,15 @@ baseline:
     tags: [vision, general]
     enabled: true
 
+  - id: custom:ollama/minicpm-v:latest
+    display_name: MiniCPM-V (local, vision)
+    provider: custom:ollama
+    base_url: http://127.0.0.1:11434/v1
+    tier: local
+    context_window: 128000
+    tags: [vision, ocr]
+    enabled: true
+
 watcher:
   # Only models that FIT the local GPU are pulled. On 12GB VRAM, ~14B is the
   # practical ceiling (qwen3.5:9b = 6.6GB leaves headroom for the judge on free cloud).
@@ -35,6 +44,7 @@ watcher:
       # poll cadence is set by the cron that invokes autobench_cycle.py
   # Judge/reporter model = the autonomous agent itself. FREE tier keeps the local
   # GPU free for the model-under-test. Public repo => free cloud allowed.
-  judge: tencent/hy3:free
+  judge: meta/llama-3.3-70b-instruct
+  judge_provider: nvidia
   # After benchmarking, the pulled model is DELETED to keep disk/VRAM free.
   delete_after_bench: true

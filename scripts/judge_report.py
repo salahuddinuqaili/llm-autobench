@@ -3,8 +3,8 @@
 llm-autobench judge & report generator.
 
 Reads a run JSON from runs/<run_id>.json, scores all rubric-llm tasks using the
-configured free judge model (tencent/hy3:free via OpenRouter), and writes a
-markdown report to reports/<run_id>.md with:
+configured free judge model (NVIDIA NIM meta/llama-3.3-70b-instruct, free 40 RPM),
+and writes a markdown report to reports/<run_id>.md with:
   - Header (run_id, timestamp, models, tasks)
   - Leaderboard table
   - Per-model breakdown
@@ -14,7 +14,8 @@ markdown report to reports/<run_id>.md with:
 Run manually:
     python scripts/judge_report.py runs/20260716_214321.json
 
-Autonomous: the cron agent calls this after autobench_cycle.py completes.
+NOTE: for the canonical NVIDIA judging path, prefer scripts/nvidia_judge.py
+(this module is kept for the OpenRouter-fallback reporting shape and legacy runs).
 """
 import argparse
 import datetime as dt
@@ -34,7 +35,7 @@ def load_run(run_path):
 
 def load_judge_config():
     with open(os.path.join(REPO, "models", "registry.yaml")) as f:
-        return yaml.safe_load(f).get("watcher", {}).get("judge", "tencent/hy3:free")
+        return yaml.safe_load(f).get("watcher", {}).get("judge", "nvidia/meta/llama-3.3-70b-instruct")
 
 
 def call_judge(judge_model, prompt, max_tokens=1024):
