@@ -27,10 +27,16 @@ import base64
 from pathlib import Path
 
 JUDGE_MODEL = "meta/llama-3.3-70b-instruct"
-# Vision judge: a multimodal NVIDIA NIM model used for tasks that carry an
-# `image:`. It actually SEES the image and scores the model's response against
-# what is really in the picture (stronger than inferring from text alone).
-VISION_JUDGE_MODEL = "meta/llama-3.2-11b-vision-instruct"
+# Two-stage vision judging (per user direction):
+#   1. ONE good local vision model looks at the image ONCE and writes a detailed
+#      factual description (ground truth). We use the benchmark's best vision
+#      model (minicpm-v) as the describer -- it is promoted by promote_vision_
+#      model.py, so the judge reuses the fleet's chosen vision model.
+#   2. The 70B TEXT judge (meta/llama-3.3-70b-instruct) scores the benchmarked
+#      model's response against that description. Text-vs-text at 70B is far more
+#      reliable than a small 11B vision judge scoring directly.
+VISION_DESCRIBER = "minicpm-v:latest"
+VISION_DESCRIBER_URL = "http://127.0.0.1:11434/api/chat"
 NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 REPO = Path(__file__).resolve().parent.parent
 
@@ -91,62 +97,80 @@ def call_judge(prompt: str, api_key: str, max_retries: int = 4,
     return f"ERROR: {last_err}"
 
 
-def call_vision_judge(prompt: str, image_b64: str, image_media: str,
-                      api_key: str, max_retries: int = 4,
-                      max_tokens: int = 256) -> str:
-    """Multimodal judge: sends the image + prompt to the vision judge model.
-    `image_media` is e.g. 'image/png' or 'image/jpeg'."""
-    content = [
-        {"type": "text", "text": prompt},
-        {"type": "image_url",
-         "image_url": {"url": f"data:{image_media};base64,{image_b64}"}},
-    ]
-    payload = json.dumps({
-        "model": VISION_JUDGE_MODEL,
-        "messages": [{"role": "user", "content": content}],
-        "max_tokens": max_tokens,
-        "temperature": 0.0,
-    })
-    last_err = ""
-    for attempt in range(1, max_retries + 1):
-        try:
-            cmd = [
-                "curl", "-s", "--max-time", "180", NVIDIA_URL,
-                "-H", f"Authorization: Bearer {api_key}",
-                "-H", "Content-Type: application/json",
-                "-d", payload,
-            ]
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=200)
-            out = res.stdout.strip()
-            if not out:
-                last_err = f"empty response (HTTP {res.returncode})"
-                raise RuntimeError(last_err)
-            data = json.loads(out)
-            return data["choices"][0]["message"]["content"].strip()
-        except Exception as e:  # noqa: BLE001
-            last_err = str(e)
-            if attempt < max_retries:
-                backoff = 2 ** attempt
-                print(f"    retry {attempt}/{max_retries} after {backoff}s ({last_err})",
-                      file=sys.stderr, flush=True)
-                time.sleep(backoff)
-    return f"ERROR: {last_err}"
+def describe_image(img_path: str, max_retries: int = 2) -> str:
+    """Stage 1: one detailed, factual description of the image from a strong
+    cloud vision model (Claude via the `claude` CLI, which uses the Max OAuth
+    quota -- NOT a per-token API key). This is the ground truth the 70B text
+    judge scores against.
+
+    Falls back to the local VISION_DESCRIBER (Ollama) if the CLI is unavailable.
+    Descriptions are cached per path so each image is described ONCE per run.
+    """
+    cache = describe_image._cache
+    if img_path in cache:
+        return cache[img_path]
+    import subprocess as _sp
+    prompt = ("Describe this image in thorough, factual detail: every object, "
+              "its color and position, any text/labels, the scene type, and "
+              "overall lighting. Be specific and literal; do not speculate.")
+    # Preferred: Claude CLI (Max quota, zero marginal cost, top vision).
+    try:
+        cmd = ["claude", "-p", prompt, "--model", "claude-sonnet-4-5",
+               "--max-turns", "1", "--output-format", "text"]
+        # pass the image as a file argument Claude can read
+        res = _sp.run(cmd + [img_path], capture_output=True, text=True,
+                      timeout=180)
+        if res.returncode == 0 and res.stdout.strip():
+            desc = res.stdout.strip()
+            cache[img_path] = desc
+            return desc
+    except Exception:
+        pass
+    # Fallback: local vision model via Ollama.
+    try:
+        with open(img_path, "rb") as fh:
+            b64 = base64.b64encode(fh.read()).decode()
+        payload = json.dumps({
+            "model": VISION_DESCRIBER,
+            "messages": [{"role": "user", "content": prompt,
+                          "images": [b64]}],
+            "stream": False, "options": {"num_predict": 400},
+        })
+        req = urllib.request.Request(
+            VISION_DESCRIBER_URL, data=payload.encode(),
+            headers={"Content-Type": "application/json"})
+        out = json.loads(urllib.request.urlopen(req, timeout=180).read().decode())
+        desc = out.get("message", {}).get("content", "").strip()
+        if desc:
+            cache[img_path] = desc
+            return desc
+    except Exception:
+        pass
+    return ""
 
 
-def build_vision_judge_prompt(task_id, rubric, response):
-    return f"""You are an objective benchmark judge WITH VISION. You can see the image.
+describe_image._cache = {}
+
+
+def build_described_judge_prompt(task_id, rubric, response, description):
+    return f"""You are an objective benchmark judge. Score the MODEL RESPONSE against
+the RUBRIC, using the GROUND-TRUTH IMAGE DESCRIPTION (written by a strong vision
+model that actually saw the image) as the factual reference.
 
 TASK: {task_id}
 
-RUBRIC (what the image actually contains / what a correct answer looks like):
+GROUND-TRUTH IMAGE DESCRIPTION (factual reference):
+{description}
+
+RUBRIC:
 {rubric}
 
-MODEL RESPONSE (a vision model's description of the image):
+MODEL RESPONSE (a vision model's description of the same image):
 {response}
 
-Look at the image yourself. Does the MODEL RESPONSE correctly describe what is
-actually in the image, per the rubric? Return ONLY a single float between 0.0
-and 1.0 (e.g. 0.85). Do not explain."""
+Does the MODEL RESPONSE correctly describe what is in the image, per the rubric
+and the ground-truth description? Return ONLY a single float between 0.0 and 1.0
+(e.g. 0.85). Do not explain."""
 
 
 def parse_score(text: str):
@@ -223,28 +247,33 @@ def main():
             print(f"  [skip] no rubric for {task_id}", file=sys.stderr)
             scored.append(r)
             continue
-        # Vision tasks: the judge SEES the image (multimodal judge).
+        # Vision tasks: Stage 1 -- describe the image ONCE with a strong cloud
+        # vision model (Claude CLI, Max quota). Stage 2 -- the 70B TEXT judge
+        # scores the model response against that description.
         img = r.get("image")
         if img:
             img_path = img if os.path.isabs(img) else str(REPO / img)
             try:
-                with open(img_path, "rb") as fh:
-                    img_b64 = base64.b64encode(fh.read()).decode("utf-8")
-                media = "image/png" if img_path.lower().endswith(".png") else "image/jpeg"
-                prompt = build_vision_judge_prompt(task_id, rubric, r.get("response", ""))
-                print(f"  [vision-judge] {task_id} ...", end=" ", flush=True)
-                out = call_vision_judge(prompt, img_b64, media, api_key,
-                                        max_retries=args.max_retries)
+                description = describe_image(img_path, max_retries=args.max_retries)
+                if not description:
+                    print(f"  [warn] image description failed for {task_id}; "
+                          f"falling back to text judge", file=sys.stderr)
+                    prompt = build_judge_prompt(task_id, rubric, r.get("response", ""))
+                else:
+                    prompt = build_described_judge_prompt(
+                        task_id, rubric, r.get("response", ""), description)
+                print(f"  [judge+vision] {task_id} ...", end=" ", flush=True)
+                out = call_judge(prompt, api_key, max_retries=args.max_retries)
                 score = parse_score(out)
                 r["score"] = score
-                r["judge"] = f"nvidia/{VISION_JUDGE_MODEL}"
+                r["judge"] = f"nvidia/{JUDGE_MODEL}" + ("+claude-vision" if description else "")
                 r["judge_raw"] = out[:300]
                 print(score, file=sys.stderr, flush=True)
                 scored.append(r)
                 _writeback(results, scored, run_path)
                 continue
             except Exception as e:  # noqa: BLE001
-                print(f"  [warn] vision-judge failed ({e}); falling back to text judge",
+                print(f"  [warn] vision describe failed ({e}); text judge",
                       file=sys.stderr)
         prompt = build_judge_prompt(task_id, rubric, r.get("response", ""))
         print(f"  [judge] {task_id} ...", end=" ", flush=True)
@@ -268,7 +297,7 @@ def main():
     lines.append(f"# autobench report — {model}")
     lines.append("")
     lines.append(f"**Run:** `{run_path.name}`  ")
-    lines.append(f"**Judge:** `nvidia/{JUDGE_MODEL}` (NVIDIA NIM, free 40 RPM)  ")
+    lines.append(f"**Judge:** `nvidia/{JUDGE_MODEL}` (70B text judge) + Claude vision describer (stage 1)  ")
     lines.append(f"**Average score:** `{avg:.2f}` / 1.00")
     lines.append("")
     lines.append("## Per-task")
