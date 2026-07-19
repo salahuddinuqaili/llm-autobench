@@ -1,25 +1,29 @@
 id: vision_progressive
 category: vision
 requires_frontier: false
-# This is a PROGRESSIVE JPEG (tasks/images/progressive_scene.jpg) — the exact
-# format that some vision models fail to decode (they return "no image provided"
-# or a blank read). A model that correctly ingests it will describe the scene
-# (blue sky, green ground, yellow sun, red house, "PROGRESSIVE TEST" label).
-# Public-repo safe: synthetic CC0 image, saved as progressive JPEG on purpose.
-image: tasks/images/progressive_scene.jpg
+# This is the USER'S progressive-JPEG photo (tasks/images/private_fixtures/
+# progressive_photo_user.jpg) -- a real-world image, committed per user
+# direction. It is a progressive JPEG, the exact format that broke ariadne's
+# screenshot ingestion. A stored ground-truth description sits beside it
+# (progressive_photo_user.desc.txt), baked in once by a strong vision model, so
+# the benchmark scores against it with NO per-run vision calls.
+# A model that correctly ingests the progressive JPEG will describe the scene
+# (blue sky, treeline, grassy meadow, wildflowers, a person); one that fails to
+# decode it returns "no image provided".
+image: tasks/images/private_fixtures/progressive_photo_user.jpg
 prompt: |
-  Describe this image in one sentence: what is in the scene (sky, ground, sun,
-  any building, and any text label)?
+  Describe this image in one or two sentences: what is in the scene (sky, trees,
+  ground, wildflowers, any person)?
 expected:
   answer: ""
 scoring:
   method: rubric-llm
   rubric: |
-    Award 1.0 if the response clearly describes actual scene content (e.g.
-    mentions a sky/blue, ground/green, a sun/yellow circle, a red house/building,
-    and/or the "PROGRESSIVE TEST" label). Award 0.0 if the model says no image
-    was provided, cannot see an image, or returns content-free boilerplate. This
-    task specifically tests whether the model can DECODE A PROGRESSIVE JPEG — a
-    known failure mode for some vision models.
+    Award 1.0 if the response clearly describes actual scene content visible in
+    the image (e.g. mentions a blue sky / clouds, a treeline, a grassy meadow,
+    yellow/white wildflowers, and/or a person). Award 0.0 if the model says no
+    image was provided, cannot see an image, or returns content-free boilerplate.
+    This task specifically tests whether the model can DECODE A PROGRESSIVE JPEG
+    -- a known failure mode for some vision models.
 max_tokens: 256
 tags: [vision, progressive]

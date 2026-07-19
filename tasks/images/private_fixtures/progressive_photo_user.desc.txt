@@ -1,0 +1,33 @@
+# Ground-truth description for tasks/images/private_fixtures/progressive_photo_user.jpg
+#
+# Generated ONCE by a strong cloud vision model (Claude Sonnet 4.5 via the
+# `claude` CLI, Max OAuth quota -- $0 marginal cost). Stored here so the
+# benchmark does NOT call a vision model per run. The 70B text judge scores
+# each benchmarked vision model's response against THIS description.
+#
+# This is the reference the judge uses -- it is the factual content of the
+# image, not a rubric. Edit only if the image changes.
+
+This is an outdoor landscape photograph.
+
+Sky: A vibrant blue sky occupies roughly the upper half of the image, with
+scattered white and light gray clouds that have good definition and contrast
+against the blue.
+
+Trees and vegetation: A dense treeline spans the middle of the frame. The
+trees appear deciduous, fully leafed out in various shades of green. Some trees
+in the center-left appear slightly lighter or more bare-branched than the
+surrounding foliage. The treeline forms a natural horizon about midway down.
+
+Foreground: A grassy hillside or meadow slopes down toward the viewer. The
+grass is predominantly green and appears lush. Scattered throughout the grass
+are small wildflowers -- notably yellow flowers (dandelions or similar)
+concentrated in a patch on the right side and lower right corner, plus white
+flowers (daisies or similar small white blooms) dotted throughout the grass.
+
+Person: In the middle distance, standing in the grassy area roughly center-frame,
+there appears to be a single person wearing a light-colored top (white or light
+blue/gray). The person is small in the frame due to distance.
+
+Overall: A spring or early summer landscape in a park or rural/semi-rural
+setting, good natural daytime lighting, likely late morning or afternoon.

@@ -98,17 +98,26 @@ def call_judge(prompt: str, api_key: str, max_retries: int = 4,
 
 
 def describe_image(img_path: str, max_retries: int = 2) -> str:
-    """Stage 1: one detailed, factual description of the image from a strong
-    cloud vision model (Claude via the `claude` CLI, which uses the Max OAuth
-    quota -- NOT a per-token API key). This is the ground truth the 70B text
-    judge scores against.
+    """Stage 1: one detailed, factual description of the image, used as ground
+    truth for the 70B text judge.
 
-    Falls back to the local VISION_DESCRIBER (Ollama) if the CLI is unavailable.
-    Descriptions are cached per path so each image is described ONCE per run.
-    """
+    PREFERRED: a stored description file next to the image
+    (<image>.desc.txt), baked in ONCE by a strong vision model (e.g. Claude via
+    the `claude` CLI, Max quota, $0). This keeps the benchmark free of per-run
+    vision calls. Falls back to a fresh Claude CLI call, then to the local
+    VISION_DESCRIBER (Ollama). Descriptions are cached per path."""
     cache = describe_image._cache
     if img_path in cache:
         return cache[img_path]
+    # Preferred: a stored ground-truth description alongside the image
+    # (e.g. progressive_photo_user.desc.txt). Baked in once by a strong vision
+    # model so the benchmark never calls a vision model per run.
+    desc_path = os.path.splitext(img_path)[0] + ".desc.txt"
+    if os.path.exists(desc_path):
+        desc = open(desc_path, encoding="utf-8").read().strip()
+        if desc:
+            cache[img_path] = desc
+            return desc
     import subprocess as _sp
     prompt = ("Describe this image in thorough, factual detail: every object, "
               "its color and position, any text/labels, the scene type, and "
