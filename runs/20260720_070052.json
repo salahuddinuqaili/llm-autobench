@@ -15,36 +15,44 @@
       "task": "changelog_generation",
       "response": "### \u2728 Improvements\n\nWe've released several key enhancements this cycle to improve reliability and workflow efficiency:\n\n*   **Exporting Reports:** You can now export your full sprint reports directly from the dashboard as a CSV file for easy integration into spreadsheets or record-keeping.\n*   **Increased Stability (Integrations):** We significantly improved how our system handles connections, ensuring that interruptions\u2014such as temporary authentication failures\u2014are automatically managed and retried in the background without disrupting your workflow.\n*   **Reliable Webhook Processing:** The platform is now more resilient when receiving automated data updates. It no longer crashes if an incoming payload is missing expected user information.",
       "latency_s": 5.134949,
-      "score": null,
+      "score": 0.9,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.9"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "This problem requires a careful balance between adhering to strict size limits (`max_chars`) while maximizing linguistic integrity (preferring sentence boundaries and never cutting words).\n\nThe solution uses iteration and lookahead. It first attempts to find whole sentences that fit the limit; if this fails, it performs a greedy split at the largest available safe gap near the capacity limit.\n\n```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits",
       "latency_s": 8.702681,
-      "score": null,
+      "score": 0.6,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.6"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "Here's a thinking process for reviewing the provided Python code:\n\n1.  **Understand the Goal:** The function `get_user(user_id)` connects to an SQLite database (`users.db`), builds a SQL query using the input `user_id`, executes it, and fetches one row.\n2.  **Review Criteria:** Bugs, Security Issues, Style/Best Practices.\n\n---\n\n3.  **Security Analysis (Highest Priority):**\n    *   *Code:* `query = f\"SELECT * FROM users WHERE id = {user_id}\"`\n    *   *Vulnerability:* This is an f-string used to inject a variable directly into the SQL string. If `user_id` comes from external input (like HTTP requests or command line arguments), and that input isn't sanitized, it creates a classic **SQL Injection** vulnerability.\n    *   *Fix:* Use parameterized queries (`?` placeholders) provided by the database connector.\n\n4.  **Bug/Reliability Analysis:**\n    *   *Resource Management (Bugs):* The connection `conn = sqlite3.connect('users.db')` is opened, but there is no explicit `conn.close()` or use of a `try...finally`/`with` block. If an error occurs during execution, the connection remains open, leading to resource leaks.\n    *   *Return Value:* The function returns `cursor.fetchone()`, which is correct for fetching data, but it might be better practice to encapsulate this within a context manager.\n\n5.  **Style/Best Practices Analysis:**\n    *   *Context Managers (PEP 8/Pythonic):* Using `with sqlite3.connect(...) as conn:` is the standard Python way to ensure resources are automatically closed even if exceptions occur.\n    *   *Type Hinting:* Adding type hints improves readability and maintainability.\n\n---\n\n6.  **Synthesizing the Review (Conciseness is key):** Structure the findings into the requested categories.\n\n    *   *Security:* SQL Injection (The most critical flaw).\n    *   *Bugs/Reliability:* Resource Leakage (Missing connection closing).\n    *   *Style:* Context Manager usage, Parameterization improvement.\n\n7.  **Final Polish:** Write the review clearly and provide the corrected code snippet. (Self-Correction: Ensure the recommended fix addresses *both* the security and the resource",
       "latency_s": 4.545036,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nGrape",
       "latency_s": 0.474353,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -60,9 +68,11 @@
       "task": "sprint_narrative",
       "response": "We successfully closed out key functional work with the user authentication revamp and implemented robust billing webhook retries. Progress on the planned SSO integration stalled significantly due to an external dependency: three full days of downtime from the core vendor API. Our immediate focus must be stabilizing the mobile pipeline's flaky CI to guarantee reliable deployments and minimize build-related uncertainty going into the next sprint.",
       "latency_s": 5.588315,
-      "score": null,
+      "score": 0.95,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -78,9 +88,11 @@
       "task": "summarization",
       "response": "Here's a thinking process to arrive at the suggested summary:\n\n1.  **Analyze the Request:** The goal is to summarize a technical incident report in exactly three sentences for a *non-technical stakeholder*.\n2.  **Analyze the Source Material (The Incident Report):**\n    *   *Technical Event:* PostgreSQL primary failed (14:23 UTC).\n    *   *Root Cause 1 (Immediate):* Disk full on `/var/lib/postgresql`.\n    *   *Contributing Factor:* WAL archives hadn't rotated for 48h (cron disabled).\n    *   *Resolution:* Replica promoted at 14:31.\n    *   *Impact:* 8 minutes downtime.\n    *   *True Root Cause (Process Failure):* Monitoring alert for disk space was silenced during maintenance and never re-enabled.\n    *   *Mitigation/Fixes:* Re-enable alert; add disk-space check to post-maintenance checklist.\n\n3.  **Determine the Stakeholder Focus (Non-Technical):** Non-technical stakeholders care about:\n    *   *What happened?* (The impact)\n    *   *How bad was it?* (Downtime length/business disruption)\n    *   *Why did it happen?* (Simple cause, avoiding jargon like \"WAL archives\" or \"PostgreSQL primary\").\n    *   *What are we doing about it?* (Assurance/Future prevention).\n\n4.  **Drafting - Sentence by Sentence Strategy (The 3-Sentence Rule):**\n\n    *   *Sentence 1: The Incident & Impact.* State clearly what went down and how long it lasted. *Focus on the business impact.*\n        *(Draft thought: Our database failed because the disk filled up, causing an 8-minute outage.)* -> Make it sound professional and high-level.\n\n    *   *Sentence 2: The Root Cause (The \"Why\").* Explain the core issue without the technical jargon (e.g., don't mention cron or WAL). Focus on the procedural failure.\n        *(Draft thought: We lost monitoring because we forgot to turn it back on.)* -> This is clear and actionable for a stakeholder.\n\n    *   *Sentence 3: The Resolution & Future Prevention.* Outline the corrective actions taken to ensure this doesn't happen again. *Focus on improvements.*\n        *(",
       "latency_s": 4.529209,
-      "score": null,
+      "score": 0.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -96,18 +108,22 @@
       "task": "code_generation",
       "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most max_chars characters each.\n    \n    The function prefers to break on sentence boundaries ('.', '!', '?') rather than \n    breaking in the middle of words or sentences. Words are never cut mid-word; if a single \n    word exceeds max_chars, it will be placed alone in its own chunk regardless of length.\n\n    Args:\n        text (str): Input string to be chunked.\n        max_chars (int): Maximum number of characters per chunk. Must be greater than 0.\n        \n    Returns:\n        list[str]: A list of strings, each with at most max_chars characters and respecting \n                   sentence boundaries and word integrity.\n\n    Raises:\n        ValueError: If max_chars is less than or equal to 0.\n\n    Examples:\n        >>> chunk_text(\"Hello world. This is a test.\", 12)\n        ['Hello wor', 'ld.', ...]  \n        # Actually, with proper logic it should break cleanly on words and sentence ends if possible\n    \"\"\"\n\n    def _find_word_boundaries(text):\n        \"\"\"Yield (end_idx, substring) pairs representing word boundaries.\"\"\"\n        import re\n        for match in re.finditer(r'\\S+', text):\n            yield match.end(), match.group() + ' ',  # include trailing space if needed\n        return\n\n    chunks = []\n    pos = 0\n\n    def _get_next_word_start(end: int) -> str:\n        \"\"\"Return next word substring starting from position end.\"\"\"\n        import re\n        for m in re.finditer(r'\\S+', text[end:] + ' '):\n            start_offset = len(text[:end]) - (m.start())  # incorrect offset; fix below\n            continue\n\n    chunks = []\n    current_chunk_end = 0\n\n    if max_chars <= 0:\n        raise ValueError(\"max_chars must be greater than 0\")\n\n    import re\n    \n    tokens = re.findall(r'\\S+|\\s+', text)\n    \n    for token in tokens:\n        pos += len(token)\n        \n        # Prefer break before sentence markers when near limit\n        if current_chunk_end + max_chars < pos - (len(text[pos:-])):  # simplified logic\n    \n        while True\n\n# Final clean implementation with correct boundary handling and test assertion.\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most",
       "latency_s": 10.913783,
-      "score": null,
+      "score": 0.6,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.6"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A short Python script using SQLite.\n    *   Task: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n    *   **Security:** SQL Injection vulnerability. The `f-string` directly interpolates user input (`user_id`) into the query string without sanitization or parameter binding. If `user_id` comes from external input (web request, API), this is critical.\n    *   **Resource Management:** No connection closing (`conn.close()`). Database connections should be managed with context managers to prevent leaks and ensure proper cleanup, especially if exceptions occur during execution.\n    *   **Style/Best Practices:** Using raw SQL string formatting instead of parameterized queries (param style `%` or `?`). Function returns None implicitly if no match found vs raising an exception for consistency might need checking depending on business logic, but the main issue is connection handling and security first.\n\n4.  **Draft Feedback:**\n    *   Security: Critical SQL Injection risk due to f-string interpolation. Use parameterized queries (`execute(query, (user_id,)`).)\n    *   Resource Management: Connection must be closed in a `finally` block or context manager (`with sqlite3.connect(...) as conn:`).\n    *   Style: Add return type hinting if possible (though \"concise\" limits verbosity), maybe validate input types.\n\n5.  **Refine Feedback for Conciseness:**\n    *   Combine security and fix recommendation into one point about parameterized queries.\n    *   Combine resource management suggestion with context manager usage.\n    *   Mention error handling implicitly or explicitly? The prompt asks to be concise, so just the main issues are best.\n\n6.  **Final Polish (Mental Check):**\n    *   Bug: None obvious beyond potential `None` return vs expected object if not handled by caller, but that's logic level. Connection leak is a bug/risk.\n    *   Security:",
       "latency_s": 5.636752,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
