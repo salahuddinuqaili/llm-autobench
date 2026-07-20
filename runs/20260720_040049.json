@@ -1,0 +1,122 @@
+{
+  "run_id": "20260720_040049",
+  "results": [
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "arithmetic_reasoning",
+      "response": "This problem can be solved using relative velocity, as both trains travel in the same direction.\n\n### 1. Calculate the Head Start Distance\n\nFirst, determine how far Train 1 has traveled before Train 2 leaves the station at 3:00.\n*   Time elapsed (from 2:00 to 3:00): 1 hour\n*   Distance = Speed $\\times$ Time\n*   $\\text{Distance}_1 = 60 \\text{ km/h} \\times 1 \\text{ hr} = 60 \\text{ km}$\n\nAt 3:00, Train 1 is $60 \\text{ km}$ ahead of Train 2.\n\n### 2. Determine the Relative Speed (Closing Rate)\n\nSince both trains are moving in the same direction, the rate at which Train 2 closes the gap is the difference",
+      "latency_s": 16.666158,
+      "score": 0.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "changelog_generation",
+      "response": "## \u2728 Improvements\n\n* **\ud83d\udcca Export Sprint Reports to CSV:** You can now easily download your full sprint reports directly from the dashboard for offline analysis and record-keeping.\n* **\ud83d\udee1\ufe0f Enhanced Connection Reliability:** Improved token refresh logic ensures that if there are temporary connection issues during syncing or OAuth processes, your data will automatically reattempt the connection without failing.\n* **\u2699\ufe0f More Stable Webhooks:** We've improved how webhooks handle incomplete payloads, preventing system crashes and ensuring more reliable automated integrations across your services.",
+      "latency_s": 3.862705,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "code_generation",
+      "response": "```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits a block of text into chunks, ensuring no chunk exceeds max_chars.\n\n    The function prioritizes breaking at natural boundaries (sentence ends: ., !, ?) \n    and strictly enforces word boundaries to prevent partial words.\n\n    Args:\n        text (str): The input string to be chunked.\n        max_chars (int): The maximum allowed character length per chunk. Must be > 0.\n\n    Returns:\n        list[str]: A list of text chunks. If the entire text cannot fit into \n                    chunks <= max_chars even by cutting words, the function \n                    will still attempt to chunk based on word boundaries.\n\n    Raises:\n        ValueError: If max_chars is less than or equal to zero.\n    \"\"\"\n    if not isinstance(text, str) or not text:\n        return []\n    if not isinstance(max_chars, int) or max_chars <= 0:\n        raise ValueError(\"max_chars must be a positive integer.\")\n\n    # Normalize the text slightly to ensure spaces around punctuation for easier tokenization\n    text = re.sub(r'([.,!?:])', r'\\1 ', text)\n    \n    # Tokenize into words and separators (punctuation + space combination)\n    tokens = []\n    current_token = \"\"\n    for char in text:\n        if char.isalnum() or char.isspace():\n            current_token += char\n        elif re.match(r'[.,!?:]', char):\n            # If we were building a token, save it first\n            if current_token and current_token not in (' ', ''):\n                tokens.append(current_token)\n            \n            # Add punctuation as its own 'token' marker if possible\n            tokens.append(char) \n            current_token = \"\"\n        else:\n            # Handle other unexpected characters by just ignoring them or treating as space\n             current_token += \" \"\n\n    if current_token and current_token not in (' ', ''):\n        tokens.append(current_token)\n\n\n    chunks = []\n    current_chunk_",
+      "latency_s": 8.488708,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "code_review",
+      "response": "### \ud83d\udea8 Security Issues (Critical)\n\n1. **SQL Injection Vulnerability:**\n   The most critical issue is using an f-string (`f\"SELECT * FROM users WHERE id = {user_id}\"`) to construct the SQL query. This allows a malicious user to inject arbitrary SQL code via the `user_id`",
+      "latency_s": 4.409388,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "instruction_following",
+      "response": "Apple\nBanana\nGrape",
+      "latency_s": 0.390754,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "logical_reasoning",
+      "response": "**Step 1: Calculate the total number of boxes.**\n$$\\text{Total Boxes} = \\text{Number of shelves} \\times \\text{Boxes per shelf}$$\n$$\\text{Total Boxes} = 12 \\times 8 = 96 \\text{ boxes}$$\n\n**Step 2: Calculate the total number of items.**\n$$\\text{Total Items} = \\text{Total boxes} \\times \\text{Items per box}$$\n$$\\text{Total Items} = 96 \\times 10 = 960 \\text{ items}$$\n\n**Step 3: Determine the fraction remaining.**\nIf $1/4$ of the items are removed, the remaining fraction is:\n$$1 - 1/4 = 3/4$$\n\n**Step 4: Calculate the number of items that remain.**\n$$\\text{Remaining Items} = \\text{Total Items} \\times (3/4)$$\n$$\\text{Remaining Items} = 960 \\times (3/4)$$\n$$\\text{Remaining Items} = 240 \\times 3 = 720 \\text{ items}$$\n\n***\n**The final number of remaining items is 720.**",
+      "latency_s": 5.940941,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "sprint_narrative",
+      "response": "This sprint saw successful completion of the user auth revamp and robust implementation of billing webhook retries. Our critical SSO integration was stalled due to an unexpected three-day outage with the vendor API, which materially impacted our velocity. To maintain momentum, we must prioritize stabilizing the flaky CI on the mobile pipeline immediately to ensure reliable deployment across all platforms.",
+      "latency_s": 3.686709,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "structured_output",
+      "response": "{\"project_name\": \"Phoenix\", \"deadline\": \"2026-09-15\", \"budget_eur\": \"\u20ac120,000\", \"team_size\": \"4\"}",
+      "latency_s": 0.724431,
+      "score": 0.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "summarization",
+      "response": "The core system experienced an unplanned outage due to running out of disk space, resulting in approximately eight minutes of downtime for users. The root cause was a critical monitoring alert that had been deactivated during maintenance",
+      "latency_s": 4.412226,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "arithmetic_reasoning",
+      "response": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Problem:**\n    *   Train A (First train): Leaves at $t = 2:00$ (which I'll define relative to start), speed ($v_A$) = 60 km/h.\n    *   Train B (Second train): Leaves at $t = 3:00$, speed ($v_B$) = 90 km/h.\n    *   Goal: Find the time when they meet/catch up.\n\n2.  **Define Variables and Coordinates:**\n    *   Let distance be measured from the station (position 0).\n    *   Let $t$ be the number of hours after the first train leaves ($t=0$ corresponds to real-world time 2:00).\n\n3.  **Determine Equations for Position vs. Time:**\n    *   For Train A:\n        *   Starts at position $d_A(0) = 0$.\n        *   Speed is constant 60 km/h.\n        *   Equation: $d_A(t) = 60t$ (where $t$ is hours past 2:00).\n\n    *   For Train B:\n        *   Starts at position $d_B(0)$? No, wait. The second train leaves an hour later.\n        *   At time $t=1$ (real-world time 3:00), it starts moving from 0.\n        *   Speed is constant 90 km/h.\n        *   Equation approach 1 (Relative to its start): Let's stick to the common timeline ($t$ = hours since 2:00).\n            *   Train B travels for $(t-1)$ hours when it starts at $d=0$.\n            *   Equation: $d_B(t) = 90 \\times (t - 1)$, valid only for $t \\geq 1$.\n\n4.  **Set the Equations Equal to find Intersection:**\n    *   We want to find when distance A equals distance B ($d_A = d_B$).\n    *   $60t = 90(t - 1)$\n\n5.  **Solve for $t$:**\n    *   Expand right side: $60t = 90t - 90$\n    *   Subtract $90t$ from both sides: $-30t = -90$\n    *   Divide by -30: $t = \\frac{-90}{-30}$\n    *   $t = 3$ hours.\n\n6.  **Calculate the Catch-up Time:**\n    *   The variable $t$ represents hours past 2:00.\n    *   Current time is calculated by adding $t=3$ to 2:00.\n    *   Base time (when A leaves): 14:00 or just \"2:00\".\n    *   Add 3 hours $\\rightarrow$ 5:00.\n\n7.  **Verify the Solution:**\n    *   Time caught up to is 5:00 PM/PM? Let's use a clock context (usually assumed PM if not specified, or just relative). The question asks for HH:MM format. I will assume AM/PM isn't strictly required but implies real-world hours usually starting at 2 in the afternoon or morning doesn't matter as long as math holds up. Usually these riddles imply standard daily time cycles where you start with a specific clock face, then add duration to it.\n    *   Check distances:\n        *   Train A travels for $5 - 2 = 3$ hours at 60 km/h $\\rightarrow 180$ km.\n        *   Train B travels for $5 - 3 = 2$ hours at 90 km/h $\\rightarrow 180$ km.\n    *   The distances match.\n\n8.  **Alternative \"Relative Speed\" Method (Mental Check):**\n    *   Head start of A: Traveling alone from 2 to 3 ($t=1$ hour).\n        *   Distance head-start = $60 \\text{ km/h} \\times 1 \\text{ h} = 60 \\text{ km}$.\n    *   Now B starts. Relative speed between A and B (closing the gap) is $v_B - v_A$? No, wait. They are moving in same direction. Closing speed of faster train catching slower one: $90 - 60 = 30 \\text{ km/h}$.\n    *   Distance to close = 60 km.\n    *   Time required = $\\frac{\\text",
+      "latency_s": 17.171829,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "code_generation",
+      "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most `max_chars` characters each, preferably breaking on sentence boundaries ('.', '!', '?') and never cutting a word in half.\n\n    Args:\n        text (str): The input string to chunk.\n        max_chars (int): Maximum allowed number of characters per chunk. Must be positive.\n\n    Returns:\n        list[str]: A list of non-empty strings, each with length at most `max_chars`. If the entire text exceeds `max_chars`, it will still attempt splitting respecting sentence boundaries and word integrity. If a single token (word) exceeds `max_chars` in length, an error is raised since such content cannot be validly chunked under current constraints.\n\n    Raises:\n        ValueError: If max_chars <= 0 or if the text contains words longer than max_chars.\n\n    Example:\n        >>> chunk_text(\"Hello world! How are you?\", 15)\n        ['Hello worl', 'd!\\\\nHow ar', ...] # Invalid - word cut; correct logic prevents this\n    \"\"\"\n    \n    if max_chars <= 0 or not text:\n        raise ValueError(\"max_chars must be positive and text cannot be empty.\")\n\n    words = [w.strip() for w in text.split(' ') if w.strip()]\n    chunks = []\n    current_chunk = \"\"\n\n    for word in words:\n        # Check if single word fits alone (in case previous chunk is full or near max_chars)\n        test_new_chunk = f\"{current_chunk} {word}\" if current_chunk else word\n        \n        if len(test_new_chunk.split(' ')[0]) > max_chars and not current_chunk:\n            raise ValueError(f\"Word '{word}' exceeds allowed character count: {len(word)} > {max_chars}\")\n\n        # Try to add the new word while staying within char limit\n        potential = f\"{current_chunk} {word",
+      "latency_s": 10.748003,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "code_review",
+      "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A short Python code snippet using SQLite.\n    *   Task: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db') # Potential issue: no close connection?\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\" # Major security vulnerability! SQL Injection.\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n    *   **Security (Critical):** The code uses string formatting (`f-string`) directly into the SQL query with a user-provided variable `user_id`. This allows for SQL injection attacks. An attacker could input `' OR '1'='1` to bypass authentication or extract data. It should use parameterized queries (placeholders `%s`).\n    *   **Resource Management:** The connection and cursor are created inside the function but never closed. If multiple calls are made, it leaks resources. Should be managed with a context manager (`with`) or explicit close in `finally`.\n    *   **Style/Best Practices:** No error handling (try/except). Returns raw tuple potentially including NULLs depending on DB state. Connection is opened locally without isolation scope management issues usually seen at top level, but still needs closing.\n\n4.  **Draft the Review:**\n    *   Security: Use parameterized queries instead of f-strings.\n    *   Resources: Close connections/curors using context managers.\n    *   Style: Add error handling (optional for conciseness). Keep it brief.\n\n5.  **Refine Concisely:**\n    *   Point out SQL injection risk immediately as the most important issue.\n    *   Mention connection leak.\n    *   Suggest parameterized queries.\n\n6.  **Final Polish:**\n    ```text\n    - Security: Use parameterized queries to prevent SQL injection (e.g., `cursor.execute(\"SELECT ... WHERE id = ?\", (user_id,))`).\n    - Resources: Manage DB connections with context managers (`with conn:`) or explicit cleanup; currently leaks resources.\n    - Style: Add error handling for robustness and ensure the connection is",
+      "latency_s": 5.558579,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "logical_reasoning",
+      "response": "Here's my thought process for solving this word problem:\n\n1.  **Analyze the Request:**\n    *   Goal: Determine how many items remain in a warehouse after some are shipped out.\n    *   Given data:\n        *   Number of shelves = 12\n        *   Items per shelf (boxes) = 8 boxes/shelf? No, wait. Let me re-read carefully: \"Each shelf holds 8 boxes.\" -> So it's Shelves $\\times$ Boxes/Shelf.\n        *   Items per box = 10 items/box.\n    *   Action taken: Remove $1/4$ of the total items for shipping (so they are gone).\n    *   Goal output: Steps shown, final number remaining.\n\n2.  **Step-by-Step Calculation Plan:**\n\n    *   *Step 1: Calculate Total Boxes.*\n        *   Multiply the number of shelves by the boxes per shelf.\n        *   $12 \\text{ shelves} \\times 8 \\text{ boxes/shelf}$\n\n    *   *Step 2: Calculate Total Items (Inventory).*\n        *   Multiply the total boxes calculated in Step 1 by the items per box.\n        *   $(\\text{Total Boxes}) \\times 10 \\text{ items/box}$\n\n    *   *Step 3: Calculate Removed Items.*\n        *   Find $1/4$ of the Total Items from Step 2.\n        *   $\\frac{1}{4} \\times (\\text{Total Items})$ (or divide by 4).\n\n    *   *Step 4: Calculate Remaining Items.*\n        *   Subtract Removed Items from Total Items.\n        *   $(\\text{Total Items}) - (\\text{Removed Items})$\n\n    *   *Alternative Step 3 & 4:* Since $1/4$ are removed, then $3/4$ remain. I can calculate $75\\%$ or $\\frac{3}{4}$ of the total items directly to get the remaining amount faster (less subtraction step). Let's do both mentally to double-check.\n\n    *   *Math:*\n        *   Shelves: 12\n        *   Boxes/Shelf: 8\n        *   Items/Box: 10\n\n        $1 \\times 12 = 144$ boxes (Wait, let me re-read again). \"A warehouse has 12 shelves. Each shelf holds 8 boxes.\" Okay, so total boxes is $12 \\times 8$.\n        Total Boxes = $96$.\n        Total Items = $96 \\text{ boxes} \\times 10 \\text{ items/box} = 960$ items.\n\n    *   *Removed:* $\\frac{1}{4}$ of 960.\n        $960 / 2 = 480$. $480 / 2 = 240$. So removed is 240.\n\n    *   *Remaining:* $960 - 240$.\n        $960 - 100 = 860$, minus another 140... let's just do the math:\n        $960 - 240 = 720$.\n\n    *   *Alternative method check:*\n        Remaining fraction = $3/4$ (since $1 - 1/4 = 3/4$).\n        $\\frac{3}{4} \\times 960$.\n        First, divide by 4: $96 / 4 = 24$. So $960 / 4 = 240$.\n        Multiply by 3: $240 \\times 3 = 720$.\n\n    *   Both methods match. The result is robust.\n\n3.  **Drafting the Response:**\n\n    *   Start with a clear header or introduction stating what needs to be found (Total Inventory).\n    *   Show multiplication for shelves and boxes: $12 \\times 8 = 96$.\n    *   Show multiplication for total items: $96 \\times 10 = 960$.\n    *   Address the removal part clearly. Explain that if $1/4$ are gone, we find that amount or calculate what remains directly. I will show finding the removed amount and subtracting it as it is usually more intuitive for these prompts (\"Show your steps\"). Or maybe just multiplying by 3/4 is cleaner? Let's stick to \"find total -> remove part\" logic but mentioning $3/4$ remaining as a check or alternate way makes sense.\n    *   Actually, calculating the removed items explicitly ($960 / 4 =",
+      "latency_s": 10.697882,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    }
+  ]
+}
