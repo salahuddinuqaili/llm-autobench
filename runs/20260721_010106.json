@@ -15,36 +15,44 @@
       "task": "changelog_generation",
       "response": "### \u2728 Improvements\n\n*   **Exportable Reports:** You can now easily download your full sprint reports as CSV files directly from the dashboard, making data analysis simpler than ever.\n*   **Enhanced Stability:** We've significantly improved how our system handles background tasks and connection refreshes, meaning fewer unexpected interruptions for your workflows.\n*   **Improved Reliability:** The platform is more robust now and won't crash unexpectedly even if incoming data payloads are missing certain fields.",
       "latency_s": 4.199917,
-      "score": null,
+      "score": 0.67,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.67"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "This solution implements a greedy approach: it builds chunks until the `max_chars` is nearly reached. When an overflow is detected, it first tries to backtrack to the nearest natural sentence boundary (`.`, `!`, `?`). If that fails (e.g., the text starts mid-sentence and there are no breaks close by), it backtracks to ensure the chunk ends cleanly after a complete word.\n\n```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits a given string of text into chunks of at most `max_chars`.\n\n    The function prioritizes breaking on sentence boundaries ('.', '!', '?').\n    It strictly enforces that no word is cut across chunk boundaries.\n\n    Args:\n        text: The input string to be chunked.\n        max_chars: The maximum desired length of any resulting chunk.\n\n    Returns:\n        A list of strings, where each string is a text chunk.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n\n    Example:\n        >>> chunks = chunk_text(\"Hello world. This is a long sentence that needs to be broken up now!\", 25)\n        >>> print(chunks)\n        ['Hello world.', 'This is a long sentence that needs to be', 'broken up now!']\n    \"\"\"\n    if max_chars < 1:\n        raise ValueError(\"max_chars must be at least 1.\")\n\n    chunks = []\n    current_position = 0\n    text_length = len(text)\n\n    while current_position < text_length:\n        # Calculate the maximum index we can reach without exceeding max_chars\n        search_end = min(current_position + max_chars, text_length)\n\n        # The potential chunk is everything up to search_end\n        potential_chunk = text[current_position:search_end]\n\n        if len(potential_chunk) <= max_chars:\n            # If we are near the end and the remaining text fits, take it all.\n            chunks.append(potential_chunk)\n            break\n        \n        # --- Attempt to find a suitable break point ---\n\n        start = current_position + 1\n        best_split_index = -1\n\n        # Strategy 1: Look for the nearest sentence boundary (., !, ?)\n        # We search backwards from just before search_end.\n        boundary_matches = list(re.finditer(r'[.!?]', potential_chunk))\n        \n        # Prioritize finding a break point that is close to max_chars, \n        # but does not exceed it.\n        if boundary_matches:\n            # We want the last possible (closest to search_end) sentence break\n            last_sentence_break = boundary_matches[-1]\n            split_at_index = last_sentence_break.end()\n            \n            # Check if splitting at this point leaves a chunk close to max_chars \n            # and is significantly better than just the current word end.\n            if split_at_index >= start and (search_end - split_at_index > 5):\n                best_split_index = split_at_index\n\n\n        # Strategy 2: Fallback to a word boundary if Sentence boundaries are not ideal\n        if best_split_index == -1 or (text[best_split_index] != '.' and text[best_split_index] != '!' and text[best_split_index] != '?'):\n            # If the preferred sentence break isn't useful, find the",
       "latency_s": 8.471068,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "## \ud83d\udc1e Bugs & Critical Fixes\n\n1.  **SQL Injection Vulnerability (CRITICAL):** Using an f-string (`f\"...\"`) with user input (`user_id`) directly embeds the variable into the query, allowing malicious users to alter the query structure (e.g., passing `1 OR 1=1 --`).\n    *   **Fix:** Always use parameterized queries via `?` placeholders.\n\n2.  **Resource Leakage (Major):** The database connection (`conn`) is opened but never explicitly closed, and the cursor isn't managed using a context manager. In production code, this will lead to resource leaks.\n    *   **Fix:** Use Python's `with sqlite3.connect(...) as conn:` structure.\n\n## \ud83d\udee1\ufe0f Security Issues\n\n1.  **SQL Injection (Confirmed):** As noted above, this is the primary security flaw. Never format SQL queries with variables.\n\n## \u2728 Style & Improvements\n\n1.  **Error Handling:** The function assumes the database file exists and connections will succeed. It should include `try...except` blocks to gracefully handle `sqlite3.OperationalError` (e.g., if the table doesn't exist).\n2.  **Typing:** Add type hints for clarity (`user_id: int`, `-> tuple | None`).\n\n## \u2705 Refactored Code Example\n\n```python\nimport sqlite3\nfrom typing import Optional, Tuple\n\ndef get_user(user_id: int) -> Optional[Tuple]:\n    \"\"\"Retrieves user data from the database using a parameterized query.\"\"\"\n    # Use 'with' for automatic connection management and cleanup\n    try:\n        with sqlite3.connect('users",
       "latency_s": 4.421554,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "apple\nbanana\ngrape",
       "latency_s": 0.375106,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -60,9 +68,11 @@
       "task": "sprint_narrative",
       "response": "We successfully completed the user auth revamp and implemented billing webhook retries, moving key features forward despite external constraints. Our SSO integration was significantly stalled due to three days of vendor API downtime, highlighting reliance on third-party stability. Moving forward, stabilizing the flaky mobile CI pipeline must be our top priority to ensure reliable deployments and minimize last-minute technical debt.",
       "latency_s": 2.315446,
-      "score": null,
+      "score": 0.95,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -78,9 +88,11 @@
       "task": "summarization",
       "response": "The main database system experienced an unexpected outage due to its storage running out of space. This issue occurred because a critical disk space warning alert was accidentally disabled during recent maintenance and never turned back on. We have now reactivated the monitoring alert, added this check to our standard operational procedures, and implemented permanent fixes to prevent future service interruptions caused by full disks.",
       "latency_s": 2.497872,
-      "score": null,
+      "score": 0.92,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.92"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -96,18 +108,22 @@
       "task": "code_generation",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Function name: `chunk_text`\n    *   Input parameters: `text` (str), `max_chars` (int)\n    *   Output type: `list[str]`\n    *   Constraints/Rules:\n        *   Split into chunks of at most `max_chars`.\n        *   Prefer breaking on sentence boundaries ('.', '!', '?').\n        *   Never cut a word.\n    *   Requirements: Include docstring, include one assert test.\n\n2.  **Algorithm Design:**\n    *   Initialize an empty list for results.\n    *   Maintain the current chunk being built (`current_chunk`).\n    *   Iterate through characters or words? Words are safer to avoid cutting mid-word. However, iterating character by character is easier to manage length constraints, but requires word boundary detection. A better approach might be tokenizing into sentences or words first, then managing chunks greedily with a fallback strategy when `max_chars` forces a cut in the middle of an idea (but not necessarily allowed per \"never cutting a word\").\n    *   Actually, let's process character by character but track indices where valid breaks occur.\n    *   Or, simpler: Split into words first? No, punctuation matters for sentence boundaries.\n    *   Let's try to accumulate characters. When adding the next char exceeds `max_chars`:\n        1. Check if a break point exists in the current chunk (e.g., whitespace or ending ' ').\n        2. Wait, \"prefer breaking on sentence boundaries\". This implies that before resorting to brute-force cutting at spaces within sentences, we should look for periods/exclamation/question marks + space.\n    *   Refined Algorithm:\n        1. Initialize `chunks = []`, `current_chunk = \"\"`.\n        2. Iterate through the text character by character? Or iterate word-by-word/punctuation-by-punctuation. Let's process token-wise (words and punctuation).\n        3. Actually, simply iterating index is fine but detecting words requires space detection or regex.\n    *   Simpler Approach: Use `max_chars` to track length. Add characters one by one? No, that cuts mid-word easily if not careful.\n    *   Best approach for \"never cut a word\": Iterate over tokens (words and punctuation). But we need to know where the next sentence starts.\n    *   Let's define what constitutes a valid chunk break:\n        1. Ideally at ' '? or newline?\n        2. Preferably at '.' + space, '!' + space, '?' + space.\n    *   Logic Flow:\n        1. Start `current = \"\"`.\n        2. Add tokens (words/punct) to `current` one by one.\n        3. Check length after adding token.\n        4. If adding a token exceeds `max_chars`, we have exceeded limit *within* that chunk logic? No, if the single addition makes it exceed, we must cut before it. But where? The rule says \"prefer breaking on sentence boundaries\". It doesn't explicitly forbid cutting at spaces within sentences unless necessary, but implies avoiding mid-word cuts (so space is fine).\n        5. If adding a token would make `len(current) > max_chars`, and this isn't the first word in `current`: we must finalize `current`. But wait, if the remaining text can fit into new chunks...\n    *   Edge case: What if one word alone exceeds `max_chars`? Usually not required to handle impossible constraints gracefully unless specified (e.g., \"truncate\"). The prompt says \"prefer breaking on sentence boundaries\". It implies standard English spacing. If a single token is > max_chars, we might just truncate it or split the first chunk differently? Standard behavior usually returns whatever fits and leaves the rest for next iteration? No, if one word > limit, you technically have to cut inside words unless allowed otherwise. But \"never cutting a word\" implies all individual words <= max_chars in normal cases. I will assume standard text where words fit or we must break at spaces before them even if sentence end is not reached (as preference). Wait, strictly: `chunk_text` should return valid chunks. If adding the next chunk exceeds limit, split *before* it? Or does that mean cut inside previous word?\n    *   Let's interpret \"never cutting a word\" as: Do not break inside spaces between characters of words if you can avoid it by breaking before punctuation or space earlier. But what if we run out of valid breaks and `max_chars` is small (e.g., max 5 chars) but sentence is long? Then the constraint becomes impossible without violating rules on some level.\n    *   However, usually in these tasks: \"Never cut a word\" means don't break string at indices inside `[",
       "latency_s": 10.787288,
-      "score": null,
+      "score": 0.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A snippet of Python code using `sqlite3` to query a database.\n    *   Task: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n    *   **Security (Critical):** SQL Injection Vulnerability. The `query` string is constructed using an f-string (`f\"...{user_id}...\"`). If `user_id` comes from user input, a malicious payload can alter the query structure and access/manipulate data unexpectedly. This needs parameterized queries (using `%s` or `{}` placeholders) with `.execute(query, (params))`.\n    *   **Resource Management:** The database connection (`conn`) is created but never closed. If `get_user` is called many times in a long-running application without closing connections, memory leaks will occur and the DB server might get overwhelmed (though for SQLite, file locks are more likely an issue than exhaustion). Need `try...finally` or context manager (`with`).\n    *   **Return Value:** The function returns raw database rows. It's often better to return a dictionary using `.fetchone()` combined with column names or wrap it in a class/model object for type safety and clarity (though technically functional style is acceptable, returning `None` implicitly handles \"not found\"). Wait, SQLite `fetchone()` usually returns `(null,)`. If ID not found, returns None.\n    *   **Type Checking:** `user_id` might be passed as a string or integer. Parameterized queries handle this fine (strings/bytes), but f-strings concatenate raw input which is unsafe regardless of type safety if strings are involved.\n\n4.  **Draft Review Points:**\n    *   **Security:** SQL Injection vulnerability due to direct interpolation. Use parameterization (`?` placeholders).\n    *   **Resource Management:** Connection not closed explicitly (missing `conn.close()` or context manager). Add error handling/cleanup for connections/transactions. Ideally use a connection pool, but at",
       "latency_s": 5.561651,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
