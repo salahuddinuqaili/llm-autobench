@@ -1,0 +1,122 @@
+{
+  "run_id": "20260720_170100",
+  "results": [
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "arithmetic_reasoning",
+      "response": "This is a classic distance, rate, and time problem. We need to find the time at which the distances traveled by both trains are equal.\n\n## Work Shown\n\n### 1. Calculate Train 1's Head Start Distance\n\nBefore Train 2 even leaves, Train 1 has been traveling for 1 hour (from 2:00 to 3:00).\n\n*   **Time difference:** $3:00 - 2:00 = 1$ hour\n*   **Distance covered by T1:** Rate $\\times$ Time\n    $$D_{\\text{start}} = 60 \\text{ km/h} \\times 1 \\text{ h} = 60 \\text{ km}$$\n\nAt 3:00, Train 1 is 60 km ahead of Train 2.\n\n### 2. Determine the Catch-Up Time\n\nWe need to find how long it takes Train 2 (the faster train) to close this 60 km gap. We can use the concept of **relative speed**.\n\n*   **Relative Speed:** The difference in their speeds.\n    $$\\text{Relative Speed} = 90 \\text{ km/h} - 60 \\text{ km/h} = 30 \\text{ km",
+      "latency_s": 17.315447,
+      "score": 0.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "changelog_generation",
+      "response": "## \ud83d\ude80 Improvements\n\n*   **Export Sprint Reports:** Easily export your full sprint reports directly from the dashboard into a CSV file for offline analysis and records.\n*   **Enhanced Login Reliability:** Improved stability when refreshing OAuth tokens, ensuring your workflow remains uninterrupted even if token renewal fails mid-request.\n*   **Increased Stability:** We have optimized our system architecture to better manage request traffic, leading to more consistent performance under load.\n*   **Webhook Fix:** Fixed an issue where webhook automation could crash if the incoming data was missing a required user identifier.",
+      "latency_s": 3.26001,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "code_generation",
+      "response": "```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits a given text string into chunks, each of at most max_chars length.\n\n    The function attempts to adhere to the following rules in order of priority:\n    1. Respect word boundaries (never cuts a word).\n    2. Prefer breaking on sentence boundaries ('.', '!', '?').\n    3. If forced to break mid-sentence due to length limits, it will choose the \n       nearest safe split point that is not inside a word or punctuation cluster.\n\n    Args:\n        text: The input text string to be chunked.\n        max_chars: The maximum desired length of each chunk.\n\n    Returns:\n        A list of strings, where each string is a self-contained text chunk.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n    \"\"\"\n    if max_chars < 1:\n        raise ValueError(\"max_chars must be at least 1.\")\n\n    chunks: list[str] = []\n    current_start_index = 0\n\n    while current_start_index < len(text):\n        remaining_text = text[current_start_index:]\n        \n        # If the remaining text is smaller than or equal to max_chars, take it all.\n        if len(remaining_text) <= max_chars:\n            chunks.append(remaining_text)\n            break\n\n        best_split_index = -1\n        search_window = current_start_index + 1\n        \n        # Loop until the next potential split point is found\n        while search_window < len(text):\n            potential_chunk = text[current_start_index:search_window]\n            current_len = len(potential_chunk)\n\n            if current_len > max_chars:\n                break  # Exceeded maximum allowed length\n\n            # 1. Check for natural breaks (Sentence ending punctuation).\n            # We search backwards from the limit to find a clean break point.\n            if current_len >= max_chars - 5 and best_split_index == -1:\n                 # Start checking potential split points near max_chars, going backward\n                for i in range(max_chars - 1, max(0, max_chars - 20), -1):\n                    if current_start_index + i < len(text) and text[current_start_index + i] in ['.', '!', '?']:\n                        # Ensure we don't split right at the beginning or end of the chunk\n                        if (i > 1 or (i == 1 and not re.search(r'[a-zA-Z]', potential_chunk[0]))):\n                            best_split_index = current_start_index + i + 1 # Split *after* punctuation\n                            break\n            \n            # If we haven't found a preferred break point yet, default to the end of an existing word boundary.\n            if best_split_index == -1:\n                # Look for space boundaries (or sentence ends) that respect length.\n                # This tries to grab chunks that look natural.\n                word_boundary_match = re.search(r'(?<![a-zA-Z])\\s+(?![\\w.])', text[current_start_index:search_window+1])\n                if word_boundary_match and (",
+      "latency_s": 8.638096,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "code_review",
+      "response": "## \ud83d\udc1e Bugs & Security Issues\n\n*   **\ud83d\udea8 SQL Injection Vulnerability (CRITICAL):** The function constructs the SQL query using an f-string (`f\"SELECT * FROM users WHERE id = {user_id}\"`). This directly embeds unsanitized user input into the query, making it vulnerable to SQL injection. An attacker could pass a malicious string for `user_id` (e.g., `1 OR 1=1 --`) and potentially view or modify unauthorized data.\n*   **Resource Leakage/Context Management:** The database connection (`conn`) is opened but never explicitly closed, even if errors occur. While Python's garbage collection might eventually clean it up, this is poor practice and can lead to resource exhaustion in long-running applications.\n\n## \u2728 Style & Best Practices\n\n*   **Connection Handling (Best Practice):** Always use a `with` statement for database connections (`sqlite3.connect(...)`) to ensure the connection is automatically closed regardless of errors.\n*   **Parameterization (Mandatory Fix):** When passing variable values into SQL queries, **never** use f-strings or string concatenation. Instead, use parameter markers (`?`) and pass the variables as a separate tuple argument to `cursor.execute()`.\n\n## \ud83d\udcd0 Refactored Code Example (Recommended)\n\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    \"\"\"Retrieves a user record securely.\"\"\"\n    try:\n        # Use 'with' statement for automatic resource management\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            # CRITICAL FIX: Use parameterized queries (placeholders '?')\n            query = \"SELECT * FROM users WHERE id = ?\"\n            cursor.execute(query, (user_id,)) # Pass input as a tuple/list\n            return cursor.fetchone()\n    except sqlite3.Error as e",
+      "latency_s": 4.546692,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "instruction_following",
+      "response": "apple\nbanana\ngrape",
+      "latency_s": 0.483545,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "logical_reasoning",
+      "response": "**Step 1: Calculate the total number of boxes.**\n$$\\text{Total shelves} \\times \\text{Boxes per shelf} = \\text{Total boxes}$$\n$$12 \\times 8 = 96 \\text{ boxes}$$\n\n**Step 2: Calculate the total number of items (initial amount).**\n$$\\text{Total boxes} \\times \\text{Items per box} = \\text{Total items}$$\n$$96 \\times 10 = 960 \\text{ items}$$\n\n**Step 3: Calculate the fraction of items remaining.**\nIf $1/4$ are removed, then $1 - 1/4 = 3/4$ remain.\n\n**Step 4: Calculate the number of remaining items.**\n$$\\text{Total items} \\times \\frac{\\text{Remaining fraction}}{1} = \\text{Remaining items}$$\n$$960 \\times \\frac{3}{4} \\quad \\text{or} \\quad (960 - (960 \\times 1/4))$$\n\nUsing the first method:\n$$\\frac{960}{4} \\times 3 = 240 \\times 3 = 720$$\n\n---\n**Alternatively (Calculating removed items first):**\n$$\\text{Items removed} = 960 \\times \\frac{1}{4} = 240 \\text{ items}$$\n$$\\text{Remaining items} = 960 - 240 = 720 \\text{ items}$$\n\n**Final number:** 720",
+      "latency_s": 6.304557,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "sprint_narrative",
+      "response": "Successfully completing the user auth revamp and implementing robust billing webhook retries significantly boosted core platform stability this sprint. Progress on SSO integration was severely hindered by three days of unexpected vendor API downtime, impacting our planned velocity. Moving forward, our immediate focus must be stabilizing the flaky mobile CI pipeline to ensure consistent and reliable deployment quality.",
+      "latency_s": 3.171846,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "structured_output",
+      "response": "{\"project_name\": \"Phoenix\", \"deadline\": \"2026-09-15\", \"budget_eur\": \"\u20ac120,000\", \"team_size\": \"4\"}",
+      "latency_s": 0.807897,
+      "score": 0.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "summarization",
+      "response": "Here's a thinking process to arrive at the suggested summary:\n\n1.  **Analyze the Source Material (Technical Incident Report):**\n    *   *Core Problem:* PostgreSQL primary failed.\n    *   *Immediate Cause (Technical):* Disk full on `/var/lib/postgresql`.\n    *   *Secondary Issue (Exacerbating Factor):* WAL archives hadn't rotated for 48h (cron disabled).\n    *   *Resolution Action:* Replica promoted at 14:31.\n    *   *Impact:* 8 minutes of downtime.\n    *   *Root Cause (Human/Process Failure):* Monitoring alert for disk space was silenced during maintenance and never re-enabled.\n    *   *Prevention/Fix:* Re-enable the alert, add a disk-space check to the post-maintenance checklist.\n\n2.  **Analyze the Goal:**\n    *   Summarize the incident.\n    *   Target Audience: Non-technical stakeholder (needs simple language, focus on impact and resolution, minimal jargon).\n    *   Constraint: 3 sentences.\n\n3.  **Determine Key Messages for a Non-Technical Audience (The \"So What\"):**\n    *   *Sentence 1 (What happened):* The system went down because the storage ran out of space.\n    *   *Sentence 2 (Impact/Resolution):* We recovered quickly (downtime) and brought service back up.\n    *   *Sentence 3 (Why it happened & what we fixed):* It was a procedural error (monitoring lapse), but we've implemented fixes to prevent recurrence.\n\n4.  **Drafting - First Pass (Mental Draft/Jargon Check):**\n    *   *Attempt 1:* The Postgres database failed because the disk filled up, which was due to archived logs not rotating. We promoted a replica and were down for eight minutes. The root cause was that the monitoring alert for disk space was forgotten after maintenance, so we are adding it back to the checklist. (A bit clunky).\n\n5.  **Refining and Polishing (Focusing on Stakeholder Language):**\n    *   Replace \"PostgreSQL primary failed\" with \"Our main database system went down.\"\n    *   Replace \"WAL archives hadn't rotated\" with a simple explanation of capacity issues or storage buildup.\n    *   Keep the timeline/impact clear.\n    *",
+      "latency_s": 4.546456,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "arithmetic_reasoning",
+      "response": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Request:**\n    *   Train A leaves at 2:00 PM (or just 2:00). Speed = $60 \\text{ km/h}$.\n    *   Train B leaves at 3:00 PM (just after Train A by 1 hour). Speed = $90 \\text{ km/h}$.\n    *   Goal: Find the time when they meet (catch up).\n    *   Output format: HH:MM with steps shown.\n\n2.  **Define Variables:**\n    *   Let $t$ be the travel time in hours for Train B until it catches Train A.\n    *   Alternatively, let $x$ be the distance from the station where they meet (where $d_A = d_B$).\n    *   Or, calculate the time relative to 3:00 PM as a reference point.\n\n3.  **Determine Distance and Time Relationships:**\n    *   Train A starts earlier than Train B by exactly 1 hour.\n    *   In that 1-hour head start (from 2:00 to 3:00), how far does Train A travel?\n        $$d_{\\text{headstart}} = \\text{speed} \\times \\text{time}$$\n        $$d_{\\text{headstart}} = 60 \\text{ km/h} \\times 1 \\text{ h} = 60 \\text{ km}.$$\n\n    *   Now, consider the moment after 3:00 PM. Both trains are moving away from the station.\n        Let $t$ be the number of hours Train B travels to catch up (measured from 3:00).\n\n4.  **Set up Equations:**\n    *   Distance covered by Train A = Head start distance + Distance traveled after 3:00\n        $$D_A = (60 \\text{ km/h} \\times 1) + (60 \\text{ km/h} \\times t)$$\n        $$D_A = 60 + 60t$$\n\n    *   Distance covered by Train B during time $t$:\n        $$D_B = 90 \\text{ km/h} \\times t$$\n        $$D_B = 90t$$\n\n5.  **Solve for Intersection ($t$):**\n    *   When Train A catches up to (or is caught by) Train B, their distances must be equal: $D_A = D_B$.\n    *   Equation: $60 + 60t = 90t$\n\n6.  **Calculate:**\n    *   Subtract $60t$ from both sides:\n        $$60 = 30t$$\n    *   Divide by 30:\n        $$t = \\frac{60}{30}$$\n        $$t = 2 \\text{ hours}.$$\n\n7.  **Determine Final Time:**\n    *   Train B catches up to the first train after traveling for $t$ hours (which is relative to its departure time).\n    *   Departure of second train: 3:00 PM/AM.\n    *   Travel time needed ($t$): 2 hours.\n    *   Time = 3:00 + 2 hours = 5:00 PM (or just 17:00 / 5:00).\n\n8.  **Alternative Method Check (Relative Speed):**\n    *   Relative speed of Train B with respect to Train A = $90 - 60 = 30 \\text{ km/h}$. (Train B is gaining on Train A at this rate).\n    *   Initial gap between them: Since Train A travels for 1 hour before Train B starts, the gap is $60 \\times 1 = 60 \\text{ km}$.\n    *   Time to close the gap = $\\frac{\\text{Distance}}{\\text{Speed}}$\n    *   $$t = \\frac{60 \\text{ km}}{30 \\text{ km/h}} = 2 \\text{ hours}.$$\n    *   Add this time to Train B's start time (or add the gap closure duration).\n    *   $18:00$ -> + 2h -> No, wait. The departure was 14:00 and second train at 15:00? Or just \"2\" and \"3\"? Usually implies AM/PM context or standard clock face time without specific date/year, but usually these problems imply PM if it's late afternoon/evening, or generic hours. Since the prompt asks for HH:",
+      "latency_s": 17.445681,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "code_generation",
+      "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most `max_chars` characters each.\n\n    The function prefers to break on sentence boundaries ('.', '!', '?'), \n    and never cuts a word in the middle. Each returned chunk will be <= \n    `max_chars`. A trailing incomplete chunk may appear if needed, but it\n    must not cut a word mid-string or violate max length constraints for full chunks.\n\n    Args:\n        text (str): Input text string to split.\n        max_chars (int): Maximum number of characters allowed per chunk.\n\n    Returns:\n        list[str]: A list of non-empty strings representing the text chunks.\n\n    Raises:\n        ValueError: If `max_chars` is less than 1, or if the entire input \n                     exceeds a single chunk's capacity when all content must be retained.\n    \n    Examples:\n        >>> chunk_text(\"Hello world! This is test.\", 20)\n        ['Hello world!', 'This is test.']\n\n        >>> chunk_text(\"One word\", 5)\n        ['On', 'e w']\n        \n        >>> assert len(chunk_text(\"Short sentence.\", 1)) == 79\n    \"\"\"\n    \n    if max_chars < 1:\n        raise ValueError(f\"max_chars must be positive, got {max_chars}\")\n\n    result = []\n    current_chunk = \"\"\n    \n    for char in text:\n        # If adding this character would exceed the limit and there are no \n        # sentence breaks near here to allow cutting before it, we check word boundaries.\n        \n        if len(current_chunk) == 0 or (len(current_chunk + char) <= max_chars):\n            current_chunk += char\n            \n            if not result:\n                continue\n                \n            else:\n                pass\n        \n    while current_chunk and len(current_chunk) > max_chars:\n        raise ValueError(f\"Text is too long for the given chunk size ({max_chars})\")\n\n```",
+      "latency_s": 10.844096,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "code_review",
+      "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A snippet of Python code using SQLite to fetch a user based on ID.\n    *   Tasks: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Code Analysis:**\n    *   `import sqlite3`: Standard library import, fine.\n    *   `def get_user(user_id):` Function definition, looks okay.\n    *   `conn = sqlite3.connect('users.db')`: Connects to a local database file every time the function is called. This is inefficient (connection pooling would be better) and potentially unsafe if not closed properly in production (though DB-API handles connections per-thread/process usually). More importantly, no error handling for connection/disconnect failures.\n    *   `cursor = conn.cursor()`: Creates a cursor, fine.\n    *   `query = f\"SELECT * FROM users WHERE id = {user_id}\"`: **Critical Security Issue.** This constructs SQL directly using string formatting with user input (`user_id`). If the database driver allows special characters in strings or if there's an injection risk (though SQLite is usually okay-ish with quotes, integers are safer), this opens the door to SQL Injection. `WHERE id = {value}` where value could be `' OR 1=1` etc. Even for IDs (usually ints), it should use parameterized queries (`?`).\n    *   `cursor.execute(query)`: Executes the query with vulnerabilities.\n    *   `return cursor.fetchone()`: Returns tuple or None, fine logic-wise.\n    *   **Missing Resources:** Connection and Cursor are not closed/committed if an error occurs in between. If exceptions happen (not handled), resources leak or leave DBs locked for other processes (though SQLite is local file based). Proper RAII pattern isn't used here explicitly (`with` statement recommended).\n\n3.  **Identify Issues:**\n    *   **Security:** SQL Injection vulnerability due to string formatting instead of parameterization.\n    *   **Style/Best Practice:** Connection not closed (use `with` context manager or explicit close/cursor methods), no error handling, connecting every time is inefficient but acceptable for simple scripts.\n\n4.  **Draft the Review:**\n    *   State security issue clearly first.\n    *   Mention resource management (`with`).\n    *   Mention style/efficiency (parameterization).",
+      "latency_s": 5.625022,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "logical_reasoning",
+      "response": "Here are the steps to solve this problem:\n\n**Step 1: Calculate the total number of boxes in the warehouse.**\nMultiply the number of shelves by the number of boxes on each shelf.\n$$12 \\text{ shelves} \\times 8 \\text{ boxes/shelf} = 96 \\text{ boxes}$$\n\n**Step 2: Calculate the total number of items initially stored.**",
+      "latency_s": 10.725411,
+      "score": 0.0,
+      "error": null,
+      "image": null
+    }
+  ]
+}
