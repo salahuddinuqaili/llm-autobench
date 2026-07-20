@@ -15,36 +15,44 @@
       "task": "changelog_generation",
       "response": "## \u2728 Improvements\n\n*   **Export Full Reports:** You can now export your entire sprint report directly to a CSV file from the dashboard, making data sharing and offline analysis easier than ever.\n*   **Improved Stability:** We've enhanced our system's reliability when handling complex workflows and background processes, ensuring uninterrupted data sync even during authentication refreshes.\n*   **Enhanced Integrations:** Critical fixes have been rolled out for webhooks, ensuring that your integrations remain stable and function reliably even if incoming payload data is incomplete.",
       "latency_s": 4.382358,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "This problem requires careful balancing between strict size constraints, preferring natural breaks (sentences), and maintaining lexical integrity (no cutting words). The solution below uses an iterative approach to build chunks greedily, but forces a break when the limit is approached or exceeded, prioritizing valid chunk boundaries.\n\n```python\nimport re\nfrom typing import List\n\ndef chunk_text(text: str, max_chars: int) -> List[str]:\n    \"\"\"\n    Splits text into chunks of at most max_chars. \n    \n    It prioritizes breaking on sentence boundaries (., !, ?) and never cuts a word.\n    If the ideal break point exceeds the limit, it attempts to cut mid-sentence \n    at a word boundary while respecting the size constraint.\n\n    Args:\n        text: The input string text.\n        max_chars: The maximum allowed character length for any chunk.\n\n    Returns:\n        A list of strings, where each string is an appropriately sized chunk.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n    \"\"\"\n    if max_chars < 1:\n        raise ValueError(\"max_chars must be at least 1.\")\n    if not text:\n        return []\n    \n    chunks = []\n    current_text = text.strip()\n    start_index = 0\n\n    while current_text:\n        # If the remaining text is smaller than max_chars, take it all and finish\n        if len(current_text) <= max_chars:\n            chunks.append(current_text)\n            break\n\n        best_break_point = -1\n        \n        # 1. Strategy: Find potential break points (Sentence ends are best)\n        # We search in a window slightly smaller than max_chars to allow for padding/whitespace.\n        search_window = min(max_chars * 0.9, len(current_text))\n        \n        # Look for sentence terminators near the end of the ideal chunk size.\n        # These checks account for whitespace after the punctuation.\n        sentence_breaks = re.finditer(r'(\\.\\s|\\!\\s|\\?\\s)', current_text[:search_window])\n\n        potential_break_points = []\n        for match in sentence_breaks:\n            end_index = match.end() - 1 # End just before the trailing space or at the punctuation\n            \n            # Check if this break point is valid (i.e., doesn't create an empty chunk)\n            if end_index > 0 and len(current_text[:end_index]) < max_chars:\n                 potential_break_points.append(end_index)\n\n        # If sentence breaks are found, prioritize the one closest to the desired capacity limit\n        if potential_break_points:\n            best_break_point = max(potential_break_points)\n            \n        else:\n             # 2. Secondary Strategy: Find the last word boundary before max_chars\n            # We look for a whitespace boundary within the allowed window",
       "latency_s": 8.490768,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "## \ud83d\udd34 Summary\n\nThe code has a critical **Security Bug (SQL Injection)** and poor resource management.\n\n---\n\n### \ud83d\udc1e Bugs & Improvements (Critical)\n\n1.  **Missing Connection Closure/Context Manager:** The connection (`conn`) is opened but never explicitly closed or committed/rolled back. If an error occurs, the connection might remain open, leaking resources.\n    *   ***Fix:*** Use `with sqlite3.connect(...)` to ensure proper cleanup.\n\n### \ud83d\udee1\ufe0f Security Issues (Critical)\n\n1.  **SQL Injection Vulnerability:** The user input (`user_id`) is directly embedded into the SQL query using an f-string (`query = f\"... {user_id}\"`). An attacker could provide a malicious string instead of an ID, potentially leading to data leaks or arbitrary command execution (e.g., if `user_id` were `'1 OR 1=1 --'`).\n    *   ***Fix:*** Always use parameterized queries (`?`) with the `cursor.execute()` method.\n\n### \u2728 Style & Best Practices\n\n1.  **Error Handling:** The function assumes the database file exists and that the connection will succeed. It lacks `try...except` blocks to handle potential `sqlite3.Error`.\n2.  **Return Type Clarity:** While functional, returning raw `cursor.fetchone()` tuple is typical but sometimes less explicit than handling type casting or converting it into a simple dictionary/model object for better usability upstream.\n\n---\n\n### \u2705 Recommended Refactoring (Solution)\n\n```python\nimport sqlite3\nfrom typing import Optional, Tuple\n\ndef get_user(user_id: int) -> Optional[Tuple]:\n    \"\"\"Retrieves user data safely using parameterized queries.\"\"\"\n    # 1. Use 'with' for automatic connection handling\n    try:\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()",
       "latency_s": 4.398146,
-      "score": null,
+      "score": 0.95,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nGrape",
       "latency_s": 0.390807,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -60,9 +68,11 @@
       "task": "sprint_narrative",
       "response": "We successfully delivered the user auth revamp and implemented billing webhook retries, significantly improving core system reliability. Our progress on SSO was severely hampered by three days of vendor API downtime, highlighting external dependencies we must factor into planning. Moving forward, we need to dedicate immediate time to stabilizing the mobile pipeline CI\u2014the current flakiness is a critical bottleneck preventing reliable deployment.",
       "latency_s": 3.103785,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -78,9 +88,11 @@
       "task": "summarization",
       "response": "The primary database system experienced an eight-minute service outage today because its physical storage filled up, causing an immediate failure. The root cause was that a critical monitoring alert for available disk space had been accidentally deactivated during maintenance and not reactivated afterward. To prevent this from recurring, we have immediately re-enabled the warning alert and implemented a mandatory checklist step requiring explicit confirmation of disk capacity",
       "latency_s": 4.419778,
-      "score": null,
+      "score": 0.95,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -96,18 +108,22 @@
       "task": "code_generation",
       "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"Split text into chunks of at most max_chars characters.",
       "latency_s": 10.809465,
-      "score": null,
+      "score": 0.75,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.75"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A snippet of Python code using `sqlite3`.\n    *   Task: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n    *   **Security (Critical):** The code constructs a SQL string using an f-string with `{user_id}` directly inserted into the query. This is classic SQL Injection vulnerability if `user_id` comes from user input (even though it's typed as integer usually, type hinting isn't here). If someone could control this variable via external channels or due to coercion issues (e.g., strings), injection occurs.\n        *   *Fix:* Use parameterized queries (`?`).\n    *   **Resource Management:** The connection `conn` and cursor are not closed explicitly in a `finally` block, nor wrapped in context managers (`with`). If the function is called multiple times or errors occur without closing resources (though SQLite connections usually hold onto memory until close), it's inefficient. More importantly, unclosed DB connections can lead to resource exhaustion if this endpoint is high-traffic within an application loop.\n    *   **Style/Best Practices:** Database credentials are hardcoded for the file path (`users.db`). Connection pooling isn't used (though simple scripts might skip). The return value isn't checked; `fetchone()` returns None, but there's no validation or error handling if it does.\n    *   **Bug Potential:** SQLite connections should generally be closed by the caller unless passed as part of a larger session management pattern. If this is an endpoint function in Flask/Django/FastAPI without connection pooling and closing resources, the app will eventually crash due to open FDs/threads.\n\n4.  **Draft the Review (incorporating fixes):**\n    *   Security: Mention SQL Injection risk immediately with f-string usage. Suggest parameterized queries.\n    *   Resources: Highlight missing `close()` or context manager (`with`).\n    *   Style: Keep it short, mention error handling",
       "latency_s": 5.521114,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
