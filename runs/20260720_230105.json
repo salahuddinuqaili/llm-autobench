@@ -1,0 +1,86 @@
+{
+  "run_id": "20260720_230105",
+  "results": [
+    {
+      "model": "custom:ollama/gemma3n:e4b",
+      "task": "arithmetic_reasoning",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found",
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma3n:e4b",
+      "task": "changelog_generation",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found",
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma3n:e4b",
+      "task": "code_generation",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found",
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma3n:e4b",
+      "task": "code_review",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found",
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma3n:e4b",
+      "task": "instruction_following",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found",
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma3n:e4b",
+      "task": "logical_reasoning",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found",
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma3n:e4b",
+      "task": "sprint_narrative",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found",
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma3n:e4b",
+      "task": "structured_output",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found",
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma3n:e4b",
+      "task": "summarization",
+      "response": null,
+      "latency_s": 0.0,
+      "score": null,
+      "error": "ollama api error: HTTP Error 404: Not Found",
+      "image": null
+    }
+  ]
+}
