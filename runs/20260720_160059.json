@@ -15,36 +15,44 @@
       "task": "changelog_generation",
       "response": "### \u2728 Improvements\n\n*   **Export Detailed Reports:** You can now easily download your sprint reports directly from the dashboard as a CSV file for offline analysis.\n*   **Enhanced Connection Reliability:** We've improved our background processing to handle token refreshing more robustly, ensuring that connected services stay synced even when temporary connection errors occur.\n*   **Stable Integrations:** Fixed an issue that could cause failures during data synchronization if certain required information was missing from webhooks.\n*   Optimized the system performance and stability by restructuring how we manage API requests.",
       "latency_s": 4.236849,
-      "score": null,
+      "score": 0.8,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.8"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits a block of text into chunks, ensuring no chunk exceeds max_chars.\n\n    The function prioritizes breaking on natural sentence boundaries (., !, ?) \n    and never cuts within a word. If a clean break is not possible at the limit, \n    it breaks at the nearest word boundary to keep the length as close as possible \n    to max_chars without exceeding it.\n\n    Args:\n        text: The input string to be chunked.\n        max_chars: The maximum allowed size of each resulting chunk.\n\n    Returns:\n        A list of strings, where each string is a chunk of the original text.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n    \"\"\"\n    if max_chars < 1:\n        raise ValueError(\"max_chars must be at least 1.\")\n\n    # Clean up potential empty input\n    text = text.strip()\n    if not text:\n        return []\n\n    chunks: list[str] = []\n    current_index = 0\n\n    while current_index < len(text):\n        # Calculate the remaining text segment\n        remaining_text = text[current_index:]\n        \n        # If the remaining text is already small enough, take it all\n        if len(remaining_text) <= max_chars:\n            chunks.append(remaining_text)\n            break\n\n        best_break_index = -1\n        \n        # --- 1. Try to find a natural break point (Sentence Boundary) ---\n        # We search for the first boundary that keeps us under max_chars.\n        \n        # Regex pattern matches potential sentence endings followed by whitespace/end of string.\n        # This handles cases like \"word. next word\" or \"word!next word\"\n        boundary_matches = list(re.finditer(r'[.!?](?:\\s|$)', remaining_text))\n\n        for match in boundary_matches:\n            # The break index is immediately after the punctuation mark \n            # (We include the punctuation itself)\n            break_point = match.end() - len(match.group(0).strip()) # Target end of punctuation\n            \n            if break_point > 0 and break_point <= max_chars:\n                best_break_index = break_point\n                # Found a clean sentence boundary that works, take it and move on.\n                break\n        \n        # --- 2. Fallback: Use word boundaries if no good sentence break was found or \n        # the best one exceeds max_chars significantly (or we want better adherence to size) ---\n\n        if best_break_index == -1:\n            # Search for the latest possible word boundary that respects max_chars\n            segment = remaining_text[:max_chars]\n            # Find the last whitespace or non-word character, ensuring we don't break before a word starts.\n            # We look for boundaries that are preceded by at least one character (i.e., not just leading spaces)\n            potential_breaks = list(re.finditer(r'\\s+(?=\\S)', segment))\n\n            if potential_breaks:\n                # Use the last valid word break point to maximize chunk size near max_chars\n                best_break_index = potential_breaks[-1].end()\n            else:\n                # If no whitespace exists (e.g., one single mega-word), \n                # just cut",
       "latency_s": 8.698124,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "This code has a critical security vulnerability and several architectural weaknesses.\n\n## \u26a0\ufe0f Security Issues (Critical)\n\n*   **SQL Injection:** This is the most severe flaw. The use of an f-string (`f\"SELECT * FROM users WHERE id = {user_id}\"`) to incorporate user input directly into the SQL query string allows a malicious user to inject arbitrary SQL commands (e.g., if `user_id` was `' OR 1=1 --`).\n    *   **Fix:** Always use parameterized queries (placeholders `?`) with the database driver's execute method.\n\n## \ud83d\udc1b Bugs & Reliability Issues\n\n*   **Resource Leakage:** The connection (`conn`) and cursor are opened but not guaranteed to be closed, even if an exception occurs. If this function runs frequently, it can lead to resource exhaustion.\n    *   **Fix:** Use a `with` statement (context manager) for the database connection.\n\n## \u2728 Style & Improvement\n\n*   **Context Manager Usage:** The standard Pythonic way to handle connections is using `with sqlite3.connect(...) as conn:`, which automatically handles closing and committing/rolling back transactions.\n*   **Type Hinting:** Add type hints to improve readability and maintainability.\n\n***\n\n## \u2705 Suggested Fix (Refactored Code)\n\n```python\nimport sqlite3\nfrom typing import Optional, Tuple\n\ndef get_user(user_id: int) -> Optional[Tuple]:\n    \"\"\"Fetches a user record safely from the database.\"\"\"\n    # Use 'with' statement for automatic connection handling/cleanup\n    try:\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            # CRITICAL FIX: Use parameterized query (question mark placeholders)\n            query = \"SELECT * FROM users WHERE id = ?\"\n            cursor.execute(query, (user_id,)) # Pass the input as a",
       "latency_s": 4.497774,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nGrape",
       "latency_s": 0.394908,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -60,9 +68,11 @@
       "task": "sprint_narrative",
       "response": "We successfully shipped the user auth revamp and implemented robust billing webhook retries this sprint, significantly improving system reliability. Progress on SSO integration stalled completely due to a three-day downtime with the vendor's API, requiring us to scope alternative approaches. To stabilize our velocity next sprint, we must urgently dedicate time to diagnosing the flaky CI in the mobile pipeline, which remains a key bottleneck risk.",
       "latency_s": 2.331903,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -78,9 +88,11 @@
       "task": "summarization",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:** The goal is to summarize a technical incident report (PostgreSQL failure due to disk full) into three sentences suitable for a non-technical stakeholder.\n2.  **Identify Key Information (Technical Report):**\n    *   *What failed?* PostgreSQL primary database.\n    *   *Why did it fail?* Disk full on `/var/lib/postgresql`.\n    *   *Impact/Timeline:* Downtime from 14:23 to 14:31 (8 minutes). Replica was promoted.\n    *   *Root Cause:* Monitoring alert for disk space was silenced during maintenance and never re-enabled.\n    *   *Solution/Prevention:* Re-enable the alert, add a disk-space check to post-maintenance checklist.\n3.  **Translate Technical Jargon (for Non-Technical Audience):**\n    *   PostgreSQL primary failed -> The core database system went down.\n    *   Disk full on `/var/lib/postgresql` -> We ran out of storage space on the server.\n    *   WAL archives hadn't rotated / cron disabled -> (Too technical for summary; simplify to focus on *why* the disk filled up).\n    *   Replica promoted at 14:31 -> We quickly switched over to a backup system.\n    *   Monitoring alert was silenced... never re-enabled -> Our automatic warning system failed/was overlooked after maintenance.\n    *   Post-maintenance checklist -> Standard procedure steps.\n4.  **Drafting the Summary (Structuring the 3 Sentences):** A good structure is: [What happened], [Impact], [How we fixed it/Preventative Action].\n\n    *   *Sentence 1 (The Problem & Impact):* State clearly what went wrong and how long it took.\n    *   *Sentence 2 (The Cause - Simplified):* Explain *why* the failure occurred in lay terms.\n    *   *Sentence 3 (Resolution/Prevention):* Detail the concrete steps taken to ensure it doesn't happen again.\n\n5.  **Review and Refine against Constraints:**\n    *   Target Audience: Non-technical stakeholder. (Use clear language, avoid jargon.)\n    *   Length: Exactly 3 sentences. (Check word count/flow).\n\n6.  **Final Polish (Result matches the desired output).**",
       "latency_s": 4.489485,
-      "score": null,
+      "score": 0.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -96,18 +108,22 @@
       "task": "code_generation",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Function name: `chunk_text`\n    *   Parameters: `text` (str), `max_chars` (int)\n    *   Return type: list[str]\n    *   Logic constraints:\n        *   Split into chunks of at most `max_chars`.\n        *   Prefer breaking on sentence boundaries ('.', '!', '?').\n        *   Never cut a word.\n    *   Requirements: Include docstring, include one assert test.\n\n2.  **Determine the Algorithm:**\n    *   Iterate through the text keeping track of current chunk characters and remaining capacity (`max_chars`).\n    *   We need to handle sentences. A sentence ends with '.', '!', or '?'. However, these punctuation marks might be followed by spaces (like \"Sentence one.\\n\\nSentence two.\"). The prompt says prefer breaking on boundaries but never cut a word. This implies we should try to include the whole word up until that boundary if it fits, otherwise just break at an arbitrary whitespace point *after* trying sentence breaks? Or does it mean stop right before a space after punctuation?\n    *   Let's refine \"prefer breaking on sentence boundaries\". If I have text like \"Hello world. It is nice.\" and `max_chars` allows only 10 chars (\" Hello w\").\n        *   Standard split at space: [\"Hel\", \", ,lo ...\"] -> invalid (cut word).\n        *   Preferred strategy: Accumulate characters. Check if the next character completes a sentence boundary or ends before it hits max limit? No, `max_chars` is hard constraint for the chunk size usually, but \"at most\". Wait, if I hit exactly `max_chars`, I must break there unless cutting words violates that rule (which can't happen).\n        *   Actually, let's interpret: We are building chunks. If adding one more character makes it exceed `max_chars`? No, the limit is per chunk. So we iterate word by word or space-by-space.\n    *   Approach 1: Iterate over words/spaces. Maintain a current buffer string and total length (without trailing whitespace). When adding next \"word\" exceeds `max_chars`, check if there's a sentence boundary before this point? No, that's complex inside the word loop usually.\n    *   Better approach:\n        1. Tokenize text into words/spaces to handle spaces easily without splitting inside them (but we need boundaries). Actually, standard string slicing is easier but finding split points requires lookahead.\n        2. Let's treat sentences as logical units? No, just characters matter for `max_chars`.\n    *   Refined Algorithm:\n        1. Start with empty list and current chunk string. Length = 0.\n        2. Iterate through the text character by character or word by word. Word-by-word is safer to avoid cutting words (e.g., splitting \"word\" into \"wor\", d\"). But punctuation attached to a preceding word like \"hello.\" counts towards length? Usually yes. If `max_chars` forces us past \".\", do we include that \".\" in the current chunk if it fits, or does including it violate \"at most\"?\n        3. Let's iterate through spaces (whitespace) and words. We maintain a list of sentences? Or just process linearly.\n        \n        *Simpler Strategy:* Iterate over whitespace-separated tokens + punctuation attached to them. Keep track of current chunk length (`chunk_len`). \n        Wait, simple string slicing is dangerous because it cuts inside words unless we find valid split points first.\n\n    Let's write a generator approach or loop logic:\n    \n    ```python\n    # Current buffer and start index in text\n    chunks = []\n    i = 0\n    \n    while i < len(text):\n        current_chunk_len_limit = max_chars\n        \n        # We want to find the longest valid chunk ending at <= max_chars limit.\n        # But we prioritize sentence ends inside that range.\n        \n        end_idx = min(len(text), i + max_chars) # Absolute hard limit index in text? \n        # Wait, does 'max_chars' count bytes or chars? Python 3 strings are unicode characters. So len() works.\n        \n    ```\n\n    Wait, logic check: \"Splits text into chunks of at most `max_chars`\". This implies if the remaining text is smaller than `max_chars`, it goes as one chunk (trailing space trimmed?). Usually trailing spaces shouldn't be part of data payload in many contexts but might be required to preserve structure. Let's aim for minimal trimming or preserving whitespace exactly as needed to separate words, maybe strip leading/trailing of each resulting string if requested? The prompt doesn't specify stripping, just \"split text\". It usually means return the parts such that they fit content-wise. I will exclude trailing spaces from chunks logic",
       "latency_s": 10.91319,
-      "score": null,
+      "score": 0.6,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.6"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A snippet of Python code using SQLite to fetch a user based on ID.\n    *   Tasks: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n    *   **Security (Critical):** SQL Injection vulnerability. The `user_id` is interpolated directly into the string using an f-string without sanitization or parameterized queries. While integers are often safe against injection, if `user_id` could come from user input as a string representing another object or if the database allows expression evaluation in specific contexts (though standard SQLite usually requires numbers), it's bad practice. If `user_id` isn't strictly validated to be an integer beforehand, this is dangerous. Best practice is always parameterized queries (`?`).\n    *   **Resource Management:** No context manager (`with`) is used for the connection/cursor. Connections should be closed properly if not committed/rolled back (though usually connections are returned by a factory or managed higher up). Here, `conn` and `cursor` will leak unless garbage collected immediately after function call returns scope, but ideally explicit closing is better in functions that manage DB access.\n    *   **Style:** Function does not raise an exception if no user found (returns `None`). This might be intentional or unintentional depending on expected behavior. However, checking for None outside the caller handles it fine. The function doesn't return a dictionary but likely expects raw row tuples which is usually acceptable for SQLite cursors unless ORM'd.\n    *   **Error Handling:** No try/except blocks to catch database errors (e.g., connection failure).\n\n4.  **Drafting Feedback:**\n    *   *Security:* Use parameterized queries (`?`) instead of string formatting. Validate `user_id` is an integer if possible before querying, though parameters are safer regardless.\n    *   *Resources:* Use context manager or close connections properly. If this function returns a row, the caller shouldn't usually manage the connection unless it",
       "latency_s": 5.587935,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
