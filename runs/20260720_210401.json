@@ -15,36 +15,44 @@
       "task": "changelog_generation",
       "response": "Here's a possible \"Improvements\" section based on your raw git commits:\n\n### Improvements\n\n* **Improved reliability**: We've added retry logic to handle OAuth token refresh errors, ensuring a smoother user experience.\n* **Enhanced reporting**: You can now export sprint reports to CSV from the dashboard for easier analysis and sharing.\n* **Simplified performance**: Our rate-limiter has been refactored into its own service, making it more efficient and scalable.\n* **Prevented crashes**: We've fixed an issue that would cause errors when a webhook payload was missing the required `user_id` field.",
       "latency_s": 0.797776,
-      "score": null,
+      "score": 0.75,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.75"
     },
     {
       "model": "custom:ollama/llama3.2:3b",
       "task": "code_generation",
       "response": "```python\nimport re\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most max_chars, preferring to break on sentence boundaries ('.', '!', '?'), \n    never cutting a word.\n\n    Args:\n        text (str): The input text to be chunked.\n        max_chars (int): The maximum number of characters in each chunk.\n\n    Returns:\n        list[str]: A list of chunks, where each chunk is a string.\n    \"\"\"\n    \n    # Initialize the list of chunks\n    chunks = []\n    \n    # Split the text into words and sentences\n    for word in re.split(r'\\s+', text):\n        \n        # Find the next sentence boundary\n        match = re.search(r'[.!?]', text[text.index(word):])\n        \n        if match is None:\n            break\n        \n        # Calculate the length of the current chunk\n        chunk_length = len(text[text.index(word):text.index(match.group()) + 1])\n        \n        # If the chunk is too long, split it into multiple chunks\n        while chunk_length > max_chars:\n            # Find the next sentence boundary that would make the chunk shorter\n            next_match = re.search(r'[.!?]', text[text.index(word):match.start()])\n            \n            if next_match is not None:\n                # Split the chunk at this point\n                new_text = text[text.index(word):next_match.start()]\n                chunks.append(new_text.strip())\n                \n                # Update the remaining text and word index\n                text = new_text + match.group()\n                word = match.group().strip()\n            else:\n                break\n        \n        # Add the current chunk to the list of chunks\n        if word or match.group():\n            chunks.append(word + match.group() if word else match.group())\n        \n    return chunks\n\n\n# Test the function\nassert chunk_text(\"Hello world! This is a test. Another sentence.\", 10) == ['Hello ', 'world!', 'This ', 'is', 'a', 'test.', 'Another ', 'sentence.']\n```",
       "latency_s": 2.254052,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/llama3.2:3b",
       "task": "code_review",
       "response": "### Review of the Provided Python Code\n\n#### Bugs:\n\n1.  The connection to the database is not closed after use, which can lead to resource leaks.\n2.  The `f-string` syntax for formatting the SQL query is vulnerable to SQL injection attacks if user input is used directly.\n\n#### Security Issues:\n\n1.  **SQL Injection**: Directly inserting a `user_id` into the query makes it susceptible to SQL injection attacks. This should be avoided unless you are confident that the input is sanitized and validated.\n2.  **Lack of Error Handling**: There's no error handling in case the database connection or query execution fails.\n\n#### Style:\n\n1.  **Importing Modules**: The `sqlite3` module is imported, but its usage does not explicitly require this import when connecting to a local SQLite database file.\n\n### Improved Code\n\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    \"\"\"Retrieve user data from the 'users.db' database.\"\"\"\n    \n    try:\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        \n        # Use a parameterized query to prevent SQL injection\n        query = \"SELECT * FROM users WHERE id = ?\"\n        cursor.execute(query, (user_id,))\n        \n        return cursor.fetchone()\n    \n    except sqlite3.Error as e:\n        print(f\"Database error: {e}\")\n        return None\n    \n    finally:\n        if 'conn' in locals():\n            conn.close()\n```\n\nThis improved version includes:\n\n*   Parameterized queries to prevent SQL injection attacks.\n*   Error handling for database connection and query execution failures.\n*   A `finally` block to ensure the database connection is closed after use, preventing resource leaks.",
       "latency_s": 1.896422,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/llama3.2:3b",
       "task": "instruction_following",
       "response": "Peach\nGrapefruit\nApricot",
       "latency_s": 0.250843,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/llama3.2:3b",
@@ -60,9 +68,11 @@
       "task": "sprint_narrative",
       "response": "Here is a possible sprint retrospective narrative:\n\n\"We successfully completed our user auth revamp and implemented billing webhooks to improve stability, but were hindered by an unexpected vendor API downtime that delayed our SSO integration. Meanwhile, our mobile pipeline was plagued by CI flakiness, requiring extra attention from the team to resolve. Despite these challenges, we demonstrated resilience and adaptability, demonstrating that even with obstacles, we can still make progress towards our goals.\"",
       "latency_s": 0.626996,
-      "score": null,
+      "score": 0.95,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/llama3.2:3b",
@@ -78,9 +88,11 @@
       "task": "summarization",
       "response": "Here is a summary of the technical incident in 3 sentences for a non-technical stakeholder:\n\nOur database system experienced a brief outage due to low disk space on one of its main storage devices. The issue was caused by a maintenance window where monitoring alerts were temporarily disabled, and it wasn't properly re-enabled afterwards. We've since resolved the problem and taken steps to prevent similar issues in the future, including adding a check to ensure our monitoring system is always functioning correctly during maintenance periods.",
       "latency_s": 0.710447,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     }
   ]
 }
