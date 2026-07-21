@@ -1,0 +1,122 @@
+{
+  "run_id": "20260722_000025",
+  "results": [
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "arithmetic_reasoning",
+      "response": "This is a classic pursuit problem, which can be solved by determining the head start and the relative speed.\n\n### Show Your Work\n\n**1. Determine the Head Start (Distance Gap):**\nTrain 1 travels from 2:00 to 3:00, giving it a 1-hour head start.\n$$\\text{Distance} = \\text{Speed} \\times \\text{Time}$$\n$$\\text{Head Start Distance} = 60 \\text{ km/h} \\times 1 \\text{ hour} = 60 \\text{ km}$$\n\n*At 3:00, Train 1 is $60 \\text{ km}$ ahead of Train 2.*\n\n**2. Determine the Relative Speed (Closing Rate):**\nSince both trains are traveling in the same direction, we find how fast Train 2 is closing the gap by subtracting the speeds.\n$$\\text{Relative Speed} = \\text{Speed}_2 - \\text{Speed}_1$$\n$$\\text{Relative Speed} = 90 \\text{ km/h} - 60 \\text{ km/h} = 30 \\text{ km/h}$$\n\n**3",
+      "latency_s": 16.455757,
+      "score": 0.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "changelog_generation",
+      "response": "### \u2728 Improvements\n\n*   **Dashboard Reporting:** Easily download your full sprint reports as a CSV file for deeper analysis or offline use.\n*   **Improved Stability:** Enhanced connection handling ensures that processes remain uninterrupted even if authentication tokens require refreshing mid-session.\n*   **Better Integrations:** Fixed an issue that could cause system crashes when receiving incomplete data payloads from webhooks, making your automated workflows more reliable.",
+      "latency_s": 3.591998,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "code_generation",
+      "response": "```python\nimport re\nfrom typing import List\n\ndef chunk_text(text: str, max_chars: int) -> List[str]:\n    \"\"\"\n    Splits a given text string into chunks, each at most max_chars characters long.\n\n    The function prioritizes breaking the text at sentence boundaries \n    (., !, ?). If the remaining text exceeds max_chars and no suitable \n    sentence boundary can be found, it attempts to break at the nearest \n    word boundary to stay under the limit without cutting a word.\n\n    Args:\n        text: The input string to chunk.\n        max_chars: The maximum allowed length for any single chunk. Must be > 0.\n\n    Returns:\n        A list of strings, where each string is a text chunk.\n\n    Raises:\n        ValueError: If max_chars is not positive or if the input text is invalid.\n    \"\"\"\n    if max_chars <= 0:\n        raise ValueError(\"max_chars must be a positive integer.\")\n    if not isinstance(text, str):\n        raise TypeError(\"Input text must be a string.\")\n\n    if not text:\n        return []\n\n    chunks = []\n    remaining_text = text\n    start_index = 0\n\n    while remaining_text:\n        current_len = len(remaining_text)\n        if current_len <= max_chars:\n            # Last chunk is small enough, take it and finish.\n            chunks.append(remaining_text.strip())\n            break\n\n        # 1. Try to find the best sentence break point (Greedy approach)\n        best_split_index = -1\n        \n        # Look for delimiters in the next max_chars section\n        segment_to_check = remaining_text[:max_chars]\n        \n        # Regex matches are complex because punctuation might be followed by whitespace.\n        # We look for common sentence endings: [.?!] followed by potential whitespace/end of string.\n        # The search is done on the whole remaining text, but we prioritize breaks within max_chars.\n        \n        # Find all potential break points (index where '.', '!', or '?' occurs)\n        # We also account for the surrounding space to ensure clean chunking.\n        matches = list(re.finditer(r'[.!?](?:\\s*|$)', remaining_text))\n\n        # Iterate backwards through matches found within the desired length, \n        # preferring the longest possible break point that respects max_chars.\n        for match in reversed(matches):\n            end_index = match.end() - (1 if remaining_text[match.end()-1].isspace() else 0)\n            if end_index <= len(remaining_text) and (end_index - start_index) >= max_chars * 0.8:\n                # Found a good, long break point near the budget limit\n                best_split_index = match.start(1) + len(match.group(0))\n                break # Take this best, most advanced sentence break\n\n        \n        if",
+      "latency_s": 8.52705,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "code_review",
+      "response": "## Review Summary\n\nThis code has **critical security vulnerabilities** and several common resource management issues. The connection must be handled using a context manager (`with`) to ensure it always closes, even if errors occur.\n\n---\n\n### \ud83d\udea8 Security Issues (Critical)\n\n1.  **SQL Injection Vulnerability:** This is the most severe issue. Using an f-string to construct the SQL query (`f\"SELECT * FROM users WHERE id = {user_id}\"`) allows any malicious string passed as `user_id` to break out of the intended query and execute arbitrary database commands (e.g., if `user_id` was `'1 OR 1=1'`).\n    *   **Fix:** Always use parameter substitution (`?`) provided by the library, letting `sqlite3` handle the formatting.\n\n### \ud83d\udc1b Bugs & Reliability Issues\n\n1.  **Unclosed Connection:** The database connection (`conn`) and cursor are not guaranteed to be closed if an exception occurs within the function (e.g., network error, database error). This can lead to resource leaks.\n    *   **Fix:** Use `with sqlite3.connect(...) as conn:` for robust handling of connections.\n\n### \u2728 Style & Best Practices Improvements\n\n1.  **Context Managers:** Using `with` statements is the Pythonic standard for managing external resources (like files, connections).\n2.  **Error Handling:** It's good practice to pass the database connection path/object into the function rather than hardcoding it internally, improving testability and reusability.\n\n---\n\n### \ud83d\udca1 Recommended Refactoring\n\n```python\nimport sqlite3\n\ndef get_user(db_path: str, user_id: int) -> tuple | None:\n    \"\"\"Retrieves a user record by ID using parameterized queries.\"\"\"\n    try:\n        # Use '",
+      "latency_s": 4.452095,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "instruction_following",
+      "response": "apple\nbanana\norange",
+      "latency_s": 0.380738,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "logical_reasoning",
+      "response": "**Step 1: Calculate the total number of boxes.**\n$$12 \\text{ shelves} \\times 8 \\text{ boxes/shelf} = 96 \\text{ boxes}$$\n\n**Step 2: Calculate the total number of items.**\n$$96 \\text{ boxes} \\times 10 \\text{ items/box} = 960 \\text{ items (Total)}$$\n\n**Step 3: Calculate the fraction of items remaining.**\nIf $\\frac{1}{4}$ is removed, then $1 - \\frac{1}{4} = \\frac{3}{4}$ remains.\n\n**Step 4: Calculate the number of items remaining.**\n$$\\frac{3}{4} \\times 960 \\text{ items}$$\n$$3 \\times (960 \\div 4)$$\n$$3 \\times 240 = 720 \\text{ items}$$\n\n**Final Answer:**\nThe number of items that remain is **720**.",
+      "latency_s": 4.691461,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "sprint_narrative",
+      "response": "We successfully completed the user auth revamp and implemented resilient billing webhook retries, significantly improving core platform stability this sprint. Our primary blocker was external, losing three days of work due to vendor API downtime on the SSO integration. Moving forward, we must stabilize the mobile pipeline immediately, as the current flaky CI testing pattern poses a persistent risk to our release velocity.",
+      "latency_s": 1.970765,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "structured_output",
+      "response": "{\"project_name\": \"Phoenix\", \"deadline\": \"2026-09-15\", \"budget_eur\": 120000, \"team_size\": 4}",
+      "latency_s": 0.692882,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "summarization",
+      "response": "Our system experienced an 8-minute outage this afternoon because the critical server disk ran out of space, causing our main database to fail. The underlying cause was that a vital monitoring alert designed to warn us about low disk space had been accidentally disabled and never reactivated after maintenance. To prevent recurrence, we have immediately re-enabled this warning system and updated our standard procedures to include mandatory disk capacity checks following all future maintenance work.",
+      "latency_s": 3.092019,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "arithmetic_reasoning",
+      "response": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Problem:**\n    *   Train A leaves Station at $t_{A\\_start} = 2{:}00$ PM (or just some time reference). Speed ($v_A$) = $60 \\text{ km/h}$.\n    *   Train B leaves the same station at $t_{B\\_start} = 3{:}00$ PM. Speed ($v_B$) = $90 \\text{ km/h}$.\n    *   They travel on the same route (presumably in the same direction).\n    *   Goal: Find the time when Train B catches up to (overtakes) Train A.\n\n2.  **Define Variables:**\n    *   Let distance from station be $d(t)$ at a specific elapsed time or absolute clock time.\n    *   Since they are moving in different speeds, it's easiest to set up equations based on the position of each train relative to the starting point as a function of \"elapsed minutes\" or \"hours\".\n\n3.  **Determine Time Differences:**\n    *   Train A has a head start. How long is that head start? From $2{:}00$ to $3{:}00$. That's exactly $1 \\text{ hour}$ ($60 \\text{ minutes}$).\n\n4.  **Calculate the Head Start Distance:**\n    *   When Train B starts at $t=0$ (relative time for calculation, corresponding to clock time 3:00), how far away is Train A?\n    *   Time traveled by Train A before start of Train B = $1 \\text{ hour}$.\n    *   Distance ($d_{head}$) = Speed $\\times$ Time.\n    *   $d_{head} = v_A \\times 1 \\text{ h} = 60 \\text{ km/h} \\times 1 \\text{ h} = 60 \\text{ km}$.\n\n5.  **Formulate the Relative Speed:**\n    *   When both trains are moving, Train B is faster than Train A. It closes the gap between them at a rate equal to their difference in speed (Relative Speed).\n    *   $v_{rel} = v_B - v_A$\n    *   $v_{rel} = 90 \\text{ km/h} - 60 \\text{ km/h} = 30 \\text{ km/h}$.\n\n6.  **Calculate the Catch-Up Time (Elapsed):**\n    *   We need to cover a gap of $d_{head}$ ($60 \\text{ km}$) using the relative speed ($v_{rel}$).\n    *   Let $\\Delta t$ be the time it takes for Train B to catch up starting from when Train B leaves.\n    *   Distance = Relative Speed $\\times$ Time\n    *   $d_{head} = v_{rel} \\times \\Delta t$\n    *   $60 \\text{ km} = 30 \\text{ km/h} \\times \\Delta t$\n    *   $\\Delta t = 60 / 30$ hours.\n    *   $\\Delta t = 2 \\text{ hours}$.\n\n7.  **Determine the Clock Time:**\n    *   The question asks \"At what time does...\" (Clock Time).\n    *   Train B left at $3{:}00$.\n    *   It takes $\\Delta t$ ($2 \\text{ hours}$) after leaving to catch up.\n    *   Catch-up Clock Time = Departure of Train B + Elapsed Time\n    *   Catch-up Clock Time = $3{:}00 + 2 \\text{ h}$\n    *   Catch-up Clock Time = $5{:}00$.\n\n8.  **Alternative Method (Distance Equations):**\n    *   Let $t$ be the number of hours past 3:00 PM when they meet.\n    *   Total time Train A travels = $(1 \\text{ hour head start}) + t$.\n    *   Distance for Train A ($d_A$) = $60(1 + t)$.\n    *   Distance for Train B ($d_B$) = $90(t)$ (since it only traveled for time $t$).\n    *   Set distances equal: $60(1 + t) = 90t$.\n    *   $60 + 60t = 90t$.\n    *   Subtract $60t$ from both sides: $60 = 30t$.\n    *   Divide by 30: $2 = t$.\n    *   So,",
+      "latency_s": 16.745245,
+      "score": 0.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "code_generation",
+      "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most max_chars characters.\n\n    The function prefers to break on sentence boundaries ('.', '!', '?'), \n    then space between words when within or near the limit. Words are never \n    split across chunks. If a single word exceeds max_chars, it will remain in its own chunk.\n    \n    Args:\n        text (str): Input string to be chunked\n        max_chars (int): Maximum number of characters per chunk\n        \n    Returns:\n        list[str]: List of strings where each has at most max_chars characters\n\n    Raises:\n        ValueError: If max_chars is less than or equal to 0\n    \"\"\"\n    if max_chars <= 0:\n        raise ValueError(\"max_chars must be greater than zero\")\n    \n    chunks = []\n    start_idx = 0\n    \n    while start_idx < len(text):\n        # Try up to the last possible break point within chunk size limit\n        end_pos = min(start_idx + max_chars, len(text))\n\n        # Find sentence-ending punctuation that can help us cut earlier than full limit\n        for idx in range(end_pos - 1, start_idx - 1, -1):\n            if text[idx] in '.!?':\n                candidates = [idx + 1 for i in range(idx + 1, end_pos) \n                              if text[i-1].isspace() or (i == len(text))]\n                # Include sentence ending position as possible chunk break point\n                all_break_points = set(candidates | {end_pos})\n                \n                best_idx = min(all_break_points)\n\n        else:  # Only run this loop once, no punctuation found earlier\n            pass\n        \n        if end_idx == len(text):\n            chunks.append(start_idx + max_chars - 1:end_idx]\n        \n    return list(chunked_text), text.split()[:max_split], None])\n```",
+      "latency_s": 9.838775,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "code_review",
+      "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A snippet of Python code using SQLite to retrieve a user record based on `user_id`.\n    *   Tasks: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n\n    *   **Security (Critical):** SQL Injection vulnerability. The code uses string formatting (`f-string`) to insert `user_id` directly into the query without parameterization or sanitization. If `user_id` contains malicious input, it could compromise the database.\n        *   *Fix:* Use placeholders (`?`) and pass arguments as a tuple/list to `.execute()`.\n\n    *   **Bugs/Stability:** Resource management (Leaked connections/cursors). The connection is not closed in a context manager (`with` statement), nor wrapped in `try/finally`. If an exception occurs after opening the DB but before closing, resources remain open.\n        *   *Fix:* Use `connection.close()` or wrap logic with `conn = sqlite3.connect(...)`, then ensure closure via try-finally or preferably using a context manager (`with`).\n\n    *   **Type Hinting:** Function arguments lack type hints (modern Python standard). Return value also lacks hint.\n        *   *Fix:* Add `def get_user(user_id: int) -> Optional[dict]:`. However, the prompt asks for conciseness, so minor style improvements can be grouped or mentioned briefly if needed. SQLite row types are tuples by default in newer versions but usually treated as rows of records. The return is just a raw cursor fetchone (tuple).\n\n    *   **Style/Best Practices:** Error handling (`sqlite3.Error`). No transaction management explicitly, though not strictly critical for select queries with connections per request.\n        *   *Fix:* Usually handled via context managers or at least connection closing.\n\n4.  **Draft the Review (Iterative refinement for conciseness):**\n\n    *   *Security:* SQL Injection risk due to f-string usage of `user_id",
+      "latency_s": 5.584649,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "logical_reasoning",
+      "response": "Thinking Process:\n\n1.  **Analyze the Request:** The user is asking a math problem involving multiplication and subtraction (or fraction calculation). I need to calculate the total number of items initially stored in the warehouse and then determine how many remain after removing a specific fraction. I also need to show my steps clearly and provide the final answer.\n\n2.  **Break Down the Problem:**\n    *   Number of shelves = 12\n    *   Boxes per shelf = 8\n    *   Items per box = 10\n    *   Fraction removed = $1/4$\n    *   Goal: Find the number of items remaining.\n\n3.  **Step-by-Step Calculation:**\n    *   Step 1: Calculate total boxes.\n        $$ \\text{Total Boxes} = \\text{Shelves} \\times \\text{Boxes per shelf} = 12 \\times 8 = 96 $$\n    *   Step 2: Calculate total items initially.\n        $$ \\text{Total Items} = \\text{Total Boxes} \\times \\text{Items per box} = 96 \\times 10 = 960 $$\n    *   Step 3: Calculate number of items removed ($1/4$ of the total).\n        $$ \\text{Removed Items} = \\frac{1}{4} \\times 960 $$\n        Calculation: $960 / 2 = 480$, then $480 / 2 = 240$. Or $96 \\times (1/4) \\times 10$ -> $24 \\times 10 = 240$. So, removed items = 240.\n    *   Step 4: Calculate remaining items.\n        $$ \\text{Remaining Items} = \\text{Total Items} - \\text{Removed Items} $$\n        $$ \\text{Remaining Items} = 960 - 240 = 720 $$\n\n    *   Alternative Method for Steps 3 & 4: Calculate the remaining fraction first.\n        If $1/4$ are removed, then $(1 - 1/4)$ remain.\n        Remaining Fraction = $3/4$.\n        $$ \\text{Remaining Items} = \\frac{3}{4} \\times 960 $$\n        Calculation: $\\frac{960}{4} = 240$, and $240 \\times 3 = 720$.\n\n4.  **Draft the Response:**\n    *   State the given values clearly.\n    *   Show the multiplication to find total items.\n    *   Show the calculation for removed items or remaining fraction.\n    *   Provide the final number prominently.\n\n5.  **Review and Verify:**\n    *   $12 \\text{ shelves} \\times 8 \\text{ boxes/shelf} = 96 \\text{ boxes}$. Correct.\n    *   $96 \\text{ boxes} \\times 10 \\text{ items/box} = 960 \\text{ items}$. Correct.\n    *   Remove $1/4$ of $960$: $240$ removed. Correct.\n    *   Remaining: $960 - 240 = 720$. Correct.\n\n6.  **Final Formatting:** Ensure the output follows the instruction \"Show your steps and give the final number.\" Use clear formatting (bolding, etc.) for readability.mn.\n\n    *Self-Correction during drafting:* Make sure to write out each calculation step clearly so the user can follow easily.\n    \n    Step 1: Total boxes = $12 \\times 8$\n    Step 2: Total items = $\\text{Total Boxes} \\times 10$\n    Step 3: Removed items = $1/4 \\times \\text{Total Items}$ (or Remaining fraction approach)\n    Step 4: Final subtraction.\n\n    Let's write it down.\n    \n    Wait, could I also calculate boxes per shelf removed? No, that complicates things unnecessarily. Stick to total count first.\n    \n    Structure:\n    1. Calculate Total Boxes.\n    2. Calculate Total Items.\n    3. Calculate Remaining Amount (either subtract the fraction or multiply by remaining fraction). Using \"multiply by remaining fraction\" is often cleaner, but subtraction shows logic better for general understanding. I will show removal then subtraction to be very explicit. Or just $960 \\times (1 - 1/4)$. Let's do total minus removed.\n    \n    Okay, ready to generate output.cltr\n\n7.  **Final Polish:** Check tone and clarity. \"Here is the",
+      "latency_s": 10.756184,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    }
+  ]
+}
