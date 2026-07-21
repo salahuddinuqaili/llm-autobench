@@ -15,36 +15,44 @@
       "task": "changelog_generation",
       "response": "### Improvements\n\n*   **\ud83d\udcca Export Reports:** Easily download your complete sprint reports as CSV files directly from the dashboard for external analysis or record-keeping.\n*   **\ud83d\udee1\ufe0f Enhanced Stability:** The system is now more robust, preventing crashes and ensuring reliable operation even when connected to webhooks that send incomplete data.\n*   **\ud83d\udd04 Smoother Connections:** Improved handling of token refreshing means your connections stay active and seamless, even if authentication details require a refresh during an ongoing task.",
       "latency_s": 3.65845,
-      "score": null,
+      "score": 0.9,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.9"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "This task requires careful handling of indices, regular expressions, and boundary conditions to satisfy all constraints simultaneously.\n\n```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_",
       "latency_s": 8.57157,
-      "score": null,
+      "score": 0.4,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.4"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "This code has significant security vulnerabilities and several areas for improvement regarding robustness and Python style.\n\n### \ud83d\uded1 Security Issues (Critical)\n\n1.  **SQL Injection Vulnerability:**\n    *   **Bug/Security:** Using an f-string (`query = f\"SELECT * FROM users WHERE id = {user_id}\"`) to build the SQL query is highly unsafe. If `user_id` comes from user input, an attacker can inject malicious SQL code (e.g., setting `user_id` to `\"1 OR 1=1 --\"`).\n    *   **Fix:** Always pass parameters directly to the database driver using placeholders (`?`).\n\n### \ud83d\udc1e Bugs and Robustness Issues\n\n1.  **Resource Leakage:**\n    *   **Bug:** The connection (`conn`) is opened but never explicitly closed, even if errors occur. This can lead to resource leaks (database file handles).\n    *   **Fix:** Use a `with` statement for the connection object.\n\n### \u2728 Style and Best Practices Improvements\n\n1.  **Context Management:** Using `with sqlite3.connect(...) as conn:` automatically handles closing the connection, even if exceptions occur.\n2.  **Type Hinting:** Adding type hints improves readability and maintainability.\n\n---\n\n### \u2705 Refactored Code (Solution)\n\n```python\nimport sqlite3\nfrom typing import Optional, Tuple, Any\n\n# Use a context manager to ensure connection is closed automatically\ndef get_user(user_id: int) -> Optional[Tuple[Any, ...]]:\n    \"\"\"Fetches a user record by ID safely.\"\"\"\n    try:\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            # Use",
       "latency_s": 4.45328,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "apple\nbanana\norange",
       "latency_s": 0.379089,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -60,9 +68,11 @@
       "task": "sprint_narrative",
       "response": "We successfully shipped the user auth revamp and completed the billing webhook retry logic this sprint, significantly improving core platform reliability. Our primary blockage was the SSO integration, which stalled completely due to three days of unexpected vendor API downtime. Moving forward, we must dedicate focused effort to stabilizing the mobile CI pipeline, as its current flakiness remains a critical deployment risk.",
       "latency_s": 3.554628,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -78,9 +88,11 @@
       "task": "summarization",
       "response": "Our core database system experienced an outage because the server's storage disk filled up. Our team rapidly promoted a backup instance, resulting in approximately eight minutes of service disruption. The root cause was a critical monitoring alert for disk space that had been accidentally silenced during maintenance; we have since re-enabled this warning and added it to our standard checklist to prevent recurrence.",
       "latency_s": 2.544376,
-      "score": null,
+      "score": 0.95,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -96,18 +108,22 @@
       "task": "code_generation",
       "response": "```python\nimport re\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most `max_chars` characters.\n\n    The function prefers breaking on sentence boundaries (., ! ?), \n    never cuts a word in half unless absolutely necessary for length reasons.\n\n    Args:\n        text: Input string to chunk.\n        max_chars: Maximum number of characters per chunk. Must be > 0.\n\n    Returns:\n        List of strings, each with at most `max_chars` characters. If input is empty or whitespace-only, returns an empty list.\n\n    Raises:\n        ValueError: If max_chars <= 0 or if any word in the text exceeds max_chars and cannot fit in a chunk without splitting it mid-word (in which case we raise instead of truncating).\n\n    Example:\n        >>> chunk_text(\"Hello world! This is a test.\", 12)\n        ['Hello wor', 'ld!', ...]   # Note: In practice, will break at sentence boundary first.\n        >>> chunk_text(\"Short words and long ones here that might exceed max_chars.\", 50)\n        ['Some longer text like this one which contains multiple sentences for splitting.', \n         'Another shorter piece of the content to fit within limits easily...']\n\n    Note: Sentence breaks occur after '.', '?', or '!' followed by whitespace. If no clean break is possible, words are split only when necessary (with a warning comment in logic). For this implementation we avoid mid-word cutting unless unavoidable and raise ValueError if it would be required without truncation.\n    \"\"\"\n    \n    assert text == \"\" or max_chars > 0, f\"text should not be empty/whitespace-only for non-trivial chunking; but more importantly max_chars must be positive.\"\n    \n    chunks = []\n    words_text = re.split(r'\\s+', text.strip())\n\n    if len(words_text) == 0:\n        return []\n\n    current_chunk = \"\"\n\n    def can_add_word(word):\n        \"\"\"Check whether the word + whitespace fits in the chunk without exceeding max_chars.\"\"\"\n        needed_length = len(current_chunk.rstrip()[-1] or '') - (len('') if not current_chunk else 0)  # simplified logic below\n        \n        actual_length_needed = len(current_chunk.split('\\n')[0])  # ignore previous line breaks\n\n    for word in words_text:\n        candidate = \" \".join([current_chunk, word].pop(1)) if not all(w == '' and i == -3 else w + ' ') \n        length_with_word = (len(candidate) if current_chunk or word else len(word))  # simplified logic again\n        \n    return chunks\n```\n\nOops! There was some logical error in the function above\u2014let me correct it with a proper, working implementation:\n\n---\n\n### \u2705 Final Working Implementation:\n\n```python\nimport re",
       "latency_s": 10.857438,
-      "score": null,
+      "score": 0.6,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.6"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A short Python code snippet using SQLite.\n    *   Task: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n    *   **Security (Critical):** SQL Injection vulnerability. The `query` string uses an f-string to interpolate `user_id`. If `user_id` is a string or comes from user input, this allows malicious inputs like `' OR '1'='1; DROP TABLE users--`. Even if `user_id` is int in Python type system, the use of `.format()` style concatenation (f-strings here) without parameterization is bad practice. Should use `%s` placeholders or `?`.\n    *   **Resource Management:** No context manager (`with` statement). Connections and cursors are not explicitly closed/closed upon error/exit in a controlled way (e.g., if an exception occurs, resources leak until garbage collection handles it). SQLite connections should be reentrant but ideally managed within scopes or returned to pools.\n    *   **Data Types:** `user_id` is likely expected as int based on database schema for IDs, but validation isn't present. If the caller passes a string like `'1'`, parameterization fixes this, but direct injection makes it dangerous regardless of type if logic allows strings. However, strictly speaking, SQLite infers types. The main issue is lack of prepared statements (`cursor.execute(query, params)`).\n    *   **Style/Readability:** `conn = sqlite3.connect('users.db')` creates a connection every time the function runs. This is inefficient for high-frequency calls but acceptable for simple scripts. It should probably return `(row, conn)` or close in destructor context (though closing inside helper functions often causes issues if caller expects persistence).\n    *   **Return Value:** Returns raw tuple (`fetchone()`), which might be `None`. No handling of non-existent users explicitly mentioned beyond returning None implicitly.\n\n4.  **Draft Review Points (Con",
       "latency_s": 5.579738,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
