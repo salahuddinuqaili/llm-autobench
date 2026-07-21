@@ -1,0 +1,122 @@
+{
+  "run_id": "20260721_020007",
+  "results": [
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "arithmetic_reasoning",
+      "response": "This is a classic relative speed problem. We need to calculate the head start distance first, and then determine how long it takes for the faster train (Train 2) to close that gap using their combined (relative) speed.\n\n### Show Your Work\n\n**1. Calculate Train 1's Head Start Distance**\n\n*   Train 1 leaves at 2:00 and travels until 3:00 (a 1-hour head start).\n*   Distance = Speed $\\times$ Time\n*   Distance covered by Train 1 = $60 \\text{ km/h} \\times 1 \\text{ hour} = 60 \\text{ km}$\n\n*At 3:00, Train 1 is $60 \\text{ km}$ ahead of the station.*\n\n**2. Calculate the Relative Speed**\n\nTrain 2 must close a gap of $60 \\text{ km}$. The relative speed is the difference between their speeds because they are moving in the same direction.\n\n*   Relative Speed = Train 2 Speed - Train 1 Speed\n*   Relative Speed = $90 \\text{ km/h} - 60 \\text{ km/h} = 30 \\text{ km/h}$\n\n**3. Calculate the Time to Catch Up**\n\nWe use the formula: Time = Distance / Speed (using the relative speed).\n\n*   Time ($\\Delta t$) = $60 \\text{ km} / 30 \\text{ km/h} = 2 \\text{ hours}$\n\n**4. Determine the Final Time**\n\nThe $\\Delta t$ (2 hours) is the time elapsed *after* Train 2 started at 3:00.\n\n*   Catch-up Time = Start Time of Train 2 + Elapsed Time\n*   Catch-up Time = 3:00 + 2 hours = 5:00\n\n***\n\nThe second train catches the first train at **",
+      "latency_s": 16.701161,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "changelog_generation",
+      "response": "## \u2728 Improvements\n\nHere is what's new and improved since our last update:\n\n*   **\ud83d\udcca Export Reports to CSV:** You can now download full sprint reports directly from the dashboard in a user-friendly CSV format, making it easier to analyze data offline.\n*   **\ud83d\udee1\ufe0f Enhanced Connection Reliability:** We\u2019ve significantly strengthened our authentication handling. If there are momentary connection issues while refreshing tokens, your synchronization will automatically retry, ensuring continuous and reliable data flow.\n*   **\u2699\ufe0f Smoother Integrations:** The system is now more robust when receiving webhook payloads. It no longer crashes if specific required data points (like a user ID) are temporarily missing, keeping your integrations stable even with imperfect incoming data.",
+      "latency_s": 4.188677,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "code_generation",
+      "response": "```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits a given string of text into chunks, ensuring each chunk is at most \n    max_chars in length. The function prioritizes breaking on sentence boundaries \n    (., !, ?) and ensures that words are never cut mid-way.\n\n    Args:\n        text: The input text string to be chunked.\n        max_chars: The maximum allowable length for any single chunk.\n\n    Returns:\n        A list of strings, where each string is a chunk of the original text.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n    \"\"\"\n    if not isinstance(text, str):\n        raise TypeError(\"Text must be a string.\")\n    if max_chars < 1:\n        raise ValueError(\"max_chars must be at least 1.\")\n\n    chunks = []\n    current_text = text\n    \n    while current_text:\n        remaining_length = len(current_text)\n        if remaining_length <= max_chars:\n            # Last chunk or manageable size\n            chunks.append(current_text)\n            break\n\n        # 1. Search for the optimal split point (prioritize sentence boundaries)\n        \n        # We look for potential break points within a radius of max_chars from the start.\n        search_area = current_text[:max_chars]\n        \n        best_split_index = -1\n        # Initialize with a fallback: simply cutting at a space near max_chars\n        fallback_cut_index = max(0, remaining_length - (max_chars // 2) - 1)\n        \n        # Try to find the best sentence boundary index within the safe zone\n        sentence_matches = list(re.finditer(r'[.!?]\\s+', search_area))\n        \n        potential_split_points = []\n\n        if sentence_matches:\n            # Prioritize the closest full sentence ending point that is close to, but not exceeding, max_chars\n            for match in reversed(sentence_matches):\n                end_index = match.end() - 1 # Include the punctuation mark\n                length = end_index\n                if length <= max_chars:\n                    potential_split_points.append((end_index, True)) # True means sentence boundary\n            \n            # Sort by index (closest to start first) and pick the best one near the limit\n            potential_split_points.sort(key=lambda x: x[0], reverse=True)\n\n            if potential_split_points:\n                # Choose the longest valid sentence chunk found before max_chars\n                best_index = potential_split_points[0][0]\n                chunk_end_text = current_text[:best_index + 1].strip()\n                # Check if cutting at this point still leaves a sensible amount of text remaining\n                if len(chunk_end_text) > max_chars * 0.2 and len(chunk_end_text) < max_chars:\n                    best_split_index = best_index\n\n        \n        # 2. If sentence boundary didn't yield a perfect split, or if we need to force a break\n        if best_split_index ==",
+      "latency_s": 8.491879,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "code_review",
+      "response": "## \ud83d\udc1e Bugs & Security\n\n| Category | Issue | Description / Impact | Suggested Fix |\n| :--- | :--- | :--- | :--- |\n| **CRITICAL SECURITY BUG** | SQL Injection | The `user_id` is passed directly into the query string using an f-string. An attacker could manipulate `user_id` (e.g., passing `'1 OR 1=1'`) to alter the query and access unauthorized data or perform other destructive actions. | **NEVER** use f-strings for SQL queries with user input. Use parameterized queries: `cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))` |\n| **BUG / RESOURCE LEAK** | Connection Management | The connection (`conn`) is opened but never explicitly closed, even if an error occurs. This can lead to resource leaks and performance issues in long-running applications. | Use the `with` statement for both the connection and potentially the cursor/connection objects to ensure they are reliably closed. |\n\n## \ud83d\udcd0 Style & Best Practices\n\n| Issue | Description / Impact | Suggested Fix |\n| :--- | :--- | :--- |\n| **Style** | Hardcoded Database Name | The database file name (`'users.db'`) is hardcoded inside the function, making testing and reusability difficult. | Pass the database path as an argument to the function or use a configuration constant. |\n| **Efficiency** | Connection Overhead (Minor) | Opening and closing the connection for every single function call can be slow if this function is called frequently. | If possible, consider managing connections at a higher level (e.g., using a connection pool or class structure). |\n\n---\n\n### \u2728 Recommended Refactoring\n\nThe following implementation addresses all security risks, resource leaks, and style issues:\n\n```python\nimport sqlite3\nfrom typing import Optional, Tuple # Good practice for type hinting\n\n# Pass the database path to the function\ndef get_user(db_path: str, user_id",
+      "latency_s": 4.424893,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "instruction_following",
+      "response": "apple\nbanana\ngrape",
+      "latency_s": 0.386626,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "logical_reasoning",
+      "response": "Here are the steps to solve the problem:\n\n**1. Calculate the total number of boxes:**\n$$\\text{Total shelves} \\times \\text{Boxes per shelf} = 12 \\times 8 = 96 \\text{ boxes}$$\n\n**2. Calculate the total number of items:**\n$$\\text{Total boxes} \\times \\text{Items per box} = 96 \\times 10 = 960 \\text{ items}$$\n\n**3. Calculate the fraction of items removed (for shipping):**\nThe problem states that $1/4$ of the items are removed.\n\n**4. Calculate the number of remaining items:**\nIf $1/4$ is removed, then $3/4$ of the items remain $(1 - 1/4 = 3/4)$.\n\n$$\\text{Remaining fraction} \\times \\text{Total items} = \\frac{3}{4} \\times 960$$\n\n$$\\text{Alternatively, calculate the removed amount first:} $$\n$$\\text{Removed items} = \\frac{1}{4} \\times 960 = 240 \\text{ items}$$\n$$\\text{Remaining items} = \\text{Total items} - \\text{Removed items} = 960 - 240 = 720 \\text{ items}$$\n\n**Final Number:** 720",
+      "latency_s": 2.66968,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "sprint_narrative",
+      "response": "We successfully completed the user auth revamp and implemented robust billing webhook retries, significantly stabilizing core payment flows. The planned SSO integration hit a significant roadblock due to three days of vendor API downtime, which requires us to adjust our dependency timeline. Our immediate focus needs to be on resolving the flaky CI failures within the mobile pipeline before committing further resources there.",
+      "latency_s": 2.524486,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "structured_output",
+      "response": "{\"project_name\": \"Phoenix\", \"deadline\": \"2026-09-15\", \"budget_eur\": 120000, \"team_size\": 4}",
+      "latency_s": 0.679149,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/gemma4:e4b",
+      "task": "summarization",
+      "response": "The core database experienced an unplanned outage because the server hosting its files ran out of disk space. This resulted in approximately eight minutes of lost service time for users. To prevent this from happening again, we have corrected the system's monitoring alerts and updated our maintenance checklist to ensure that disk-space warnings are always reactivated after any scheduled downtime.",
+      "latency_s": 3.507621,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "arithmetic_reasoning",
+      "response": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Problem:**\n    *   **Train A (First Train):** Leaves at 2:00 PM, Speed = $v_1$ = 60 km/h.\n    *   **Train B (Second Train):** Leaves at 3:00 PM, Speed = $v_2$ = 90 km/h.\n    *   Route: Same route starting from the same station.\n    *   Goal: Find the time when Train B catches up to Train A.\n\n2.  **Define Variables:**\n    *   Let $t$ be the travel time of the second train (Train B) in hours after it leaves at 3:00 PM until it catches Train A.\n    *   Alternatively, let $T$ be the number of minutes or seconds from a common reference point (e.g., 2:00 PM).\n\n    *Let's stick with 'hours' as it's easier for standard algebra.*\n\n    Let $t$ = time in hours past 3:00 PM.\n    \n    *   **Distance covered by Train B:** $d_B = v_2 \\times t = 90t$.\n    *   **Time elapsed since departure of Train A:** When Train B has traveled for time $t$, Train A has been traveling for time $(t + 1)$ because it left one hour earlier.\n        *Note:* The trains leave at 3:00 PM (relative to the clock) and then we look forward from that point. Wait, let's fix the reference frame properly.*\n\n    Let $x$ be the number of hours since Train B left (at 3:00). So catch-up happens at time = 3:00 + $x$.\n    \n    *   Distance for Train A ($d_A$): Speed $\\times$ Time.\n        *   Speed = 60 km/h.\n        *   Start time relative to \"now\" (when catching occurs): The train has been moving since the initial catch-up point? No, better: Let's calculate how far ahead it is at a specific moment and find when distances are equal.\n\n    **Method 1: Using Time from Departure of First Train**\n    \n    *   Start time = 2:00 PM (reference $t=0$).\n    *   Catch-up happens at time $T$.\n    *   Distance for A ($d_A$) = $60 \\times T$.\n    *   Train B leaves 1 hour later. So, when the clock reads time corresponding to catch-up point:\n        *   Time elapsed since start (2:00 PM): Let's call it $T_{total}$.\n        *   If A starts at 2:00 and catches up happens at time $t$ hours after 3:00, then total time for A is $(1 + t)$.\n    *   Wait, let's just use \"Time elapsed since the second train left\" to make it simple.\n\n    Let $\\Delta t$ be the number of hours Train B travels until catching up.\n    \n    *   Distance covered by B: $d_B = 90 \\times \\Delta t$.\n    *   At that exact moment, A has been traveling for $(1 + \\Delta t)$ hours (since it left an hour earlier).\n    *   Distance covered by A: $d_A = 60 \\times (1 + \\Delta t)$.\n\n3.  **Set up the Equation:**\n    \n    Since they catch up at the same spot, their distances must be equal.\n    $$90 \\Delta t = 60(1 + \\Delta t)$$\n\n4.  **Solve for $\\Delta t$:**\n    *   $90 \\Delta t = 60 + 60 \\Delta t$\n    *   Subtract $60 \\Delta t$ from both sides:\n        $$30 \\Delta t = 60$$\n    *   Divide by 30:\n        $$\\Delta t = 2$$\n\n5.  **Interpret the Result:**\n    $\\Delta t = 2$ hours means Train B catches up to Train A exactly 2 hours after it departs from the station at 3:00 PM.\n\n6.  **Calculate Final Time:**\n    *   Departure of Train B: 3:00\n    *   Travel time for catch-up: +2 hours\n    *   Catch-up time = $3{:}00 + 2 \\text{ hours} = 5{:}00$.\n\n7.  **Verification:**\n    *   At 4:00 PM (1 hour after B leaves,",
+      "latency_s": 17.219671,
+      "score": 0.0,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "code_generation",
+      "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most `max_chars` characters each. The function \n    prefers to break on sentence boundaries ('.', '!', '?') when possible and never cuts a word in the middle.\n\n    If no suitable boundary exists within reasonable distance before reaching max_chars, it will split between words using whitespace as separator. Whitespace after punctuation is included with the segment that follows (e.g., '. \\n').\n\n    Args:\n        text (str): Input string to be chunked\n        max_chars (int): Maximum number of characters per chunk\n\n    Returns:\n        list[str]: List of strings where each has at most `max_chars` characters. An empty input or whitespace-only input yields [''].\n\n    Raises:\n        ValueError: If max_chars < 1.\n        TypeError: If text is not a string, even if it's empty.\n    \n    Example::\n\n        >>> chunk_text(\"Hello world! This is another sentence.\", 20)\n        ['Hello world!', 'This is', 'another sentence.']\n    \"\"\"\n    from itertools import groupby as _groupby\n    \n    def find_next_break(current, end_limit):\n        # current: the position we are at in text (current index)\n        # We need to check up until `end_index` of this chunk limit\n        \n        if current >= len(text):\n            return None\n\n        best_idx = None  # The break point will be an actual whitespace after a character.\n        \n        for i, ch in enumerate(current[current:], start=current + 1):\n            if ch == ' ':  # Possible word boundary (whitespace)\n                candidate_break_index = current + i - len(text[:current])\n\n                next_pos_after_space = text.rfind(' ', current + i, min(len(text), end_limit))\n\n                if best_idx is None:\n                    best_idx = next_pos_after_space\n\n        # Fallback break point logic within range before exceeding max_chars. Find the latest valid word break (space) that keeps chunk <= max_chars and avoids breaking inside a sentence boundary area.\n        \n    def build_chunks():\n        chunks, pos = [], 0\n        \n        while pos < len(text):",
+      "latency_s": 10.785778,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "code_review",
+      "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A short Python script using `sqlite3` to query a database.\n    *   Task: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n\n    *   **Security (Critical):** SQL Injection vulnerability. The code constructs the SQL query using string interpolation (`f\"...{user_id}...\"`). If `user_id` contains malicious input (e.g., `\"1 OR '1'='1\"`), it could compromise data integrity or access unauthorized rows/users.\n    *   **Resource Management (Bug/Style):** Connection is not closed explicitly in the function scope, though SQLite connections are often kept open until garbage collection if `conn.close()` isn't called immediately after use. However, for robust code, context managers (`with sqlite3.connect(...) as conn:`) should be used to ensure resources are released properly even on errors.\n    *   **Style/Best Practice:** Direct usage of string formatting is deprecated/bad practice in SQL contexts compared to parameterized queries. The `fetchone()` returns a tuple or None, but no type hinting exists. No error handling (e.g., if the user ID doesn't exist, it just returns `None` silently which might be okay depending on logic, but usually wrapped in exceptions).\n    *   **Bug:** If `user_id` is not an integer/valid query parameter format that matches expected types implicitly without validation? Actually, Python evaluates `{}` in strings as a placeholder for variable value. The main bug here isn't runtime crash necessarily, it's the security flaw and resource leak potential.\n\n4.  **Drafting the Review:**\n    *   **Security:** SQL Injection risk due to string formatting. Use parameterized queries (`?`).\n    *   **Resources/Style:** Don't forget `conn.close()`. Use context managers for cleaner code. Add type hinting (e.g., `user_id: int`, returns `dict | None` or similar).\n\n5.",
+      "latency_s": 5.550392,
+      "score": null,
+      "error": null,
+      "image": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "logical_reasoning",
+      "response": "Here are the step-by-step calculations to find out how many items remain:\n\n**Step 1: Calculate the total number of boxes.**\n$$12 \\text{ shelves} \\times 8 \\text{ boxes per shelf} = 96 \\text{ boxes}$$\n\n**Step 2: Calculate the total number of items before shipping.**\n$$96 \\text{ boxes} \\times 10 \\text{ items per box} = 960 \\text{ items}$$\n\n**Step 3: Determine how many items are removed for shipping.**\nTo find $1/4$ of the total items, divide by 4:\n$$\\frac{960}{4} = 240 \\text{ items removed}$$\n\n**Step 4: Calculate the remaining items.**\nSubtract the removed items from the total number of items:\n$$960 - 240 = 720 \\text{ items remain}$$\n\n*(Alternatively, you can calculate that if $1/4$ are removed, then $3/4$",
+      "latency_s": 10.720009,
+      "score": 1.0,
+      "error": null,
+      "image": null
+    }
+  ]
+}
