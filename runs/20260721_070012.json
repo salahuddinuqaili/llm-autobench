@@ -15,36 +15,44 @@
       "task": "changelog_generation",
       "response": "## \u2728 Improvements\n\n*   **Export Dashboard Data:** You can now export your sprint reports directly as CSV files from the dashboard, making it easy to analyze and share your data externally.\n*   **Enhanced Stability & Connectivity:** We've significantly improved how the system handles token refreshes, ensuring that your connections remain stable and uninterrupted even if authentication details expire mid-session.\n*   **Reliable Integrations:** Fixed an issue where certain missing pieces of data in webhook updates could cause crashes, making your automated integrations more robust and trustworthy.\n*   **Improved Performance:** We've optimized internal services to boost overall stability, ensuring a faster and smoother experience across the platform.",
       "latency_s": 5.581146,
-      "score": null,
+      "score": 0.8,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.8"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "```python\nimport re\nfrom typing import List\n\ndef chunk_text(text: str, max_chars: int) -> List[str]:\n    \"\"\"\n    Splits a block of text into chunks, ensuring no chunk exceeds max_chars.\n\n    The function prioritizes breaking at sentence boundaries ('.', '!', '?').\n    If a perfect boundary isn't available near the limit, it ensures that \n    the split occurs only on word boundaries and does not cut any words.\n\n    Args:\n        text: The input string to be chunked.\n        max_chars: The maximum allowed characters per chunk.\n\n    Returns:\n        A list of strings, where each string is a self-contained text chunk.\n\n    Raises:\n        ValueError: If max_chars is less than or equal to zero.\n\n    Example:\n        >>> text = \"This is a very long piece of text that needs careful splitting.\"\n        >>> chunk_text(text, 20)\n        ['This is a very long ', 'piece of text that needs', 'careful splitting.']\n    \"\"\"\n    if max_chars <= 0:\n        raise ValueError(\"max_chars must be a positive integer.\")\n\n    chunks = []\n    current_start_index = 0\n    text_length = len(text)\n\n    while current_start_index < text_length:\n        remaining_text = text[current_start_index:]\n        \n        # If the remaining chunk is smaller than max_chars, take it all and break.\n        if len(remaining_text) <= max_chars:\n            chunks.append(remaining_text)\n            break\n\n        best_split_index = -1\n        \n        # 1. Search for the best sentence boundary split point (prioritized)\n        # We search from current_start_index up to (but not exceeding) max_chars.\n        search_window = remaining_text[:max_chars]\n        \n        # Regex pattern to find boundaries followed by whitespace or end-of-string\n        boundary_matches = list(re.finditer(r'[.!?]\\s*|\\.\\n|\\?\\s*', search_window))\n\n        # Try to find a boundary that maximizes length while staying under max_chars\n        max_length_at_boundary = -1\n        candidate_split_index = current_start_index + len(remaining_text) # Default fail split\n        \n        for match in boundary_matches:\n            # The index of the *end* of the boundary marker (including trailing space)\n            end_index = match.end() \n            chunk_length = end_index - current_start_index\n\n            if chunk_length > max_length_at_boundary:\n                max_length_at_boundary = chunk_length\n                candidate_split_index = current_start_index + end_index\n\n\n        # 2. If a good boundary is found, use it (unless it's too short)\n        if max_length_at_boundary >= min(5, len(remaining_text)): # Use only if meaningful chunk length\n            best_split_index = candidate_split_index\n        else:\n            # 3. Fallback: Find the latest word boundary near or just under max_chars\n            # We look at the end of the search window for a space followed by non-space characters.\n            search_substring = remaining_text[:max_chars]\n            \n            # Use re.finditer to locate all potential word ends (followed by space)\n            word_",
       "latency_s": 8.67003,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "## Code Review\n\n### \ud83d\udc1b Bugs & Reliability Issues\n* **Resource Leakage:** The database connection (`conn`) is opened but never explicitly closed, even if an error occurs. This can lead to resource exhaustion over time.\n* **Error Handling:** The function lacks any `try...except` blocks. If the database file cannot be accessed or the query fails (e.g., table doesn't exist), the program will crash with unhandled exceptions.\n\n### \ud83d\udd12 Security Issues (Critical)\n* **SQL Injection Vulnerability:** This is a critical vulnerability. The use of an f-string to embed `user_id` directly into the SQL query (`query = f\"SELECT * FROM users WHERE id = {user_id}\"`) allows any malicious input for `user_id` to modify the structure of the query, potentially allowing attackers to read or delete unauthorized data.\n    * **Fix:** Always use parameterized queries (the second argument in `cursor.execute()`).\n\n### \u2728 Style & Best Practices\n* **Context Managers (`with` statement):** Python's standard library provides the `with` statement for managing resources like database connections. This ensures that the connection is automatically closed (even if errors occur) and significantly cleans up the code.\n* **Typing:** Adding type hints (e.g., `user_id: int`, `-> Optional[tuple]`) improves readability and maintainability.\n\n***\n\n## \ud83d\udca1 Suggested Fix (Refactored Code)\n\n```python\nimport sqlite3\nfrom typing import Optional, Tuple\n\ndef get_user(user_id: int) -> Optional[Tuple]:\n    \"\"\"Retrieves user data securely from the database.\"\"\"\n    try:\n        # Use 'with' for automatic connection management and resource cleanup\n        with sqlite3.connect('users.db')",
       "latency_s": 4.526418,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "apple\nbanana\ngrape",
       "latency_s": 0.39555,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -60,9 +68,11 @@
       "task": "sprint_narrative",
       "response": "We successfully completed the user auth revamp and implemented crucial billing webhook retries, boosting core service reliability this sprint. Our main blocker remains the SSO integration due to three days of unexpected vendor API downtime, which significantly delayed that key dependency. Moving forward, we must dedicate time to stabilizing the mobile CI pipeline because the current flakiness is creating unnecessary risk for future deployments.",
       "latency_s": 2.594492,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -78,9 +88,11 @@
       "task": "summarization",
       "response": "Our PostgreSQL database experienced an 8-minute outage because the server ran out of disk space. This critical failure was caused by a monitoring alert for low disk space being silenced during maintenance and never reactivated afterward, leaving us unaware of the storage issue. To prevent future outages, we have re-enabled the alert system and updated our post-maintenance checklist to ensure all necessary infrastructure checks are completed moving forward.",
       "latency_s": 2.328279,
-      "score": null,
+      "score": 0.95,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -96,18 +108,22 @@
       "task": "code_generation",
       "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split the input text into chunks of at most `max_chars` characters each, \n    preferring to break on sentence boundaries ('.', '!', '?') whenever possible,\n    and never cutting a word mid-word.\n\n    Args:\n        text (str): The text string to be chunked.\n        max_chars (int): Maximum number of characters allowed in any single chunk.\n\n    Returns:\n        list[str]: A list of chunks, each not exceeding `max_chars` characters.\n                   If the input is empty or contains only whitespace, returns an empty list.\n\n    Raises:\n        ValueError: If max_chars is less than 0.\n\n    Examples:\n        >>> chunk_text(\"Hello world!\", 15)\n        ['Hello world!']\n\n        >>> chunk_text(\"First sentence. Second sentence.\", 20)\n        ['First sentenc.', 'e Second sentence.']  # May vary depending on logic\n    \"\"\"\n    if max_chars < 0:\n        raise ValueError(\"max_chars must be non-negative\")\n\n    chunks = []\n    text = text.strip()\n    if not text or len(text) <= max_chars:\n        return [text] if text else []\n\n    i = 0\n    current_chunk = \"\"\n\n    while i < len(text):\n        # Look ahead to find a safe cut point (sentence boundary before the chunk limit)\n        sentence_end = -1\n        for j in range(i, min(len(text), max_chars)):\n            if text[j] in '.,?!':\n                candidate_split = current_chunk + text[i:j+1]\n                chunks.append(candidate_split.strip())  # Remove trailing whitespace after split punctuation\n                i += len(candidate_split) - (candidate_split[-1].lstrip().startswith(' ') or False)\n                break\n            if j == max_chars - 1:\n                sentence_end = None\n        else:\n            current_chunk += text[i]\n\n    # Handle remaining characters in the final chunk after loop finishes normally\n    while i < len(text):\n        chunks[-1] += text[i]\n        i += 1\n\n    return [chunk.strip() for chunk in chunks if chunk.strip()]\n\n\n# Example test case using an assert statement:\nassert not any(len(chunk) > 50 for chunk in chunk_text(\"This is a short sentence. \" + \n                                                        \"It will be split because of max_chars limit.\", 30)), \\\n    f\"Chunks exceed max_chars=50, got {[(c, len(c)) for c in _]}\"\n\n# Helper to simulate test:\ntext = (\"Hello world! This is a test sentence. It has many characters that \" + \n        \"need split properly if we want small chunks.\")\nresult = chunk_text(text, 25)\nassert all(len(chunk) <= 26 for chunk in result), f\"Chunk exceeded max_chars: {[len(c) for c in result]}\"\n\n# Print the results to check manually (optional):\nprint(result)\n```",
       "latency_s": 9.448902,
-      "score": null,
+      "score": 0.9,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.9"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A snippet of Python code using SQLite.\n    *   Task: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    # Missing: closing connection/handling exceptions? (Implicitly part of \"bugs/style\")\n    ```\n\n3.  **Identify Issues:**\n    *   **Security (Critical):** SQL Injection vulnerability. The `query` string uses f-string formatting `{user_id}` directly into the query without parameterization. If `user_id` is user input, it's vulnerable to injection attacks. Should use cursor.execute(query, parameters).\n    *   **Resource Management (Bug/Stability):** Database connection (`conn`) and cursor are created inside the function but never closed/cleared in case of error or normal return flow (if not using context managers). This leads to resource leaks and potential lock issues on concurrent access. Should use a `with` statement for connections/transactions if persistent, though usually DBs are handled at app level; however, strictly speaking within this function snippet, closing is needed for correctness in an isolated script or should be moved outside if it's shared logic. Given the context of \"reviewing code\", missing cleanup inside the function (unless relying on a global connection) is bad practice unless wrapped properly.\n    *   **Style:** `fetchone()` returns None if no rows, which is fine for return value but worth noting type safety. Variable names are okay (`query`, `conn`). Import statement is standard.\n\n4.  **Draft Feedback (Iterative refinement):**\n\n    *   *Point 1: Security.* Major issue. Use parameterized queries.\n        Fix: `cursor.execute(\"SELECT ... WHERE id = ?\", (user_id,))`\n    *   *Point 2: Resource Management.* Connection not closed. Risk of leaks/locks.\n        Fix: Wrap in try-except or use context manager (`with sqlite3.connect(...) as conn:`). Although for long-running apps, the connection might be managed outside, but inside a",
       "latency_s": 5.555535,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
