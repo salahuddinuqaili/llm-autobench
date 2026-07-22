@@ -22,7 +22,7 @@
       "task": "changelog_generation",
       "response": "### \ud83d\ude80 Improvements\n\n*   You can now export your sprint reports directly to CSV format from the dashboard for easy offline analysis.\n*   Enhanced connection reliability: The system automatically handles temporary credential issues during token refresh, ensuring uninterrupted access.\n*   Fixed a critical bug that could cause crashes when incoming webhook data was missing required user identifiers.",
       "latency_s": 3.087983,
-      "score": null,
+      "score": 0.9,
       "error": null,
       "image": null,
       "truncated": false,
@@ -31,14 +31,16 @@
       "max_tokens_used": 768,
       "prompt_tokens": 112,
       "completion_tokens": 343,
-      "tokens_per_s": 111.1
+      "tokens_per_s": 111.1,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.9"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "This function uses a greedy approach: it tries to take entire sentences first, falling back to taking chunks of complete words if a sentence is too long, ensuring that we never exceed `max_chars` and always respect word boundaries.\n\n```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most max_chars, prioritizing sentence \n    boundaries (., !, ?), and ensuring no words are cut.\n\n    Args:\n        text: The input string to chunk.\n        max_chars: The maximum allowed length for any single chunk.\n\n    Returns:\n        A list of strings, where each string is a properly chunked segment \n        of the original text.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n    \"\"\"\n    if not isinstance(max_chars, int) or max_chars < 1:\n        raise ValueError(\"max_chars must be a positive integer.\")\n    if not isinstance(text, str):\n        raise TypeError(\"Input text must be a string.\")\n\n    chunks = []\n    current_start = 0\n    text_length = len(text)\n\n    while current_start < text_length:\n        # If remaining text is smaller than max_chars, take it all.\n        if text_length - current_start <= max_chars:\n            chunks.append(text[current_start:])\n            break\n\n        # 1. Try to find the largest possible chunk respecting boundaries (greedy).\n        best_end = -1\n\n        # --- Step A: Check for ideal sentence break points ---\n        # Find all potential end points that mark the end of a sentence\n        sentence_splits = [m.span()[1] for m in re.finditer(r'[.!?]\\s*', text[current_start:], re.IGNORECASE)]\n\n        # Prioritize taking the longest segment that is an entire sentence \n        # and fits within max_chars.\n        for end_index_offset in sorted(sentence_splits, reverse=True):\n            potential_end = current_start + end_index_offset\n            chunk_candidate = text[current_start:potential_end]\n            if len(chunk_candidate) <= max_chars and chunk_candidate.strip():\n                best_end = potential_end\n                break # Found the longest fitting sentence break\n\n        # --- Step B: Fallback to Word Break (If no suitable full sentence found or preferred) ---\n        if best_end == -1 or (current_start + max_chars >= text_length and current_start + max_chars > 0):\n            \n            # We need the farthest word boundary that fits within remaining length.\n            # Find all potential word ends from the start position.\n            word_splits = []\n            i = current_start\n            while i < text_length:\n                match = re.search(r'\\b\\w+\\b', text[i:])\n                if match:\n                    end_pos = i + match.end()\n                    word_splits.append(end_pos)\n                    i = end_pos\n                else:\n                    break\n\n            # Choose the largest word boundary that respects max_chars\n            for potential_end in sorted(word_splits, reverse=True):\n                if (potential_end - current_start) <= max_chars:\n                    best_end = potential_end\n                    break\n\n\n        # --- Step C: Finalize Chunking ---\n        if best_end > current_start:\n            chunk = text[current_start:best_end].strip()\n            if chunk:\n                chunks.append(chunk)\n            current_start = best_end\n        else:\n            # Should theoretically not happen if max_chars >= 1, but handles edge cases\n            break\n\n    return chunks\n\n\n# --- Assert Test ---\n\ndef test_chunk_text():\n    \"\"\"Tests the chunking functionality.\"\"\"\n    print(\"Running tests...\")\n    \n    # Test Case 1: Simple sentence breaks and length constraints\n    long_text = (\n        \"This is a very long paragraph containing multiple sentences. \"\n        \"It ends with an exclamation point! Does it work well? Yes, it should.\"\n    )\n    max_len_1 = 40 # Must break after the first two sentences\n\n    chunks_1 = chunk_text(long_text, max_len_1)\n    expected_1 = [\n        \"This is a very long paragraph containing multiple sentences. \",\n        \"It ends with an exclamation point! Does it work well?\",\n        \" Yes, it should.\"\n    ]\n    assert chunks_1 == expected_1, (f\"\\nExpected: {expected_1}\\nGot:      {chunks_1}\")\n    print(\"Test 1 Passed (Sentence Breaks)\")\n\n\n    # Test Case 2: Forcing a word break in the middle of a long sentence\n    long_sentence = \"This is an exceptionally long sentence that needs to be broken up because it exceeds forty characters and there are no natural breaks available within the limit.\"\n    max_len_2 = 50 # Should cut mid-sentence at a word boundary\n\n    chunks_2 = chunk_text(long_sentence, max_len_2)\n    # Expected breaks should occur after \"characters\" (49 chars) and then take the rest.\n    expected_2 = [\n        \"This is an exceptionally long sentence that needs to be broken up because it exceeds forty characters\",\n        \"and there are no natural breaks available within the limit.\"\n    ]\n    # Note: Due to padding/whitespace handling, we check content equality\n    assert len(chunks_2) == 2 and chunks_2[0].strip() == expected_2[0].strip() \\\n           and chunks_2[1].strip() == expected_2[1].strip(), (f\"\\nExpected: {expected_2}\\nGot:      {chunks_2}\")\n    print(\"Test 2 Passed (Word Break)\")\n\n    # Test Case 3: Max length equal to total text length",
       "latency_s": 25.366424,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": true,
@@ -47,14 +49,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 83,
       "completion_tokens": 2048,
-      "tokens_per_s": 80.7
+      "tokens_per_s": 80.7,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "### \ud83d\udc1e Bugs\n\n1.  **Resource Management:** The database connection (`conn`) is opened but never explicitly closed or managed using a `with` block. This can lead to resource leaks.\n\n### \ud83d\udd12 Security Issues (CRITICAL)\n\n1.  **SQL Injection Vulnerability:** The primary issue is the construction of the SQL query using an f-string: `query = f\"SELECT * FROM users WHERE id = {user_id}\"`. If a malicious user provides input for `user_id` that contains SQL code (e.g., `' OR '1'='1`), they can execute arbitrary database commands. **This must be fixed using parameterized queries.**\n\n### \u2728 Style & Best Practices\n\n1.  **Connection Handling:** The entire function should utilize the `with sqlite3.connect(...) as conn:` context manager to ensure the connection is automatically closed, even if errors occur.\n2.  **Return Type (Implicit):** If no user is found, `cursor.fetchone()` returns `None`, which is acceptable but worth documenting or handling explicitly.\n\n---\n\n### \u2705 Refactored Example (Recommended)\n\n```python\nimport sqlite3\n\ndef get_user(user_id: int):\n    # Use a context manager to ensure the connection is automatically closed\n    try:\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            \n            # CRITICAL FIX: Use parameterized queries (?) instead of f-strings\n            query = \"SELECT * FROM users WHERE id = ?\"\n            cursor.execute(query, (user_id,)) \n            \n            return cursor.fetchone()\n    except sqlite3.Error as e:\n        print(f\"Database error occurred: {e}\")\n        return None # Handle the failure gracefully\n```",
       "latency_s": 4.163212,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -63,14 +67,16 @@
       "max_tokens_used": 512,
       "prompt_tokens": 105,
       "completion_tokens": 476,
-      "tokens_per_s": 114.3
+      "tokens_per_s": 114.3,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nOrange",
       "latency_s": 1.7205,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -79,7 +85,9 @@
       "max_tokens_used": 256,
       "prompt_tokens": 43,
       "completion_tokens": 6,
-      "tokens_per_s": 3.5
+      "tokens_per_s": 3.5,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -102,7 +110,7 @@
       "task": "sprint_narrative",
       "response": "We successfully completed the user auth revamp and hardened the billing webhook retry mechanism this sprint, hitting key backend deliverables. The SSO integration remains blocked due to prolonged vendor API downtime, pushing that dependency out until reliable external access resumes. Our immediate focus must be stabilizing the flaky CI pipeline on the mobile stack, as unstable testing is hindering feature confidence.",
       "latency_s": 2.796224,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -111,7 +119,9 @@
       "max_tokens_used": 768,
       "prompt_tokens": 80,
       "completion_tokens": 310,
-      "tokens_per_s": 110.9
+      "tokens_per_s": 110.9,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -134,7 +144,7 @@
       "task": "summarization",
       "response": "The service experienced an 8-minute outage because the database system ran out of disk space. This was caused by a routine monitoring alert for available disk storage being accidentally disabled and not reactivated after maintenance, preventing essential cleanup processes from running. To prevent this in the future, we have re-enabled the critical alerts and updated our post-maintenance checklist to ensure disk capacity is always monitored.",
       "latency_s": 7.242618,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -143,14 +153,16 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 128,
       "completion_tokens": 307,
-      "tokens_per_s": 42.4
+      "tokens_per_s": 42.4,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "arithmetic_reasoning",
       "response": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Problem:**\n    *   **Train A (First train):** Leaves at $2{:}00$. Speed = $60$ km/h.\n    *   **Train B (Second train):** Leaves at $3{:}00$ (one hour after Train A). Speed = $90$ km/h.\n    *   **Goal:** Find the time when Train B catches up to Train A.\n\n2.  **Define Variables and Units:**\n    *   Let $t$ be the number of hours since a specific reference point in time. It's usually easiest to measure time from the departure of the first train (Train A) or just define variables based on distance.\n    *   Distance ($d$), Speed ($v$), Time ($t$). The relationship is $d = v \\times t$.\n\n3.  **Establish a Reference Point:**\n    *   Let's set time $0$ at the moment the first train leaves (2:00 PM).\n\n4.  **Formulate Equations for Distance Traveled:**\n\n    *   *Train A:*\n        *   Speed ($v_A$) = $60$ km/h.\n        *   Time elapsed since departure = $t$.\n        *   Distance($d_A$) = $60 \\times t$.\n\n    *   *Train B:*\n        *   Speed ($v_B$) = $90$ km/h.\n        *   Leaves 1 hour later (at 3:00).\n        *   Time elapsed since Train A's departure is still $t$, but for distance calculation, we need time relative to its own start or just account for the \"head start\" in position/time equations. Let's look at it this way: At a specific absolute time $T$ (where 2:00 is $T=0$), Train B has been traveling for $(t - 1)$ hours? No, let's stick to simpler logic.\n        *   When the two trains catch up, they will have traveled the same distance from the station relative to their specific departure times plus any initial offset (which is zero since they leave the *same* station). Wait, they start at different times but are on a track starting at 0 km for both? No.\n        *   Let's re-evaluate the setup. They leave \"from the same station\". This implies the origin ($d=0$) is fixed for both tracks (or parallel segments of interest). However, Train B starts later. So, when calculating distance $D(t)$:\n            *   For a total duration $t$ measured from 2:00 PM:\n                *   Distance A = $60 \\times t$.\n                *   Time elapsed for Train B is $(t - 1)$. Why? Because it starts at 3:00 (which is 1 hour after the reference). It catches up when its distance equals Train A's.\n            *   For this equation to hold ($d_A = d_B$), $t > 1$.\n\n5.  **Set Up Equality:**\n    $$60 \\times t = 90 \\times (t - 1)$$\n    *(Note: It's crucial here that $(t-1)$ represents the time Train B has been moving. If we define a new variable $x$ as hours after 3:00, it might be cleaner).*\n\n6.  **Solve using Method A (Time since First Train departure):**\n    $$60t = 90(t - 1)$$\n    Divide by common factor or expand:\n    $$60t = 90t - 90$$\n    Move $90$ to the left and $60t$ to the right (or vice versa):\n    $$90 = 90t - 60t$$\n    $$90 = 30t$$\n    $$t = \\frac{90}{30}$$\n    $$t = 3$$\n\n    So, $t=3$ hours. Since the reference time was 2:00 PM (time 0), we add 3 hours to that clock face? No, be careful here. If 2:00 is $T_1$, and 3:00 is $T_1 + 1$.\n    The variable $t$ represents the duration since 2:00 PM.\n    So, if catch up happens at total time duration of 3 hours from 2:00 PM? Wait, let me re-read my equation logic above carefully.\n\n    *   Distance A = Speed $\\times$ Total Time (since 2:00). $D_A = 60t$.\n    *   Train B leaves at 3:00 (1 hour later). If total time elapsed is still $t$, then duration moving for B is $(t - 1)$. This assumes the catch up happens after 3:00. Since Train A travels slower than B ($60 < 90$), they will cross paths eventually.\n    *   Equation: $D_A = D_B \\Rightarrow 60(t) = 90(t-1)$. Wait... does this make sense? If $t=3$, then time for B is 2 hours. Distance A = 180 km. Distance B = $90 \\times 2 = 180$ km. They match.\n    *   So, the catch-up occurs at a total duration of **4** hours from 2:00 PM? Let's re-verify my arithmetic or logic in the previous step ($t=3$ vs $t=4$).\n\n    Wait, let me check the math on \"$60(t) = 90(t-1)$\".\n    If catch up is at time 5 (duration), then Train A has gone 5 hours. Distance = 300 km. Train B left at hour 1? No, if I define $t$ as clock hours where 2:00 is 14:00 and reference point is just \"hours passed\".\n    Let's stick to the specific logic used in step 5 equation but check the arithmetic carefully.\n\n    Equation: $60 \\cdot t = 90(t - 1)$? No, that implies they meet after train A has traveled for time $t$, and train B travels for $(t-1)$.\n    Let's solve it again properly.\n\n    **Let $x$ be the number of hours Train A travels.**\n    Distance = $60x$.\n    \n    Train B leaves 1 hour later. So when they meet, Train B has been traveling for $(x - 1)$ hours (assuming catch-up is after train B starts). Let's assume this condition holds ($90$ is faster than $60$, so it catches up eventually). However, the time variable needs to handle negative duration if we just plug in blindly? No.\n    \n    *Wait*, there's a logic trap here often used by people confusing relative speed vs total elapsed time variables. Let's stick to: \"Time after Train B leaves\".\n\n7.  **Alternative Method (Method B - Variable based on Second train):**\n    Let $x$ be the number of hours Traveler B has been traveling when they catch up.\n    \n    *   Time for Train A = $(x + 1)$ hours (since it started an hour earlier).\n    *   Distance Train A covers in that time: $d_A = 60(x + 1)$.\n    *   Distance Train B covers in its travel time: $d_B = 90(x)$.\n    \n    Condition to catch up: Distances must be equal.\n    $$60(x + 1) = 90x$$\n    \n    Expand left side:\n    $$60x + 60 = 90x$$\n    \n    Subtract $60x$ from both sides:\n    $$60 = 30x$$\n    \n    Divide by 30:\n    $$2 = x$$\n    \n    So, Train B travels for **2 hours**.\n\n8.  **Calculate the Clock Time:**\n    *   Second train leaves at 3:00.\n    *   It catches up after $x = 2$ hours of travel.\n    *   Current time + 3:00 PM + 2 hours = ?\n    \n    Calculation:\n    Start: 15:00 (using 24h format or just clock).\n    End: 17:00? Wait, $x$ was derived in step 8. Is that correct? Let's re-verify the previous method where I got $t=3$.\n\n    *   **Re-evaluating Method A vs B:**\n        *   Method A equation used earlier: $60(t) = 90(t - 1)$? Wait, if I solved $60 = 30x$ in Method B to get $x=2$, that means Train B traveled for 2 hours. If Train B left at 3:00, it meets at 5:00.\n        *   Let's check the distance at 17:00 (or whatever time is). Wait, if train leaves at 2 and catches up...\n            *   Train A travels for $t_{total}$ hours starting from 2:00. Distance = $60 \\cdot t_{total}$.\n            *   If the meeting happens at Time $T$ (relative to start), then time is simply that duration. Let's say they meet after Train B has traveled $x=2$ hours. Then total elapsed since train A started was 3 hours? No, wait.\n\n    *Let's trace carefully:*\n    Scenario: Start of Train A = Time $T_{0}$. Start of Train B = $T_{1} = T_{0} + 1$h.\n    Let meeting time be $M$.\n    Distance A = $60 \\times (M - T_{0})$\n    Distance B = $90 \\times (M - T_{1})$\n    \n    Set equal:\n    $$60(M - T_0) = 90(M - T_0 - 1)$$ -- Assuming speeds are constant. Wait, let's simplify variables. Let $\\Delta t_A$ be duration for A and $\\Delta t_B$ be duration for B.\n    \n    If they meet at a clock time that is $y$ hours after the second train starts:\n    Then Train B has traveled $90 \\cdot y$.\n    Train A, which left an hour earlier (at 3:00 minus 1 hr = 2:00), would have been traveling for $(y + 1)$ hours. Wait... if meeting is at time $T_{meet}$ and start B is $T_B$, then duration B is $t$. If start A was $T_A$ ($= T_B - 1h$). Then duration A is $t+1$.\n    Distance equality:\n    $$60(t + 1) = 90t$$\n    \n    Let's solve for $t$:\n    $$60t + 60 = 90t$$\n    $$60 = 30t$$\n    $$t = 2 \\text{ hours}.$$\n\n    Wait, let me rethink the previous calculation in Step A where I got $x=4$ or something else.\n    Let's look at the first method again:\n    \"Let $t$ be time elapsed since first train leaves.\"\n    Distance A ($d_A$) = $60 \\times t$.\n    Train B starts after 1 hour, so it travels for $(t-1)$ hours (assuming catch up is after 3pm). Wait... why did I think of \"negative\" or weird math? Because the algebra was tricky.\n\n    Let's try a concrete example to check logic:\n    Time = 2:00 PM. Train A leaves. Dist=0. Speed=60.\n    Time = 4:00 PM (2 hours later).\n      - Train A position: $60 \\text{ km/h} \\times 2 \\text{ h} = 120$ km from station.\n    At this moment, Train B just left at 3:00 PM and has been going for 1 hour? Wait. No, if Time is now 4:00 PM... Train A leaves at 2pm (elapsed 2h). Train B leaves at 3pm. So at 4pm, Train B is moving for $4-3=1$ hour.\n    - Position of Train B at 4:00 PM = $90 \\text{ km/h} \\times 1 \\text{ h} = 90$ km from station.\n    \n    At 5:00 PM (Total elapsed since A started = 3 hours).\n      - Train A position ($t=3$): $60 \\times 3 = 180$ km.\n      - Train B duration ($5pm - 3pm = 2h$): Position = $90 \\times 2 = 180$ km.\n    \n    They are at the same spot (180km) at **5:00 PM**.\n\n    So why did I doubt myself in Method A vs B?\n    Let's re-read my manual calculation of Step A/Method B above to see where confusion came from.\n    \n    *   In step 7, \"Alternative Method\", I found $x=2$ (hours for train B). Since Train B starts at 3:00 PM, adding 2 hours gives **5:00 PM**. This matches the concrete check just now ($t_{total}$ for A = 3h from 2pm -> 5pm. Wait... if $x=2$, then duration A was $(x+1) = 3$? Let me re-read Step 7).\n    \n    Ah, I see a typo in my mental draft of step 8 or the text below it.\n    In Method B (Step 7): \"$60(t + 1)$\" vs \"90t\". Wait... if $x$ is hours for train B ($B_{time}$), then Train A has been traveling since the start, which was 2:00 PM. If meeting happens at time such that Train B traveled $x$, and it left at 3pm (which is +1 hour relative to 2pm). Then Total Time = $(Start_A) \\to (End)$.\n    Start A -> End = Duration A ($D_A$).\n    Start B -> End = Duration B ($D_B$).\n    Relationship: $D_A = D_B + 1$? No.\n    \n    Let's check the timeline again.\n    Train A leaves at 2pm.\n    Train B leaves at 3pm.\n    So when meeting happens, say it is time $T$.\n    Duration for A ($d_{ur}A$) = Time between 2:00 and $T$. Let's call this $\\tau_A$.\n    Duration for B ($d_{ur}B$) = Time between 3:00 and $T$. Let's call this $\\tau_B$.\n    \n    Since Train A left at 2pm, if it meets Train B (which leaves at 3pm), then clearly the meeting time must be after 3pm. So $\\tau_A > \\tau_B$. specifically $\\tau_A = \\tau_B + 1$ hour? No... Wait.\n    If Meeting Time is $M$, and Start times are $S_A=2:00, S_B=3:00$.\n    Duration A ($D_{ur}A$) = $|M - 14:00|$ (using military or similar).\n    Duration B ($D_{ur}B$) = $|M - 15:00|$.\n    \n    Clearly, since they catch up on the *same* track starting from a station... wait. If train A is ahead at any given time after 3pm? No. Train A left earlier so it has distance head start. Wait, \"head start\" in terms of position (distance covered). Yes.\n    \n    At $M$ minutes/hours:\n    Distance A = Speed $\\times$ Duration ($S_A \\to M$) -> $60(x + 1)$ if we let $x = D_{ur}B$. Wait, is it?\n    Let's verify this relation again carefully.\n    \n    Timeline:\n    |---2pm (A leaves)------|3pm (B leaves)|----X hours later(MEETING)----\n    \n    Time A travels from 2pm to Meeting = $T_{meet} - T_A$.\n    Time B travels from 3pm to Meeting = $T_{meet} - T_B$.\n    \n    Since $T_B$ is exactly 1 hour after $T_A$:\n    $(T_{meet} - T_A) - (T_{meet} - T_B)$? No.\n    Let $\\Delta t$ be the time from B's departure to meeting ($t_B = \\text{meeting\\_time} - \\text{B\\_departure}$).\n    Then $A$'s duration is $(\\text{meeting\\_time} - A_{start})$.\n    Since $B_{start} = A_{start} + 1$, then:\n    Time for B ($t_B$) corresponds to interval $[S_A+1, S_A+x]$. (Using hour difference logic).\n    \n    Let's just use absolute units.\n    Distance of catch up point relative to station:\n    Train A leaves at $T=0$ (2pm). Speed 60km/h. Position $d(t) = 60t$.\n    Train B leaves at $T=1$ (3pm). Speed 90km/h.\n    \n    At a time $t > 1$:\n    Pos A: $d_A = 60 \\times t$ (since it started at $t=0$ and has been moving for $t$ hours) -- Wait, if we define origin as station position, yes. If Train B leaves later from the *same* station (position 0), then its distance traveled is speed $\\times$ duration since start ($T-1$).\n    So equation: $60(t - 0)$? No wait...\n    \n    Let's check \"Position relative to station\".\n    At time $t=2$h after A leaves (so it's 4pm):\n    Pos A = $60 \\times 2$. Correct. It has been moving for 2 hours starting from pos 0 at t",
       "latency_s": 70.38391899999999,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -159,7 +171,9 @@
       "max_tokens_used": 4096,
       "prompt_tokens": 84,
       "completion_tokens": 4096,
-      "tokens_per_s": 58.2
+      "tokens_per_s": 58.2,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -175,14 +189,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 72,
       "completion_tokens": 2048,
-      "tokens_per_s": 63.2
+      "tokens_per_s": 63.2,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "I will score the model response against the rubric.\n\n\nThe model response does not fully meet the requirements. Here's the score breakdown:\n\n\n* Respects max_chars: Yes\n* Breaks on sentence boundaries when possible: Yes\n* Never splits a word: Yes\n* Has a docstring: Yes\n* Has an assert test: No\n\n\nSince"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Review Python code for bugs, security issues, and style.\n    *   Constraint: Be concise.\n    *   Code Snippet: A simple SQLite function using string formatting for a SQL query.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\" # Potential SQL Injection!\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n    *   **Security (Critical):** The code constructs an SQL query using string interpolation (`f\"...{user_id}...\"`). This is vulnerable to SQL injection attacks if `user_id` contains malicious input, even though it's technically a number in typical cases. It should use parameterized queries. Wait, strictly speaking for integers ID might not be vulnerable *if* the type casting ensures integer, but best practice requires parametrization. However, SQLite interprets `{}` as format string interpolation unless `str.format` or `%s`. Here f-string is used directly. This allows injection if `user_id` comes from external input (e.g., URL parameters).\n    *   **Resource Management:** The database connection (`conn`) and cursor are not closed explicitly. If called multiple times, it holds connections open. Should use a context manager or try/finally/close.\n    *   **Style/Naming:** `get_user` implies returning user data but returns the raw row (tuple/dict?). This is okay but usually better to handle exceptions like `sqlite3.Error`.\n    *   **Path Security:** The db file path `'users.db'` could be more secure, though less of an issue here.\n\n4.  **Draft Review Points:**\n    *   **Security:** SQL Injection vulnerability via f-string interpolation in query construction. Use parameterized queries (`?`).\n    *   **Resource Management:** Connection is not closed after use. Risk of connection leak in production. Use `with` statement or explicit close.\n    *   **Error Handling:** No exception handling (e.g., for missing users, DB errors).\n\n5.  **Refine Review Points (Conciseness):**\n    *   Merge points where possible. Focus on the biggest issues first.\n    *   Security: Replace f-string with parameters (`cursor.execute(query, {user_id})`). Wait, `execute` takes `(query, params)` for parameterized queries in sqlite3? Yes, `%s`. Actually, standard is `f\"SELECT ... WHERE id = ?\"` then pass tuple/list as second argument.\n    *   Resources: Use `with sqlite3.connect(...)`.\n\n6.  **Construct Final Output:**\n    *   Keep it bulleted or very short paragraphs.\n    *   Highlight the specific lines/corrections.\n\n7.  **Final Polish:**\n    *   Security (SQL Injection).\n    *   Resource Cleanup (Connection closing).\n    *   Error Handling (Optional but good to mention briefly).\n\n8.  **Output Generation:** (Drafting the response)\n    *   Start with \"Critical: SQL Injection\". Explain why and fix.\n    *   Next \"Resource Leaks\": Context managers.\n    *   Mention error handling if needed, maybe keep it very brief as per \"concise\" instruction.\n\n    Let's combine for maximum conciseness.\n\n    **Security:** Critical SQL injection vulnerability using string interpolation instead of parameterized queries. Use `?` placeholders and pass arguments to `.execute()`.\n    **Resource Management:** Database connection is not closed. Risk of exhaustion if called repeatedly in a loop without cleanup. Wrap logic or use context managers (`with`).\n    **Input Validation/Handling:** Add error handling for query failures (e.g., user doesn't exist, database error).\n\n    Let's make it even punchier.\n\n    *   **Security:** Vulnerable to SQL injection via f-string interpolation. Use parameterized queries: `cursor.execute(\"SELECT ... WHERE id = ?\", (user_id,))`.\n    *   **Resources:** Connection isn't closed/committed explicitly if execution fails before `.close()`. Use a context manager (`with sqlite3.connect(...) as conn:`).\n    *   **Error Handling:** Missing exception handling for database errors or missing records.\n\n    Wait, is `fetchone()` returning None okay? Usually yes, but might be worth checking type hints (optional). Let's stick to the requested \"bugs, security issues, and style\". Style covers context manager + f-string usage.\n\n    Final check on code:\n    The variable name `query` inside a string interpolation is risky if not handled via `%s` or `?`.",
       "latency_s": 16.449978,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -191,7 +207,9 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 89,
       "completion_tokens": 1024,
-      "tokens_per_s": 62.2
+      "tokens_per_s": 62.2,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
