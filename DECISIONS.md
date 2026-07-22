@@ -3,6 +3,13 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-07-22 — All-time results view + auto-injected README leaderboard
+Aggregate every `runs/*.json` via `scripts/aggregate_results.py` (deterministic, stdlib-only) into a
+leaderboard / task-difficulty / model×task matrix + honest caveats, injected into README between
+RESULTS markers. Why: 100+ runs had no aggregate view; per-run reports can't show trends or fair
+cross-model comparison. Rejected: an LLM-summarized section (non-reproducible) and a dashboard/DB
+(overkill; paid infra is off-policy for this public repo).
+
 ## 2026-07-18 — Credibility-first remediation sequencing
 Fix scoring, truncation, judge visibility, and the `bench()`/report wiring (Phase 0–1) **before**
 porting HumanEval/MMLU/reward models (Phase 2). Why: a self-audit found the flagship run reports a
