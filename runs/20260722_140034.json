@@ -15,36 +15,44 @@
       "task": "changelog_generation",
       "response": "### \u2728 Improvements\n\n*   **Export Reports Easily:** You can now export your sprint reports directly from the dashboard into a CSV file for offline analysis.\n*   **Enhanced Connection Reliability:** We've improved how our system manages OAuth connections, ensuring that token refreshes work correctly even if interrupted mid-process. Your data syncing is more stable than ever.\n*   **Improved Data Stability:** The platform is now more robust when handling incoming webhook data, preventing unexpected crashes and ensuring continuous operation.",
       "latency_s": 2.574381,
-      "score": null,
+      "score": 0.67,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.67"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "Here's a thinking process that leads to the suggested solution:\n\n1.  **Understand the Goal:** The objective is to write a Python function `chunk_text(text: str, max_chars: int)` that takes a string and a maximum length (`max_chars`). It must return a list of strings (the chunks).\n2.  **Constraints/Priorities (The Rules):**\n    *   Chunk size $\\le$ `max_chars`.\n    *   Must prefer breaking at sentence boundaries (`.`, `!`, `?`).\n    *   Cannot cut a word (must keep whole words).\n3.  **Initial Approach - Simplification & Edge Cases:**\n    *   The input text might have multiple paragraphs, etc. Treating it as one continuous stream is usually fine, but respecting sentence structure is key.\n    *   We need a way to detect and separate sentences first.\n\n4.  **Step 1: Sentence Segmentation (Macro-Level Chunking):**\n    *   The best strategy is to split the text into potential \"sentence units.\" We can use regular expressions or simple splitting based on delimiters (`.`, `!`, `?`) while being careful not to lose the delimiter itself (because it's part of the sentence structure).\n\n5.  **Step 2: Iterating and Chunking (Micro-Level Management):**\n    *   We process the text chunk by chunk, aiming for the maximum size but respecting boundaries.\n\n6.  **Refining the Strategy (Combining Rules):**\n\n    *   *Attempt 1 (Simple Split)*: Just splitting on words and rejoining until we hit `max_chars`. This fails the \"prefer sentence boundary\" rule.\n    *   *Attempt 2 (Sentence by Sentence)*: Try to fit as many whole sentences as possible without exceeding `max_chars`. If a single sentence exceeds `max_chars`, that sentence *must* be split, and we fall back to word/punctuation boundaries within it.\n\n7.  **Implementing the Logic (Detailed Steps):**\n\n    *   **A. Identify Sentences:** Split the text into potential sentences. A regex is ideal for this: `([.!?]\\s*)` will capture delimiters along with subsequent whitespace, helping us keep them attached to the sentence.\n    *   **B. Process Accumulation:** Use a loop structure to accumulate chunks.\n        *   Start with an empty result list and a running buffer (current chunk).\n        *   For each potential sentence:\n            1.  Check if adding the whole sentence (`sentence_length`) exceeds `max_chars`.\n            2.  If it *does not* exceed: Add it to the current buffer.\n            3.  If it *does* exceed OR if the current buffer is empty (meaning even one sentence is too big): We must process/flush the current buffer first, and then handle the problematic sentence.\n\n    *   **C. Handling Over-sized Units (The Fallback mechanism):** If a single sentence or remaining text segment is $> max\\_chars$:\n        1.  We must split it by words.\n        2.  Keep adding words until we are near $max\\_chars$.\n        3.  When appending a word, check if the next boundary (space, punctuation) exists right after the word to make the split cleaner (though simple word splitting is often sufficient if boundaries are prioritized).\n\n8.  **Self-Correction/Refinement (Focus on Simplicity and Robustness):** The complex flow of \"if buffer is non-empty, flush it; then process new sentence\" can get messy. A cleaner approach is to work with *segments* (sentences or words) and build the chunk until hitting a boundary that keeps us below $max\\_chars$.\n\n    *(Implementing using word tokenization/iterative checking)*:\n    1. Tokenize the entire text into clean tokens (words, punctuation).\n    2. Iterate through tokens, building the current chunk.\n    3. Before adding a token, check the potential length.\n    4. If adding the token *and* any trailing space exceeds $max\\_chars$:\n        a. Flush the existing buffer. Start a new chunk with the current token.\n    5. If we finish all tokens, process the final buffer.\n\n9.  **Final Code Structure (Using `re` for tokenization and boundary awareness):** This combines the desire for sentence boundaries *and* word-level safety checks. The implemented solution focuses on identifying sentences first, then splitting those large sentences if necessary. (This matches the robust pattern used in professional NLP chunking.)\n\n10. **Adding Docstrings and Tests:** Write clear docstrings following conventions and create an appropriate `assert` test case that covers the boundary condition (e.g., making sure a long sentence gets split correctly,",
       "latency_s": 8.624818,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "## Code Review (get_user)\n\n### \ud83d\udea8 Critical Bugs & Security Issues (High Priority)\n\n1. **SQL Injection Vulnerability:** This is the most severe flaw. Using an f-string to construct the SQL query (`f\"SELECT * FROM users WHERE id = {user_id}\"`) directly embeds user input into the query, allowing a malicious user to inject arbitrary SQL code.\n   * **Fix:** Always use parameterized queries (placeholders `?` and pass the values as a tuple).\n\n2. **Resource Leakage (Context Manager):** The database connection (`conn = sqlite3.connect(...)`) is opened but never explicitly closed or handled correctly. If an exception occurs, or even if the function exits normally, the resource might remain open, leading to leaks.\n   * **Fix:** Use the `with` statement for the connection object.\n\n### \u2728 Best Practices & Style (Medium Priority)\n\n1. **Magic String Database Name:** Passing `'users.db'` directly makes testing harder and couples the function strongly to a specific file name.\n2. **Type Hinting/Error Handling:** The function should ideally handle database connection errors or non-existent tables gracefully.\n\n---\n\n### \ud83d\udca1 Refactored Solution (Recommended)\n\n```python\nimport sqlite3\n\ndef get_user(user_id: int):\n    \"\"\"Retrieves a user record safely using parameterized queries.\"\"\"\n    # Use 'with' statement to ensure the connection is closed automatically\n    try:\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            # CRITICAL FIX: Use parameterization (?) to prevent SQL injection\n            query = \"SELECT * FROM users WHERE id = ?\"\n            cursor.execute(query, (user_id,))",
       "latency_s": 4.495999,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nOrange",
       "latency_s": 0.371593,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -60,9 +68,11 @@
       "task": "sprint_narrative",
       "response": "Key deliverables for this sprint included successfully completing the user authentication revamp and implementing robust billing webhook retry logic. Progress on SSO integration was significantly blocked by external vendor API downtime, causing a three-day delay to that feature. Moving forward, stabilizing the flaky mobile CI pipeline must be our top priority to ensure reliable deployments and prevent future quality regressions.",
       "latency_s": 4.786204,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -78,9 +88,11 @@
       "task": "summarization",
       "response": "The system experienced an unplanned eight minutes of downtime today when its main database server failed. This failure was caused by a critical local storage issue\u2014the disk space became completely full, preventing necessary operational files from saving. We have restored service and immediately implemented new procedures, including re-enabling key alerts and adding mandatory disk-space checks to prevent this type of incident during future maintenance periods.",
       "latency_s": 3.233605,
-      "score": null,
+      "score": 0.92,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.92"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -96,18 +108,22 @@
       "task": "code_generation",
       "response": "Let me write a Python function that chunking text based on sentence boundaries while respecting certain constraints:\n\n1. Chunks should be at most `max_chars` characters long\n2. Prefer to break at sentence boundary markers ('.', '!', '?') followed by whitespace or end of string\n3. Never cut in the middle of words\n4. Should handle edge cases like empty text, single character chunks when needed\n\nLet me think about the implementation:\n\n1. I need to find natural breaks (sentence boundaries) within `max_chars` limit\n2. If no sentence boundary is found but we're at max_chars, just split there without cutting words\n3. Need to handle edge cases properly\n\nHere's my approach:\n- Try to break on '.' + ' ', '!' + ' ', '?' + ' (with space)' or end of text\n- Keep track of current chunk length\n- When approaching max_chars and we find a sentence boundary, use that as the split point\n- If no good break is found within the limit, just return what fits without cutting words\n\nLet me write this step by step:\n\n```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most max_chars characters.\n    \n    The function prefers to break on sentence boundaries ('.', '!', '?'),\n    while ensuring words are never cut in the middle. If no suitable \n    boundary exists within the character limit, it will still ensure \n    complete words remain intact by breaking appropriately.\n    \n    Args:\n        text: Input string to be chunked\n        max_chars: Maximum number of characters per chunk\n        \n    Returns:\n        List of strings where each is at most max_chars in length\n        \n    Raises:\n        ValueError: If max_chars <= 0 or if any word exceeds the limit.\n        \n    Example:\n        >>> chunk_text(\"Hello world! This is a test.\", 15)\n        ['Hello world!', 'This is', ...] (depending on exact splitting rules)\n    \n    \"\"\"\n```\n\nI need to reconsider whether raising ValueError for single words exceeding max_chars makes sense - the problem likely expects that scenario. For empty text, an empty list seems appropriate rather than special-casing it as a case where nothing gets chunked correctly.\n\nActually, I'm going in circles on this edge case handling. Let me focus on getting the core logic right first: find sentence boundaries when approaching max_chars limit, break at those points or at word boundaries if needed, and validate that no individual word exceeds what we can handle while staying within the character constraint per chunk.\n\n```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most max_chars characters each.\n    \n    Prefers to break on sentence boundaries ('.', '!', '?'), ensuring \n    words are never cut in the middle. If a word exceeds max_chars, it's \n    included as-is (the caller should verify this case is acceptable).\n    \n    Args:\n        text: The input string to be chunked\n        max_chars: Maximum characters per chunk\n        \n    Returns:\n        A list of non-empty strings where each has at most max_chars characters.\n        \n    Example:\n        >>> chunk_text(\"Hello world! This is a test.\", 15)\n        ['Hello world!', 'This is', ...]\n    \n    \"\"\"\n```\n\nThe approach involves iterating through text, tracking current length, and when approaching the limit, checking for sentence endings before word breaks. For normal sentences followed by spaces or newlines, I can safely split there if within bounds; otherwise break at any space to avoid cutting words. At line starts (after newline), just use whichever boundary works best without strict constraints.\n\nLet me refine this further with proper error handling and edge cases:\n\n```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most max_chars characters each.\n    \n    Prefers to break on sentence boundaries ('.', '!', '?'), ensuring \n    words are never cut in the middle. If no suitable boundary is found \n    within limit, splits before whitespace while avoiding word cuts.\n    \n    Args:\n        text: The input string to be chunked\n        \n    max_chars: Maximum characters per chunk (must be positive)\n        \n    Returns:\n        A list of non-empty strings where each has at most max_chars characters\n    \"\"\"\n```\n\nI need to handle the core loop logic and make sure sentence boundaries are prioritized when approaching character limits. I see a cleaner implementation now that handles edge cases properly. The function splits text into chunks respecting maximum length, preferring breaks after punctuation marks while keeping words intact. For empty input or very short texts, it returns appropriately\u2014either an empty list for no content",
       "latency_s": 10.925298,
-      "score": null,
+      "score": 0.8,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.8"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A snippet of Python code using SQLite3 to fetch user data based on an ID.\n    *   Task: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n    *   **Security (Critical):** SQL Injection Vulnerability. The `f-string` constructs the query directly, embedding user input (`user_id`) without sanitization or parameterization. If `user_id` is not an integer (e.g., a string containing quotes), it can break the database syntax and allow injection attacks.\n    *   **Resource Management:** Connection/Cursor handling lacks context managers (with statements). Resources aren't explicitly closed, potentially leading to resource leaks in production code.\n    *   **Style/Best Practices:** The query is too generic (`SELECT *`). It's better to select specific columns for privacy and performance.\n\n4.  **Draft Improvements:**\n    *   Use parameterized queries (e.g., `?` placeholders).\n    *   Add a `with sqlite3.connect(...)` block or explicitly close connection/cursor. Since the function returns data, closing might need to be outside or handled with context managers if possible within the function scope for thread safety/robustness. A local helper class is usually better in production, but for this snippet:\n        *   Pass `user_id` as an argument tuple `(user_id,)`.\n    *   Type hinting (optional but good style).\n\n5.  **Formulate Concise Review:**\n    *   Mention SQL Injection risk immediately.\n    *   Suggest parameterized queries.\n    *   Mention connection handling (`with`).\n    *   Keep it short.\n\n6.  **Refine Output:**\n    *   Structure: Issues -> Fix (optional) or just list points? The prompt asks to \"Review\", implying listing findings and potentially suggestions.\n    *   Let's provide the critique first, then maybe a corrected snippet for clarity if space",
       "latency_s": 5.635282,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
