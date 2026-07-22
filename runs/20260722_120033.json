@@ -15,36 +15,44 @@
       "task": "changelog_generation",
       "response": "## \u2728 Improvements\n\n*   Easily export full sprint reports to CSV, allowing you to analyze and archive your data offline.\n*   Improved connection stability: We've enhanced our login and token refresh process so that unexpected interruptions are handled automatically, keeping you connected without hassle.\n*   Reliable Webhooks: Your automated webhooks are now more robust and resilient, ensuring they don't fail even if incoming payload data is incomplete.",
       "latency_s": 3.168033,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "This solution uses an iterative approach, prioritizing finding natural breaks (sentence or word) before forcing a split due to reaching the `max_chars` limit.\n\n```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most max_chars.\n\n    It prioritizes breaking on sentence boundaries (., !, ?), \n    and never cuts a word. If the desired length limit cannot be met \n    by following natural breaks, it attempts to cut at the nearest \n    word boundary before the maximum limit.\n\n    Args:\n        text: The input string text.\n        max_chars: The maximum allowed characters per chunk.\n\n    Returns:\n        A list of strings, where each string is a content chunk.\n\n    Raises:\n        ValueError: If max_chars is non-positive or less than 1.\n    \"\"\"\n    if max_chars <= 0:\n        raise ValueError(\"max_chars must be positive.\")\n\n    chunks = []\n    start_index = 0\n    text_length = len(text)\n\n    while start_index < text_length:\n        remaining_text = text[start_index:]\n        current_chunk_end = min(start_index + max_chars, text_length)\n        \n        # If the remaining text is already within limit, take it all and finish.\n        if current_chunk_end == text_length:\n            chunks.append(remaining_text)\n            break\n\n        # 1. Look for preferred break points (Sentence endings) near max_chars\n        # This pattern looks for common sentence end punctuation followed by whitespace/boundary\n        sentence_matches = list(re.finditer(r'[.!?]\\s+', remaining_text))\n        best_split_index = -1\n\n        for match in sentence_matches:\n            # The index of the break is where the punctuation ends (match.end())\n            potential_end_index = start_index + match.end() \n            \n            # We prioritize breaks that are significantly less than max_chars, \n            # but we must ensure they are >= a certain threshold to prevent excessive chunking.\n            if potential_end_index <= start_index + max_chars and \\\n               (potential_end_index - start_index) > (max_chars * 0.5):\n                best_split_index = potential_end_index\n\n        # If we found a good sentence break point, use it.\n        if best_",
       "latency_s": 8.842601,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "## Review Summary\n\nThe code has critical security flaws and major issues regarding resource management (bugs/best practices).\n\n### \ud83d\udc1e Bugs & Best Practices\n*   **Connection Management:** The database connection (`conn`) is opened but never explicitly closed or committed. This is a resource leak. Use the `with` statement to ensure connections are reliably closed, even if errors occur.\n*   **Return Type (Minor):** While not strictly an error, connecting and retrieving data should ideally handle potential exceptions (e.g., database file missing, table doesn't exist).\n\n### \u26a0\ufe0f Security Issues (CRITICAL)\n*   **SQL Injection:** This is the most critical flaw. Using an f-string to construct the SQL query (`query = f\"SELECT * FROM users WHERE id = {user_id}\"`) directly concatenates user input into the query string. A malicious user could pass input like `1 OR 1=1` to bypass authentication or retrieve unauthorized data.\n    *   **Solution:** Always use parameterized queries (passing parameters as a tuple/list to `cursor.execute()`).\n\n### \u2728 Style & Code Quality\n*   **Global Connection Handling:** It is generally better practice to manage the database connection outside of this small function, or at least pass the connection object into the function rather than opening and closing it every time.\n\n---\n\n## Refactored Example (Solution)\n\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    # Use 'with' statement for guaranteed resource cleanup (best practice)\n    try:\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            \n            # CRITICAL FIX: Use parameterized queries (?) instead of f-strings\n            query =",
       "latency_s": 4.609813,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "Mango\nGrape\nKiwi",
       "latency_s": 1.371526,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -60,9 +68,11 @@
       "task": "sprint_narrative",
       "response": "We successfully completed the user auth revamp and implemented billing webhook retries, significantly improving core system stability. Our progress on SSO integration stalled due to three days of downtime from the external vendor API, which was a major dependency bottleneck. Moving forward, we must prioritize stabilizing the flaky mobile CI pipeline; establishing a dedicated tooling spike is recommended to ensure reliable deployment testing.",
       "latency_s": 3.093241,
-      "score": null,
+      "score": 0.95,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -78,9 +88,11 @@
       "task": "summarization",
       "response": "The database service experienced an unexpected outage when the underlying disk storage ran out of space, resulting in eight minutes of downtime for users at 14:23 UTC. The immediate issue was traced to a monitoring alert\u2014designed to warn us about low disk space\u2014that had been accidentally disabled and not reactivated after routine maintenance. To prevent recurrence, we have fixed the system by immediately re-enabling the warning alert and adding a mandatory disk space check to our post-maintenance checklist.",
       "latency_s": 2.85037,
-      "score": null,
+      "score": 0.95,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -96,18 +108,22 @@
       "task": "code_generation",
       "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most `max_chars` characters each.\n    \n    The function prefers to break on sentence boundaries ('.', '!', '?'), \n    and never cuts a word in the middle when possible. If no suitable boundary\n    exists, it will split by removing words from the end until within limit.\n\n    Args:\n        text (str): Input string of text to chunk.\n        max_chars (int): Maximum number of characters allowed per chunk.\n\n    Returns:\n        list[str]: A list of strings where each has at most `max_chars` length.\n\n    Raises:\n        ValueError: If `max_chars` is less than 1 or if the input string itself exceeds `max_chars`.\n    \n    Example:\n        >>> chunk_text(\"Hello world! This is a test.\", 20)\n        ['Hello world!', 'This is'] # Note, may depend on text logic depending on max constraint\n\n    \"\"\"\n    if max_chars < 1 or not isinstance(max_chars, int):\n        raise ValueError(f\"max_chars must be an integer >= 1, got {type(max_chars).__name__}\")\n\n    sentences = []\n    current_chunk = \"\"\n\n    # Helper: Find next safe break point (sentence boundary after last punctuation)\n    def _get_next_break_idx(start_idx: int):\n        \"\"\"Finds index of first sentence-ending punct following start.\"\"\"\n        for i in range(start_idx, len(text)):\n            if text[i] in '.!?':\n                return i + 1\n\n    # Helper: Check where to split chunk safely without breaking a word\n    def _find_word_boundary(limit_len: int) -> str | None:\n        \"\"\"Try splitting at last possible space that doesn't break words.\"\"\"\n        for i in range(len(current_chunk) - 2, max(0, limit_len), -1):\n            # Look back to find start of word if we're cutting somewhere mid-text\n            remaining = current_chunk[i:]\n            return remaining[:limit_len]\n\n    # Main chunking loop: iterate over characters with sentence awareness\n    sentences.append(text)  # placeholder for first batch logic correction below\n\n    result_chunks, i = [], 0\n    while i < len(text):\n        start_pos = max(i, current_chunk.__class__().startswith(\"\")",
       "latency_s": 11.215499,
-      "score": null,
+      "score": 0.6,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.6"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A snippet of Python code using `sqlite3`.\n    *   Task: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n\n    *   **Security (Critical):** SQL Injection vulnerability. The `user_id` is interpolated directly into the string using an f-string (`f\"... = {user_id}\"`). If `user_id` contains special characters or logic injection, it could compromise the database integrity/access control.\n        *   *Fix:* Use parameterized queries (`?` placeholders).\n\n    *   **Resource Management (Bug/Best Practice):** The connection and cursor are not closed in a `finally` block or using context managers (`with`). If an exception occurs during execution, resources leak, leading to potential database lock issues under concurrency.\n        *   *Fix:* Use `conn = sqlite3.connect(...)` with a `with conn:` pattern (though usually, you want the cursor inside). Actually, for SQLite connections in Python 3.x, it's safer to use try/finally or context manager on both if managing lifecycle manually, but standard practice often wraps the connection execution. A better fix is using a context manager for the connection and query logic within one `with` block.\n\n    *   **Style (PEP 8):**\n        *   Variable names: `conn`, `cursor` are fine.\n        *   Function naming convention seems okay (`get_user`).\n        *   Missing error handling? Not strictly a style issue but good practice to catch exceptions or at least return None explicitly if no user found vs raising an exception (SQLite doesn't raise on not-found, returns None from fetchone usually). `fetchone()` returning `None` is standard.\n\n    *   **Type Hinting:** Missing type hints for modern Python standards (`-> Optional[Row]`).\n        *   Fix: Add annotations.\n\n4.  **Draft the Review (Concise):**\n\n    *   *Security:* High",
       "latency_s": 5.749214,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
