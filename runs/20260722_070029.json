@@ -15,36 +15,44 @@
       "task": "changelog_generation",
       "response": "## \ud83d\ude80 Improvements\n\n*   **\ud83d\udcc8 Enhanced Reporting:** You can now export full sprint reports directly to a CSV file from the dashboard, making it easy to analyze data in your favorite spreadsheet software.",
       "latency_s": 6.751735,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "This solution uses a greedy approach, prioritizing sentence boundaries first, then ensuring words are not split.\n\n```python\nimport re\nfrom typing import List\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits a given text into chunks of at most max_chars.\n\n    The function attempts to break the text at natural boundaries:\n    1. Sentence endings (., !, ?) are highly preferred.\n    2. Words must never be cut.\n    3. If necessary, the chunk will simply stop at an appropriate word boundary.\n\n    Args:\n        text: The input string to be chunked.\n        max_chars: The maximum allowed size for any resulting chunk. Must be > 0.\n\n    Returns:\n        A list of strings, where each string is a chunk of the original text.\n\n    Raises:\n        ValueError: If max_chars is non-positive.\n    \"\"\"\n    if max_chars <= 0:\n        raise ValueError(\"max_chars must be a positive integer.\")\n    if not text:\n        return []\n\n    chunks: List[str] = []\n    current_pos = 0\n\n    while current_pos < len(text):\n        remaining_text = text[current_pos:]\n        end_index = -1\n        chunk_to_add = \"\"\n        break_successful = False\n\n        # If the remaining text is smaller than or equal to max_chars, take it all.\n        if len(remaining_text) <= max_chars:\n            chunks.append(remaining_text)\n            break\n        \n        # --- Step 1: Look for ideal boundaries within the character limit ---\n        \n        # The search window is up to max_chars length from current_pos\n        search_window = remaining_text[:max_chars]\n\n        # A. Prioritize Sentence Boundaries (., !, ?)\n        # We look for these markers, ensuring they are followed by whitespace \n        # or are at the very end of the search window.\n        sentence_matches = re.finditer(r'[.!?]\\s', search_window)\n        for match in sentence_matches:\n            potential_end = match.end() - 1 # Include the boundary character itself\n            if potential_end > 0:\n                # Found a perfect break point (Sentence end + whitespace)\n                end_index = current_pos + potential_end\n                break_successful = True\n                break\n\n        # B. If no sentence boundary found, fall back to Word Boundaries\n        if not break_successful:\n            # Try slicing the search window backwards from",
       "latency_s": 8.851858,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "### \ud83d\udc1b Bugs & Logic Errors\n\n1.  **Resource Management:** The database connection (`conn`) is opened but never explicitly closed, leading to potential resource leaks.\n2.  **Return Type (Minor):** If no user is found, the function correctly returns `None` (since `cursor.fetchone()` does this). However, if an error occurs *before* `fetchone()`, the connection might still be left open or resources unmanaged.\n\n### \ud83d\udee1\ufe0f Security Issues (Critical)\n\n1.  **SQL Injection Vulnerability:** **This is critical.** The function constructs the SQL query using an f-string: `query = f\"SELECT * FROM users WHERE id = {user_id}\"`. If `user_id` comes from external input (e.g., a web request), an attacker can inject malicious SQL by setting `user_id` to something like `' OR 1=1 --`.\n\n### \u2728 Style & Best Practices Improvements\n\n1.  **Connection Handling:** Using context managers (`with sqlite3.connect(...) as conn:`) is the Python standard for ensuring resources (like connections) are reliably closed, even if errors occur.\n2.  **Efficiency/Clarity:** The dedicated `cursor` variable is redundant; you can pass the cursor functionality directly to `execute`.\n\n---\n\n### \ud83d\udcdd Recommended Refactoring\n\nHere is a robust and secure version:\n\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    # Use context manager for automatic connection closing\n    try:\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            # CRITICAL FIX: Pass parameters as a tuple (the second argument)\n            query = \"SELECT * FROM users WHERE",
       "latency_s": 4.621733,
-      "score": null,
+      "score": 0.85,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "apple\nbanana\ngrape",
       "latency_s": 0.407507,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -60,9 +68,11 @@
       "task": "sprint_narrative",
       "response": "We successfully delivered major items this cycle, completing the user auth revamp and stabilizing the billing webhook retries. Our forward velocity was significantly hampered by external factors, specifically the three-day downtime of the vendor API required for SSO integration. Next sprint must prioritize addressing the unstable mobile pipeline CI to ensure reliable quality gates before any further feature development begins.",
       "latency_s": 5.207912,
-      "score": null,
+      "score": 0.95,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -78,9 +88,11 @@
       "task": "summarization",
       "response": "The database experienced an 8-minute outage because the main server ran out of disk space. This critical failure occurred because the monitoring alert designed to warn us about low disk capacity had been inadvertently disabled and forgotten after recent maintenance work. To prevent this from happening again, we have immediately re-enabled the disk space warning system and are updating our post-maintenance procedures to ensure these checks are never missed in the future.",
       "latency_s": 2.476727,
-      "score": null,
+      "score": 0.95,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -96,18 +108,22 @@
       "task": "code_generation",
       "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most `max_chars` characters. \n    Prefers to break on sentence boundaries ('.', '!', '?'), and avoids cutting words in half.\n\n    Args:\n        text (str): The input text string.\n        max_chars (int): Maximum number of characters allowed per chunk.\n\n    Returns:\n        list[str]: A list of strings, each with at most `max_chars` characters, \n                   preserving sentence boundaries and avoiding mid-word splits where possible.\n\n    Examples:\n        >>> chunk_text(\"This is a short text.\", 15)\n        ['This is a', 'short text.']\n        \n        >>> chunk_text(\"First. Second! Third?\", 8)\n        ['First.', 'Second!', 'Third?']\n    \"\"\"\n    \n    if not",
       "latency_s": 11.208262,
-      "score": null,
+      "score": 0.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A snippet of Python code using `sqlite3`.\n    *   Task: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n    *   **Security (Critical):** SQL Injection vulnerability. The code uses string concatenation/f-string interpolation (`f\"...{user_id}...\"`) to build the query without parameterization. An attacker can manipulate `user_id` to inject arbitrary SQL commands.\n    *   **Resource Management (Bug/Best Practice):** Database connection is opened but never explicitly closed in a context manager or via `.close()`. This can lead to resource leaks, especially if called frequently or from exceptions occur after opening the cursor/connection but before return/close logic is properly handled outside this function (though here it returns result, so closing happens implicitly? No, SQLite connections aren't automatically garbage collected efficiently enough for concurrent/repeated use without `commit/rollback` handling in many drivers, though standard sqlite3 might not require close if using a shared connection pool pattern. However, leaking open file handles is bad). Better to use context managers (`with`).\n    *   **Input Validation:** The function assumes `user_id` can be converted directly into SQL syntax safely (which it doesn't) or that the database driver auto-converts types. In string interpolation, any integer works, but if a malicious payload comes through an HTTP request and is passed here as a string representation of user ID without sanitization? Wait, actually `user_id` likely comes from outside. If it's not sanitized/internally validated to be an int first, the f-string allows injection *if* input isn't cast safely or if the parameter is treated as a value directly inside the query structure (Wait, standard SQLite3 executes SQL commands). The vulnerability exists regardless of type because `{user_id}` inserts text. If `user_id` comes from user input and isn't strictly validated/converted to int first? Actually, just using f-strings for DB queries is *always*",
       "latency_s": 5.748137,
-      "score": null,
+      "score": 1.0,
       "error": null,
-      "image": null
+      "image": null,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
