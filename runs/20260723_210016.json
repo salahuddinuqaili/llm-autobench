@@ -22,7 +22,7 @@
       "task": "changelog_generation",
       "response": "### \u2728 Improvements\n\n*   **Easy Data Export:** You can now export your full sprint reports directly as CSV files from the dashboard, making it simple to analyze data offline or share with others.\n*   **Enhanced Integration Reliability:** We improved our background sync processes. Your connections are more robust and will handle temporary credential issues automatically, minimizing interruptions.\n*   **Stable Data Syncs:** Fixed a bug that could prevent data syncing when incoming webhook payloads were missing specific user identification details.",
       "latency_s": 4.858717,
-      "score": null,
+      "score": 0.85,
       "error": null,
       "image": null,
       "truncated": false,
@@ -31,14 +31,16 @@
       "max_tokens_used": 768,
       "prompt_tokens": 112,
       "completion_tokens": 547,
-      "tokens_per_s": 112.6
+      "tokens_per_s": 112.6,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits a given text into chunks of at most max_chars.\n\n    The function prioritizes breaking on sentence boundaries ('.', '!', '?').\n    If a perfect break is not possible within the limit, it ensures that \n    no word is cut and respects the maximum character constraint.\n\n    Args:\n        text: The input string to be chunked.\n        max_chars: The maximum allowable length of any resulting chunk.\n\n    Returns:\n        A list of strings, where each string is a text chunk.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n    \"\"\"\n    if not isinstance(text, str):\n        raise TypeError(\"Input text must be a string.\")\n    if not isinstance(max_chars, int) or max_chars < 1:\n        raise ValueError(\"max_chars must be a positive integer.\")\n\n    chunks = []\n    current_index = 0\n    text_length = len(text)\n\n    while current_index < text_length:\n        # Calculate the absolute maximum index we can reach\n        limit = min(text_length, current_index + max_chars)\n        \n        best_split_index = -1\n        remaining_text = text[current_index:]\n\n        # --- 1. Attempt to find the best preferred split (Sentence Boundary) ---\n        # We search for a boundary marker followed by whitespace or end of string, \n        # within the allowed length limit.\n        \n        # Regex explanation: ([\\.\\!\\?]) matches one of the separators. \n        # (\\s|$) makes sure it's followed by space or EOF.\n        # We search in the current remaining text only up to max_chars.\n        search_segment = remaining_text[:limit]\n        \n        # Find all potential splits within the limit\n        sentence_matches = list(re.finditer(r'[.\\!\\?](?=\\s|\\Z)', search_segment))\n\n        if sentence_matches:\n            # Prefer the largest possible split point that is still a sentence boundary\n            best_split_index_relative = -1\n            for match in sentence_matches:\n                # The best candidate is the one closest to, but not exceeding, the limit.\n                # Since re.finditer finds matches sequentially, we just take the last one \n                # that doesn't put us over max_chars.\n                split_point = match.end()\n                if split_point <= max_chars:\n                    best_split_index_relative = split_point\n            \n            if best_split_index_relative != -1:\n                best_split_index = current_index + best_split_index_relative\n\n\n        # --- 2. Fallback to Word Boundary (If no good sentence break is found) ---\n        if best_split_index == -1 or best_split_index >= limit:\n            # If the preferred boundary is too close to the end, or we couldn't find one:\n            # We must step back from 'limit' until we hit a word boundary (whitespace).\n            \n            potential_end = min(text_length, current_index + max_chars)\n            fallback_found = False\n            \n            # Search backwards from the limit for the last whitespace character.\n            for i in range(potential_end - 1, current_index, -1):\n                char = text[i]\n                if char.isspace():\n                    best_split_index = i + 1  # Split *after* the space\n                    fallback_found = True\n                    break\n            \n            # Edge Case: If we couldn't find any space, but haven't reached the end, \n            # just take the chunk up to the limit (this handles one very long word)\n            if not fallback_found and potential_end > current_index and remaining_text[0].isalnum():\n                 best_split_index = limit\n\n\n        # --- 3. Final Split and Update ---\n        if best_split_index == -1 or best_split_index >= text_length:\n            # If we are at the end, or the calculated split is past the end of the string\n            best_split_index = text_length\n\n        chunk = text[current_index:best_split_index]\n        chunks.append(chunk)\n        current_index = best_split_index\n\n    return chunks\n\n\n# --- Assert Tests and Examples ---\n\ndef run_tests():\n    print(\"--- Running Test Cases ---\")\n    \n    # 1. Standard chunking test, preferring spaces over max_chars limit\n    text1 = \"This is a medium length text designed to test the word boundary handling capability of this function.\"\n    max_chars1 = 20\n    result1 = chunk_text(text1, max_chars1)\n    print(f\"\\nTest Case 1 (Max {max_chars1}):\")",
       "latency_s": 25.938540000000003,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": true,
@@ -47,14 +49,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 83,
       "completion_tokens": 2048,
-      "tokens_per_s": 79.0
+      "tokens_per_s": 79.0,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "## \ud83d\udc1e Bugs & Reliability\n\n*   **Connection Management (Major):** The database connection (`conn`) is opened but never explicitly closed or managed with a `try...finally` block or context manager. This can lead to resource leaks, especially if an error occurs.\n\n## \ud83d\udee1\ufe0f Security Issues (Critical)\n\n*   **SQL Injection (CRITICAL):** Using an f-string to construct the SQL query (`query = f\"SELECT * FROM users WHERE id = {user_id}\"`) is highly vulnerable to SQL injection. An attacker could pass a malicious string for `user_id` (e.g., `\"1 OR 1=1 --\"`) and manipulate the database query.\n\n## \u2728 Style & Best Practices\n\n*   **Resource Management:** Always use `with sqlite3.connect(...) as conn:` for automatic connection handling and cleanup.\n*   **Parameterization:** When executing queries with external inputs (like `user_id`), always use parameterized queries (`?` placeholders) rather than string formatting.\n*   **Context Manager Usage:** Using a context manager should ideally encompass both the connection and the cursor, though modern database wrappers often handle this efficiently enough when using the main connection context manager.\n\n***\n\n### \ud83d\udca1 Recommended Refactoring (The Fix)\n\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    # Use 'with' for automatic connection closing\n    try:\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            # FIX 1: Use parameterized query (?) to prevent SQL injection\n            query = \"SELECT * FROM users WHERE id = ?\"\n            cursor.execute(query, (user_id,))\n            return cursor.fetchone()\n    except sqlite3.Error as e:\n        print(f\"Database error occurred: {e}\")\n        return None\n```",
       "latency_s": 4.494998,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -63,14 +67,16 @@
       "max_tokens_used": 512,
       "prompt_tokens": 105,
       "completion_tokens": 505,
-      "tokens_per_s": 112.3
+      "tokens_per_s": 112.3,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nOrange",
       "latency_s": 0.378988,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -79,7 +85,9 @@
       "max_tokens_used": 128,
       "prompt_tokens": 43,
       "completion_tokens": 6,
-      "tokens_per_s": 15.8
+      "tokens_per_s": 15.8,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -102,7 +110,7 @@
       "task": "sprint_narrative",
       "response": "We successfully completed the user auth revamp and implemented reliable billing webhook retries this sprint. Our velocity was significantly hindered by the SSO integration block, which was stalled due to three days of vendor API downtime. Going forward, we must prioritize stabilizing the mobile CI pipeline because its current flakiness presents an unnecessary risk to our deployment schedule.",
       "latency_s": 2.93808,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -111,7 +119,9 @@
       "max_tokens_used": 768,
       "prompt_tokens": 80,
       "completion_tokens": 320,
-      "tokens_per_s": 108.9
+      "tokens_per_s": 108.9,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -134,7 +144,7 @@
       "task": "summarization",
       "response": "Our primary database experienced an eight-minute outage when local storage capacity ran out, causing the system to fail unexpectedly. The root cause was a gap in our preventative monitoring; the disk space alert had been accidentally disabled during maintenance and not reactivated afterward. To prevent recurrence, we have corrected this issue by re-enabling the alert and adding a specific disk health check to our mandatory post-maintenance checklist.",
       "latency_s": 4.350316,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -143,14 +153,16 @@
       "max_tokens_used": 512,
       "prompt_tokens": 128,
       "completion_tokens": 495,
-      "tokens_per_s": 113.8
+      "tokens_per_s": 113.8,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "arithmetic_reasoning",
       "response": "Here is the step-by-step solution to find when the second train catches up to the first.\n\n**1. Determine the head start distance:**\nFirst, we need to calculate how far ahead the first train is when the second train begins its journey at 3:00 PM (or AM).\n*   The first train leaves at **2:00**.\n*   It travels for **1 hour** before the second train departs (from 2:00 to 3:00).\n*   Speed of the first train = $60 \\text{ km/h}$.\n\n$$ \\text{Head start distance} = 60 \\text{ km/h} \\times 1 \\text{ hour} = 60 \\text{ km}. $$\n\n**2. Determine the relative speed:**\nThe second train is faster than the first, so it will eventually catch up. We need to find out how fast it closes that gap.\n*   Speed of second train ($v_2$) = $90 \\text{ km/h}$.\n*   Speed of first train ($v_1$) = $60 \\text{ km/h}$.\n\n$$ \\text{Relative speed} = 90 \\text{ km/h} - 60 \\text{ km/h} = 30 \\text{ km/h}. $$\n\nThis means the second train closes the gap between them at a rate of",
       "latency_s": 71.61474,
-      "score": null,
+      "score": 0.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -159,14 +171,16 @@
       "max_tokens_used": 4096,
       "prompt_tokens": 84,
       "completion_tokens": 4096,
-      "tokens_per_s": 57.2
+      "tokens_per_s": 57.2,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_generation",
       "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most `max_chars` characters.\n    \n    The splitting prefers sentence boundaries ('.', '!', '?') when a break is \n    necessary to stay within the character limit. Words are never cut in half; \n    complete words only will be included in each chunk.\n\n    Args:\n        text (str): Input string to be split into chunks.\n        max_chars (int): Maximum number of characters allowed per chunk.\n\n    Returns:\n        List[str]: A list of non-empty strings, where each contains at most \n                   `max_chars` and ends with a sentence boundary if possible.\n\n    Example:\n        >>> chunk_text(\"Hello world! This is a test.\", 12)\n        ['Hello', 'world!', 'This is']\n\n    Raises:\n        ValueError: If max_chars is less than or equal to zero.\n    \"\"\"\n    if text == \"\":\n        return []\n    if not isinstance(max_chars, int):\n        raise TypeError(f\"max_chars must be an integer\")\n    if max_chars <= 0:\n        raise ValueError(\"max_chars must be a positive integer\")\n\n    chunks = []\n    current_chunk = \"\"\n\n    # Handle edge case where even single words are longer than max_chars\n    for word in text.split():\n        word_with_space = \" \".join([w.strip('.') + '.' if w.strip().endswith(('.', '!', '?')) else f\"{w} \"] \n                                     for w in word.split(' ')])  # placeholder logic handled below\n\n        current_chunk += word.lstrip(' \\t\\n')\n        \n        while len(current_chunk) > max_chars:\n            found_break = False\n            best_pos = -1\n            \n            # Try to find a sentence boundary within the chunk that keeps us \u2264 max_chars\n            for i, ch in enumerate(current_chunk):\n                if current_chunk[i] in \".!?\":\n                    test_chunk = current_chunk[:i+1].rstrip() + \" \" + word.lstrip(' \\t\\n')\n                    if len(test_chunk) <= max_chars:\n                        best_pos = i + 2  # include space after break point\n\n            if best_pos != -1 and current_chunk[best_pos] in \".!?\":\n                chunk_to_add = current_chunk[:best_pos+1].rstrip() + \" \"\n                remaining_text = text[current_chunk.find(word):][len(word)+1:]\n                \n                chunks.append(chunk_to_add.rstrip())\n                current_chunk = \"\"\n\n            elif len(current_chunk) <= max_chars:\n                chunks.append(current_chunk.strip())\n                current_chunk = word.lstrip(' \\t\\n') + \" \"\n            \n            else:\n                # This should rarely happen if logic is correct; treat as error case\n                raise ValueError(\"Unable to chunk text within specified character limit.\")\n\n    if current_chunk.strip():\n        chunks.append(current_chunk.rstrip())\n\n    return [chunk for chunk in chunks]\n\n\n# Test cases including an assert statement\nassert isinstance(chunk_text(\"Hello world! This is a test.\", 12), list)\nall(len(c) <= max(8, 7)) == False or all(len(s) > len('') and s.strip() != \"\" for c in chunked := [] if (chunked := chunk_text(\"This is example text. Some words are long but still fit! Here's more.\", 15)))\nassert not any(any(c[i] < 'a' or c[i] > 'z' or c[i].isspace() and len(set([ch for ch in range(len(chunk) + 1)])) != 0 and chunked[chunk.index(max_chunk := \"\".join(ch if i is None else [j])])) <= max_chars\n                )",
       "latency_s": 25.994139,
-      "score": null,
+      "score": 0.85,
       "error": null,
       "image": null,
       "truncated": false,
@@ -175,14 +189,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 72,
       "completion_tokens": 1369,
-      "tokens_per_s": 52.7
+      "tokens_per_s": 52.7,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Review provided Python code for bugs, security issues, and style.\n    *   Input: A simple SQLite query function `get_user`.\n    *   Constraints: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    # Missing: commit, close connection (implicit), error handling, input validation.\n    ```\n\n3.  **Identify Issues:**\n    *   **Security:** SQL Injection vulnerability! The `f-string` directly interpolates `{user_id}` into the query string without parameterization. If `user_id` comes from user input, it's a critical flaw.\n    *   **Bugs/Robustness:** No error handling (e.g., database connection errors, missing table, etc.). Connection is not closed or committed in a `with` statement, leading to resource leaks if the function returns early due to an exception before commit/close logic runs outside this snippet scope (though here it's local). Actually, better practice uses context managers.\n    *   **Style/Best Practices:** Using parameterized queries (`?`) instead of string formatting. Missing input validation/types. Connection not reused or managed via context manager.\n\n4.  **Draft the Review (Concise):**\n    *   *Security:* Critical SQL injection risk due to f-string interpolation. Use `?` placeholders and `.execute(query, (user_id,))`.\n    *   *Resource Management:* Always close connections/commits properly using a context manager (`with conn: ...`).\n    *   *Error Handling:* Add try/except or let the caller handle DB errors (but at least ensure robustness). For this snippet, suggesting `with` is key.\n\n5.  **Refine for Conciseness:**\n    *   Combine points into a short list.\n    *   Provide the corrected code example briefly if helpful, but focus on the review first as per instruction \"Review... Be concise\". I will provide the issues and then a corrected snippet or just the fixes. Usually, providing the fixed version is clearer for code reviews.\n\n6.  **Final Polish:**\n    *   Security: SQL Injection.\n    *   Stability: Connection leak (missing `close()`/context).\n    *   Input validation: Check type? Optional but good to mention parameterized args.\n    *   Style: Use context managers.\n\n    Let's structure the output clearly.\n\n    **Issues:**\n    1.  **SQL Injection:** High risk via f-string interpolation. Fix with placeholders `?`.\n    2.  **Resource Leak:** Connection is not closed properly (missing cleanup). Use a context manager (`with sqlite3.connect(...) as conn:`).\n    3.  **Error Handling:** No try/except block for DB operations.\n\n    **Fix:** Show corrected code using parameterized query and context manager.\n\n7.  **Final Output Construction:** Keep it tight.\n\n    *   Security: SQL Injection vulnerability due to f-string interpolation of `user_id`.\n    *   Resources: Connection not closed; use a context manager (`with` statement).\n    *   Style/Robustness: Add error handling and parameterized queries.\n\n    (Self-Correction): The prompt asks to review for bugs, security, style. I should list them clearly and offer the fixed version if appropriate or just point out what's wrong. Providing the corrected code is usually expected in a \"code review\" context unless forbidden by length constraints which aren't strict here but conciseness is requested.\n\n    Let's draft:\n    **Security:** Critical SQL Injection vulnerability via string formatting (`{user_id}`). Always use parameterized queries `(?, )`.\n    **Resources:** Connection leak risk; `cursor` and connection should be closed or managed with a context manager (`with`).\n    **Style/Robustness:** Add error handling (try/except) for DB operations. Validate input types if possible before execution.\n\n    Corrected snippet:\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            query = \"SELECT * FROM users WHERE id = ?\"\n            return cursor.execute(query, (user_id,)).fetchone()\n    ```\n    Wait, strict instruction says \"Be concise\". I will list the points briefly.\n\n    **Security:** SQL Injection risk due to f-string interpolation (`{user_id}`). Use parameterized queries (`?`).\n    **Resources",
       "latency_s": 16.812682000000002,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -191,7 +207,9 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 89,
       "completion_tokens": 1024,
-      "tokens_per_s": 60.9
+      "tokens_per_s": 60.9,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -214,7 +232,7 @@
       "task": "vision_ocr",
       "response": "The text \"HELLO\" is printed on it, and the color of the square in the top-left corner is red.",
       "latency_s": 5.77617,
-      "score": null,
+      "score": 0.5,
       "error": null,
       "image": "tasks/images/ocr_card.png",
       "truncated": false,
@@ -223,14 +241,16 @@
       "max_tokens_used": 256,
       "prompt_tokens": 236,
       "completion_tokens": 26,
-      "tokens_per_s": 4.5
+      "tokens_per_s": 4.5,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.5"
     },
     {
       "model": "custom:ollama/minicpm-v:latest",
       "task": "vision_progressive",
       "response": "In the picture we can see some grass and plants with flowers on it which are green color. In the background there is sky with clouds,trees. On right side a part of river is also visible. It looks like to be taken in outside area.",
       "latency_s": 1.170377,
-      "score": null,
+      "score": 0.6,
       "error": null,
       "image": "tasks/images/private_fixtures/progressive_photo_user.jpg",
       "truncated": false,
@@ -239,7 +259,9 @@
       "max_tokens_used": 256,
       "prompt_tokens": 498,
       "completion_tokens": 52,
-      "tokens_per_s": 44.4
+      "tokens_per_s": 44.4,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.6"
     }
   ]
 }
