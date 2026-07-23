@@ -22,7 +22,7 @@
       "task": "changelog_generation",
       "response": "Okay, here\u2019s a user-facing \"Improvements\" section for your changelog, based on those git commits, formatted as markdown bullets and focusing on the benefits for users:\n\n## Improvements\n\n*   **Easier Reporting:** Now you can export detailed sprint reports directly from your dashboard in CSV format \u2013 perfect for sharing with your team!\n*   **More Reliable Access:** We\u2019ve made improvements to ensure smoother access to your account, especially when refreshing your login details.\n*   **Enhanced Stability:**  We've taken steps to improve the overall stability of the application and prevent unexpected crashes.\n*   **Improved Data Delivery:**  Your webhook data is now consistently delivered \u2013 you\u2019ll always receive important user information. \n\n\n---\n\n**Notes on why I chose this approach:**\n\n*   **Benefit-Oriented Language:** Instead of saying \"fixed retry logic,\" it says \u201cEasier Reporting\u201d or \u201cMore Reliable Access.\u201d Users care about *what* the change does for them, not *how* it was done.\n*   **Concise:**  Short and sweet bullet points are easy to scan.\n*   **No Jargon:** Removed any technical terms like \"OAuth token refresh\" or \"rate-limiter.\"\n*   **Markdown Formatting:**  Clean and readable for your changelog.\n\nTo help me tailor the changelog further, could you tell me:\n\n*   What kind of SaaS product is this for? (e.g., project management, marketing automation, etc.) - Knowing the context helps with more relevant benefit statements.\n*   Who is the primary audience for this changelog? (e.g., all users, paying customers only, technical users?)",
       "latency_s": 2.684825,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -31,14 +31,16 @@
       "max_tokens_used": 768,
       "prompt_tokens": 107,
       "completion_tokens": 352,
-      "tokens_per_s": 131.1
+      "tokens_per_s": 131.1,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma3:4b",
       "task": "code_generation",
       "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"Splits text into chunks of at most max_chars, preferring to break on\n    sentence boundaries ('.', '!', '?'), never cutting a word.\n\n    Args:\n        text: The input text string.\n        max_chars: The maximum number of characters per chunk.\n\n    Returns:\n        A list of strings where each string is a chunk of the original text.\n    \"\"\"\n    if not text:\n        return []\n\n    chunks = []\n    start = 0\n    current_chunk = \"\"\n\n    for i, char in enumerate(text):\n        current_chunk += char\n        if len(current_chunk) > max_chars:\n            chunks.append(current_chunk[:max_chars])\n            current_chunk = current_chunk[max_chars:]\n        elif i == len(text) - 1 or text[i+1] in ['.', '!', '?']:\n            if current_chunk:\n                chunks.append(current_chunk)\n                current_chunk = \"\"\n\n    if current_chunk:\n        chunks.append(current_chunk)\n    return chunks\n\n\nassert chunk_text(\"This is a sentence. This is another!\", 10) == [\n    'This is a ', 'sentence.', 'This is anoth', 'er!']\n```",
       "latency_s": 2.372689,
-      "score": null,
+      "score": 0.85,
       "error": null,
       "image": null,
       "truncated": false,
@@ -47,14 +49,16 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 78,
       "completion_tokens": 312,
-      "tokens_per_s": 131.5
+      "tokens_per_s": 131.5,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma3:4b",
       "task": "code_review",
       "response": "Here's a concise review of the Python code:\n\n**Bugs/Issues:**\n\n*   **SQL Injection Vulnerability:** The `f-string` is vulnerable to SQL injection.  If `user_id` comes from user input, a malicious user could craft an ID that alters the query's logic and potentially exposes data or modifies the database.\n*   **No Error Handling:** No error handling for potential issues like the database not existing, table missing, invalid `user_id` type, etc.\n\n**Style/Recommendations:**\n\n*   **Use Parameterized Queries:**  Always use parameterized queries (e.g., using `?` placeholders and passing values separately) to prevent SQL injection.\n*   **Explicit Cursor Closing:** Although the `conn` will be closed when the function exits, it\u2019s good practice to explicitly close the cursor after fetching data with `cursor.close()`. This is not strictly necessary because Python's garbage collector handles this but makes intent clearer.\n*  **Consider `None` Return**: If a user isn't found, `fetchone()` returns `None`. Consider clarifying this in docstring or return a default value.\n\n**Revised Code (with suggestions):**\n\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    conn = sqlite3.connect('users.db')\n    cursor = conn.cursor()\n    try:\n        query = \"SELECT * FROM users WHERE id = ?\" # Use parameterized query\n        cursor.execute(query, (user_id,))  # Pass user_id as a tuple\n        user = cursor.fetchone()\n        return user\n    except sqlite3.Error as e:\n        print(f\"Database error: {e}\") # Log for debugging\n        return None # Handle errors gracefully or raise the exception\n    finally:\n        cursor.close()\n        conn.close()\n```\n\nKey changes in revised code:\n\n*   Parameterized query prevents SQL injection.\n*   Includes basic error handling with a `try...except` block to catch potential database errors and return `None` if there's an issue.\n*   Explicitly closes cursor and connection using `finally`.\n*  Documented intent via docstring (added for clarity).",
       "latency_s": 3.487674,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -63,14 +67,16 @@
       "max_tokens_used": 512,
       "prompt_tokens": 100,
       "completion_tokens": 477,
-      "tokens_per_s": 136.8
+      "tokens_per_s": 136.8,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma3:4b",
       "task": "instruction_following",
       "response": "apple\nbanana\norange",
       "latency_s": 0.362548,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -79,7 +85,9 @@
       "max_tokens_used": 128,
       "prompt_tokens": 38,
       "completion_tokens": 6,
-      "tokens_per_s": 16.5
+      "tokens_per_s": 16.5,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma3:4b",
@@ -102,7 +110,7 @@
       "task": "sprint_narrative",
       "response": "Okay, here\u2019s a 3-sentence retrospective narrative for a team lead, incorporating the provided information and aiming for an honest, concise tone:\n\n\u201cWe successfully delivered the user auth revamp and stabilized billing webhook retries \u2013 strong execution by everyone.\u201d \u201cThe SSO integration was unfortunately blocked for three days due to ongoing vendor API downtime, highlighting our reliance on external systems.\u201d \u201cMoving forward, we need to proactively address the flaky CI in the mobile pipeline to prevent future delays and maintain consistent delivery.\u201d",
       "latency_s": 0.989564,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -111,7 +119,9 @@
       "max_tokens_used": 768,
       "prompt_tokens": 75,
       "completion_tokens": 101,
-      "tokens_per_s": 102.1
+      "tokens_per_s": 102.1,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma3:4b",
@@ -134,7 +144,7 @@
       "task": "summarization",
       "response": "Here\u2019s a 3-sentence summary of the incident for a non-technical stakeholder:\n\nOur database server experienced a brief interruption due to its storage drive running out of space.  A backup system automatically switched over to a working copy, minimizing the downtime \u2013 it was only about 8 minutes long. We've addressed the issue by ensuring our monitoring alerts are always active and adding a check for disk space as part of our regular server maintenance process.",
       "latency_s": 0.933224,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -143,7 +153,9 @@
       "max_tokens_used": 512,
       "prompt_tokens": 123,
       "completion_tokens": 93,
-      "tokens_per_s": 99.7
+      "tokens_per_s": 99.7,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     }
   ]
 }
