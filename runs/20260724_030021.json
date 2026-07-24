@@ -22,7 +22,7 @@
       "task": "changelog_generation",
       "response": "## \u2728 Improvements\n\nWe've rolled out several enhancements designed to increase stability, boost performance, and give you better control over your data.\n\n*   **\ud83d\udcca Export Data:** You can now export full sprint reports directly as CSV files from the dashboard, making it easier than ever to analyze and archive your data.\n*   **\u2699\ufe0f Enhanced Stability & Resilience:** Improved background processes mean your integrations are more robust. The system will automatically attempt to refresh credentials if a connection expires mid-task, preventing unexpected failures.\n*   **\ud83d\udee0\ufe0f Core Reliability Fixes:** We've strengthened our handling of incoming webhooks. Our platform will now gracefully process payloads even if they are missing expected user identification data, ensuring uninterrupted workflow stability.\n*   **\ud83d\ude80 Performance Boost:** Under the hood, we've optimized core services to improve overall system speed and reliability, guaranteeing a smoother experience as your usage grows.",
       "latency_s": 14.401332,
-      "score": null,
+      "score": 0.7,
       "error": null,
       "image": null,
       "truncated": false,
@@ -31,14 +31,16 @@
       "max_tokens_used": 1536,
       "prompt_tokens": 112,
       "completion_tokens": 935,
-      "tokens_per_s": 64.9
+      "tokens_per_s": 64.9,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.7"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "This problem requires careful handling of text structure constraints (sentences vs. words) and length limits. The following implementation uses a combination of string manipulation and pattern matching to ensure these rules are followed.\n\n```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits the given text into chunks, each no longer than max_chars.\n\n    The function prioritizes breaking at natural boundaries:\n    1. Sentence endings ('.', '!', '?') - preferred.\n    2. Whitespace (to avoid splitting words) - fallback.\n\n    Args:\n        text: The input string to be chunked.\n        max_chars: The maximum allowed length for any single chunk.\n\n    Returns:\n        A list of strings, where each string is a text chunk.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n    \"\"\"\n    if max_chars < 1:\n        raise ValueError(\"max_chars must be at least 1.\")\n    \n    chunks: list[str] = []\n    text_len = len(text)\n    current_index = 0\n\n    while current_index < text_len:\n        remaining_text = text[current_index:]\n        chunk = \"\"\n        start_of_potential_chunk = current_index\n        \n        # Determine the maximum possible chunk length for this iteration\n        max_allowed = min(max_chars, len(remaining_text))\n\n        if max_allowed == 0:\n            break # Should not happen if initial check passed\n        \n        best_split_point = -1\n        \n        # --- Strategy 1: Look for a good boundary near the limit ---\n        # We search in the segment [current_index : current_index + max_allowed]\n        search_area = remaining_text[:max_allowed]\n\n        # Regex pattern to find common separators (including space before punctuation)\n        # Group 1: Separator characters (., !, ?)\n        # Group 2: Any preceding whitespace or non-word character that separates the break.\n        separator_pattern = re.compile(r'([.?!\\n]\\s*|(?<=\\S)\\s+)')\n\n        # Find all potential breakpoints in the search area\n        potential_breaks = []\n        \n        # Using finditer to get match indices relative to remaining_text\n        for m in separator_pattern.finditer(search_area):\n            end_index = m.end()\n            \n            # 1. Check if this break point leaves a minimum amount of text (e.g., not just whitespace)\n            # We want to ensure the chunk segment is meaningful, typically > 5 chars, or it's an obvious separator.\n            if end_index - current_index >= 3: # Requires at least a few characters before the break\n                potential_breaks.append(end_index)\n\n        if potential_breaks:\n            # Prioritize the furthest break point found (closest to max_chars)\n            best_split_point = potential_breaks[-1]\n        else:\n            # Fallback if no clear sentence/space boundary is found near the limit.\n            # We must at least ensure we don't cut mid-word. Find the last space.\n            temp_search = remaining_text[:max_allowed]\n            last_space_index_relative = temp_search.rfind(' ')\n            if last_space_index_relative != -1:\n                best_split_point = current_index + last_space_index_relative + 1\n            else:\n                # If no space found, we must take everything up to max_allowed, \n                # even if it cuts a word (this implies the input is one giant unseparated word).\n                best_split_point = current_index + max_allowed\n\n\n        # --- Determine the final chunk and advance the pointer ---\n\n        if best_split_point == -1:\n            # Fallback for safety, take up to max_chars if logic fails\n            end_index = current_index + max_allowed\n        else:\n            end_index = best_split_point\n\n        chunk = remaining_text[:end_index].strip()\n        \n        if not chunk:\n             # If the chosen split point resulted in an empty string (e.g., cutting only whitespace), \n             # we take up to max_allowed and hope it fixes itself later.\n            chunk = remaining_text[:max_allowed]\n\n        chunks.append(chunk)\n        current_index += len(remaining_text[:end_index])\n\n\n    return chunks\n\n# --- Test Cases ---\n\ndef run_tests():\n    print(\"--- Running Tests ---\")\n\n    # 1. Standard test with varying boundaries and lengths\n    long_text = (\n        \"This is the first sentence, which is quite long and needs careful chunking \"\n        \"to ensure it doesn't exceed the limit of 30 characters. The second paragraph \"\n        \"starts here! It is slightly shorter but still tests boundary conditions. \"\n        \"Finally, a third short segment. Is this enough?\"\n    )\n    max_c1 = 45 # Enough to take most sentences whole\n\n    chunks1 = chunk_text(long_text, max_c1)\n    print(\"\\n[Test Case 1: Standard Chunking (Max 45 chars)]\")\n    print(\"Expected structure: Sentence-by-sentence.\")\n    for i, c in enumerate(chunks1):\n        print(f\"  Chunk {i+1} (Length={len(c)}): '{c[:60]}{'...' if len(c) > 60 else ''}'\")\n\n    # Assert 1: Ensure the list of chunks is non-empty and respects max length\n    assert all(len(chunk) <= max_c1 for chunk in chunks1)\n    print(\"\\nAssert passed: All chunks respect max_chars.\")\n\n\n    # 2. Aggressive limit test (forcing cuts mid-sentence at a comma or space)\n    short_text = \"The quick brown fox jumps over the lazy dog and the end.\"\n    max_c2 = 15\n\n    chunks2 = chunk_text(short_text, max_c2)\n    print(\"\\n[Test Case 2: Aggressive Limit (Max 15 chars)]\")\n    print(\"Expected structure: Cuts around natural spaces/boundaries.\")\n    for i, c in enumerate(chunks2):\n        print(f\"  Chunk {i+1} (Length={len(c)}): '{c}'\")\n\n    # Assert 2: Ensure word integrity is maintained\n    assert \"brown fox jumps over the lazy dog and the end.\" not in str(\"\".join(chunks2)) # Should be chunked\n    for i, chunk in enumerate(chunks2):\n        if len(chunk) > 0:\n            # Check if the chunk contains two adjacent words separated by only a single space (rough proxy for word splitting test)\n            # This is complex to assert perfectly, but we can check that no obvious mid-word cut occurs.\n            pass\n\n    print(\"\\nAssert passed: Challenging segment lengths handled.\")\n\n\n    # 3. Boundary Punctuation Test (Small chunks ending exactly on punctuation)\n    punct_text = \"Hello! World? How are you today.\"\n    max_c3 = 10\n\n    chunks3 = chunk_text(punct_text, max_c3)\n    print(\"\\n[Test Case 3: Punctuation Boundary (Max",
       "latency_s": 25.491007,
-      "score": null,
+      "score": 0.9,
       "error": null,
       "image": null,
       "truncated": true,
@@ -47,14 +49,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 83,
       "completion_tokens": 2048,
-      "tokens_per_s": 80.3
+      "tokens_per_s": 80.3,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.9"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "## \ud83d\udea9 Major Security Issue: SQL Injection\n\nThe code uses an f-string to build the SQL query: `query = f\"SELECT * FROM users WHERE id = {user_id}\"`. This method directly injects user input into the query, making it vulnerable to **SQL Injection**. A malicious attacker could pass a payload like `1' OR '1'='1` as the `user_id`, bypassing the intended logic.\n\n## \ud83d\udc1e Bugs & Reliability: Resource Leakage\n\nThe database connection (`conn`) is opened but never explicitly closed using `conn.close()`. If an exception occurs during execution, or if the function finishes without explicit cleanup, the connection remains open, leading to a resource leak (though Python's garbage collector will eventually handle it, relying on this is poor practice).\n\n## \u2728 Style & Best Practices\n\n1. **Context Manager:** Use `with` statements for handling database connections and cursors. This guarantees that resources are properly closed even if errors occur.\n2. **Type Hinting:** Add type hints to the function signature (`user_id: int`) for improved readability and static analysis.\n\n---\n\n## \u2705 Recommended Fix (The Improved Code)\n\nHere is how the function should be rewritten to address all concerns:\n\n```python\nimport sqlite3\nfrom typing import Optional, Tuple # Use appropriate types if needed\n\ndef get_user(user_id: int) -> Optional[tuple]:\n    \"\"\"Retrieves a user record safely using parameter substitution.\"\"\"\n    try:\n        # 1. Use 'with' for reliable resource management\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            \n            # 2. CRITICAL FIX: Use placeholders (?) to pass parameters securely\n            query = \"SELECT * FROM users WHERE id = ?\"\n            cursor.execute(query, (user_id,)) # Pass user_id as a tuple\n            \n            return cursor.fetchone()\n\n    except sqlite3.Error as e:\n        print(f\"Database error occurred: {e}\")\n        # Consider re-raising the exception or returning None upon failure\n        return None\n\n```",
       "latency_s": 12.920359000000001,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -63,14 +67,16 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 105,
       "completion_tokens": 1012,
-      "tokens_per_s": 78.3
+      "tokens_per_s": 78.3,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nGrape",
       "latency_s": 0.38429,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -79,7 +85,9 @@
       "max_tokens_used": 128,
       "prompt_tokens": 43,
       "completion_tokens": 7,
-      "tokens_per_s": 18.2
+      "tokens_per_s": 18.2,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -102,7 +110,7 @@
       "task": "sprint_narrative",
       "response": "We successfully completed the user auth revamp and implemented robust billing webhook retries, hitting two critical infrastructure milestones this sprint. Progress on SSO was derailed for three days due to external vendor API downtime, which significantly impacted our planned integration timeline. Going forward, stabilizing the flaky mobile CI pipeline must be a top priority; we need dedicated bandwidth to address these testing gaps before they impede future releases.",
       "latency_s": 3.745956,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -111,7 +119,9 @@
       "max_tokens_used": 768,
       "prompt_tokens": 80,
       "completion_tokens": 424,
-      "tokens_per_s": 113.2
+      "tokens_per_s": 113.2,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -134,7 +144,7 @@
       "task": "summarization",
       "response": "Service was interrupted for eight minutes this afternoon when our main database system unexpectedly went offline due to critical storage capacity issues. The underlying cause was a procedural failure: the automated monitoring alert for low disk space was incorrectly silenced during maintenance and not reactivated afterward. To prevent any recurrence, we have restored full monitoring functionality and updated our operational checklists to include mandatory post-maintenance resource checks.",
       "latency_s": 10.677306999999999,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -143,7 +153,9 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 128,
       "completion_tokens": 736,
-      "tokens_per_s": 68.9
+      "tokens_per_s": 68.9,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -166,7 +178,7 @@
       "task": "code_generation",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Function name: `chunk_text`\n    *   Arguments: `text` (str), `max_chars` (int) -> Returns list of strings.\n    *   Constraints/Logic:\n        *   Each chunk must be at most `max_chars`.\n        *   Prefer breaking on sentence boundaries ('.', '!', '?').\n        *   Never cut a word.\n    *   Requirements: Include docstring, include one assert test.\n\n2.  **Determine Logic:**\n    *   Iterate through the text trying to find split points before or at `max_chars`.\n    *   If we can take everything remaining as is within limit -> return it all (and end loop).\n    *   While building chunks:\n        *   Check if adding a word exceeds `max_chars`.\n        *   Try splitting at the previous punctuation mark.\n        *   If no valid split found before max chars, cut there anyway? The prompt says \"never cutting a word\" and \"preferring to break on sentence boundaries\". Usually, this implies that if we reach the end of available text without finding a good boundary within `max_chars`, it's acceptable (or maybe raise an error/stop). However, standard behavior for this type of constraint is:\n            1. Try greedy accumulation with spaces between words (split by ' ').\n            2. If adding next word exceeds limit -> find last '.'/'!'? in current chunk + previous part before the potential cut point? Wait.\n        *   Refined Logic: Split text into individual tokens (words). Reconstruct chunks from these tokens.\n        *   Accumulate words until `current_chunk_length >= max_chars`.\n        *   If it exceeds: Look for a split character near end of current accumulated string that is inside the chunk. Specifically, find the last occurrence of '.', '!', '?' in the current buffer (excluding trailing spaces/newlines). Actually, better approach: Split text into sentences first? No, sentence splitting might break paragraph structure if not careful.\n        *   Better Approach: Iterate through words joined by their separator (' '). Maintain `current_chunk`. When adding a word + space exceeds limit, stop accumulating for current chunk. Now find the best split point in `current_chunk` such that length <= max_chars. The preferred points are punctuation marks (. ! ?). If no punctuation found recently enough to fit, we *must* cut somewhere within (maybe last whitespace?) or just force a cut before the word causing overflow?\n        *   Constraint: \"never cutting a word\". This usually means split boundaries must be at spaces between words. However, splitting on sentence end implies `chunk` ends with `.`, then next starts new. So if we have \"Hello world.\", and max is 7 (excluding period?). No, length includes punctuation/spaces.\n        *   Strategy:\n            1. Split text into tokens based on spaces? Or iterate char by char? Char iteration allows tracking words easily. Let's split the raw string by whitespace to get a list of `(word, position)` or just word strings if we reconstruct. But simply splitting `text` and rejoining is risky for preserving original spacing (though usually acceptable). A safer way:\n            2. Use a state machine approach or simple loop with regex?\n            3. Simple logic often used in this problem: Accumulate words into a buffer. If buffer + next word > max_chars, we need to truncate the current buffer. We want the truncation point before a sentence ending punctuation if possible within limit. Or simply remove everything after the last valid break that keeps length <= max_chars.\n            4. Actually, \"never cutting a word\" implies split must happen between words. So `word1 + ' ' + word2`. If we exceed limit adding `word`, check for best cut point in current buffer before `max_chars` which respects the punctuation preference?\n            *   Let's re-read: \"preferring to break on sentence boundaries\". This implies if a valid boundary exists within max_chars, use it. If not (e.g., long paragraph without periods near limit), we might have to cut differently or just drop words. Standard chunking logic usually means: Take as much as possible. If that exceeds `max_chars`, backtrack to the closest sentence ending punctuation *before* exceeding length? Or if no period is within the buffer, force a space split before overflow word (even if it looks ugly)? Usually \"never cutting a word\" + \"prefer boundary\" implies:\n                1. Try adding words until exceed max.\n                2. If exceeded, search backwards in current chunk for the last '.', '!', '?'.\n                3. Remove from that period onwards into new chunks? Or take up to that punctuation mark (including it). Then start next. What if no punctuation exists inside buffer (e.g., \"Hello world...\" vs just words)? Just cut at space before overflow word is usually a fallback, but the constraint says \"preferring...\". If we *must* not cut words, then cutting between spaces is allowed even without period?\n                4. Let's assume: Split text into chunks where each chunk <= max_chars. We scan forward. Build string `s`. When adding next word exceeds limit, check if there was a punctuation mark near the start of this overflow situation that would make sense to split after it (including space + punct). If so, finalize previous chunk up to that point.\n                5. Wait, simpler interpretation often found in similar tasks: Split into words first? No, text splitting should handle arbitrary spaces if possible. But usually input is whitespace delimited for this function type unless specified otherwise. Let's stick to whitespace as primary delimiter logic but preserve structure where reasonable? Or just standard split(' ') logic.\n                6. Most robust interpretation without regex complexity: Split by ' '. Iterate words. Accumulate into `current`. If adding word makes length > max_chars: Check previous chunks/last sentence boundary in current buffer. Find the last index of `.`, `!`, or `?` within `current` (before exceeding point). Actually, usually logic is: \"If can't add next full chunk size, split at most recent valid punctuation\". If no valid punctuation found recently enough to fit into limit, we must cut before that word (splitting a line of words without punctuation). Wait, if I have 50 chars and `max` is 12.\n            Let's try: Iterate over words joined by ' '. Keep track of sentence endings in the buffer? No.\n\n    *   **Algorithm Plan:**\n        1. Tokenize text into a list of \"sentences\" or chunks based on whitespace, keeping punctuation attached to tokens? Or simpler: Split `text` using regex `(?<!\\w)([.\\!\\?]|\\s)` ?\n           Let's just split by spaces first (`.split()`). But this loses newlines. Usually for text chunking like RSS summaries or LLM prompts, newline preservation is good but complex. The prompt asks to \"never cut a word\", which implies splitting at `max_chars` should respect whitespace boundaries between words if we hit the wall without punctuation.\n           \n           Actually, simple approach: \n           1. Split `text` into sentences? Regex `(?:[.\\!\\?]|\\s)+`). No.\n           Let's iterate by character or word index?\n           \n           Proposed Logic (Standard Greedy with Backtracking):\n           - Maintain a list of chunks `[current]`.\n           - Iterate through the text words one by one.\n           - Add current chunk + space + next_word. If <= max_chars, append to `current_chunk` and continue loop.\n           - If > max_chars: \n             We are forced to start a new chunk (or close previous). But we want to \"prefer sentence boundaries\".\n             So instead of just cutting before the overflow word immediately if possible? No, that doesn't solve punctuation preference.\n             \n             Correct Logic for this constraint (\"Prefer punctuation\"):\n             While accumulating words in `current_chunk`:\n               If next_word causes length > max_chars:\n                 1. Check current buffer (before overflow point) backwards to find the last sentence ending ('.', '!', '?'). \n                    Wait, we must include that boundary *in* previous chunk? Yes.\n                    Example: \"A B C D E\" -> Max chars allows A B C .(4). Next word makes it 5+ > max. If there is a '?' before the overflow point (which isn't in this example), use '?'. \n                 Actually, if we just cut at whitespace anyway (if no punctuation nearby) that's usually acceptable for \"never cutting words\". But strict constraint says prefer boundaries.\n                 \n             Let's refine: When adding `word` fails max_chars limit:\n               Search the current built string *before* this word insertion to find a sentence delimiter ('.', '!', '?'). \n               If found, split there (inclusive of punctuation in previous chunk). Start new chunk with next word? No.\n               \n             Actually, simply splitting text by spaces and reassembling is safest for \"never cutting words\". We must handle the logic:\n             \n             Let's write a loop over `text`. Since Python doesn't support arbitrary slicing easily without knowing boundaries. \n           \n           Revised Algorithm:\n          1. Split input into sentences (by punctuation). No, that might be too aggressive if there are multiple paragraphs. But standard text usually contains newlines or spaces. The prompt says \"sentence boundaries ('.', '!', '?')\". This suggests splitting by those characters is the goal. \n           \n           Let's iterate through words of `text.split()`.\n           Wait, what about punctuation attached to words? `\"Hello.\"` vs `\"hello",
       "latency_s": 32.458845000000004,
-      "score": null,
+      "score": 0.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -175,14 +187,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 72,
       "completion_tokens": 2048,
-      "tokens_per_s": 63.1
+      "tokens_per_s": 63.1,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A snippet of Python code using SQLite to fetch a user based on ID.\n    *   Task: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Code Analysis:**\n    *   `import sqlite3`: Standard library import. OK.\n    *   `def get_user(user_id):` Function definition. OK.\n    *   `conn = sqlite3.connect('users.db')`: Opens a database connection every time the function is called. Potential performance issue (resource leak if not closed), but more importantly, no error handling for DB errors. Security-wise, it's fine to connect there, but closing is important.\n    *   `cursor = conn.cursor()`: Creates cursor. OK.\n    *   `query = f\"SELECT * FROM users WHERE id = {user_id}\"`: **CRITICAL SECURITY ISSUE (SQL Injection)**. String formatting inserts the user input directly into the query string without sanitization/parameterization. If `user_id` is a number, it works in SQLite for integers usually via casting or implicit type inference, but if an attacker passes a payload like `1 OR '1'='1`, they can bypass checks. Even though `id` sounds like an integer key, relying on input being only ints isn't safe practice without parameterization.\n    *   `cursor.execute(query)`: Executes the potentially malicious query. **CRITICAL SECURITY ISSUE**.\n    *   `return cursor.fetchone()`: Returns a tuple or None. OK.\n    *   Missing: Closing connection (`conn.close()`). If called multiple times, connections accumulate. This can lead to resource exhaustion (memory leaks on some drivers) and potential DoS if the DB file lock becomes an issue. **Resource Management**.\n\n3.  **Identify Issues:**\n    *   **Security**: SQL Injection vulnerability due to f-string interpolation instead of parameterized queries (`?` placeholders).\n    *   **Style/Best Practice**: Connection is not closed in a `with` statement (context manager), leading to connection leaks if exceptions occur or the script runs indefinitely. The function returns raw rows; usually, one should handle None vs actual user data more explicitly if desired (though returning raw fetchone is acceptable).\n    *   **Style/Idiomatic**: Variable names could be clearer (`user_id` -> `id_param`).\n\n4.  **Draft the Review:**\n    *   Security: Use parameterized queries to prevent SQL injection. Don't use f-strings for query values.\n    *   Resource Management: Use a context manager (or try/finally) to ensure connection closes properly, though using a function-local connection inside a `with` block requires nesting or returning the result within one. Actually, keeping it simple in this snippet suggests adding cleanup. Better yet, make the DB object global or passed as argument? For conciseness: use `contextlib.contextmanager` logic but simplest fix is putting `conn.close()` at end and recommending a class-level manager if used heavily. However, for *this* function, wrapping execution with connection open/close in the same scope isn't ideal (file locking). But strictly speaking, closing connections properly is vital.\n    *   Style: Use `%s` or f-string placeholders (`?`) rather than string interpolation `{}`.\n\n5.  **Refine Concisely:**\n    *   Point out SQL Injection risk immediately.\n    *   Mention resource leak (connection not closed).\n    *   Suggest fix briefly in code example within the review if needed, or just describe it clearly? The prompt asks to \"Review\", implying describing issues and maybe fixing them is good but concise means listing points first then optional code block for fixed version.\n\n6.  **Final Polish:**\n    *   Bullet points are best for conciseness.\n    *   Highlight the SQL Injection (Major).\n    *   Highlight Resource Leak/Context Manager (Minor/Major depending on volume).\n    *   Suggest `cursor.execute(query, params)`.\n\n7.  **Output Generation:** (Drafting response)\n    *   Security: Vulnerable to SQL injection due to string formatting (`{user_id}`). Use parameterized queries (`?` placeholders).\n    *   Resource Management: Connection is never closed. Causes resource leaks if called frequently or interrupted. Wrap in `try/finally` or context manager.\n    *   Style: Consider adding error handling (e.g., return None on DB error) instead of crashing the app with an exception that isn't caught upstream, but strictly speaking raising exceptions for errors is often preferred over silent returns depending on design. Let's stick to Security and Resources as primary bugs/style.\n\n8.  **Final Decision:**\n    *   Highlight SQL Injection (Critical).\n    *   Highlight Resource Leak (High).",
       "latency_s": 16.469726,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -191,7 +205,9 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 89,
       "completion_tokens": 1024,
-      "tokens_per_s": 62.2
+      "tokens_per_s": 62.2,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -214,7 +230,7 @@
       "task": "vision_ocr",
       "response": "The text \"HELLO\" is printed in black with a red square in the top-right corner.",
       "latency_s": 5.552676,
-      "score": null,
+      "score": 0.5,
       "error": null,
       "image": "tasks/images/ocr_card.png",
       "truncated": false,
@@ -223,14 +239,16 @@
       "max_tokens_used": 256,
       "prompt_tokens": 236,
       "completion_tokens": 21,
-      "tokens_per_s": 3.8
+      "tokens_per_s": 3.8,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.5"
     },
     {
       "model": "custom:ollama/minicpm-v:latest",
       "task": "vision_progressive",
       "response": "In the foreground of the picture there are plants and flowers. In the middle we can see many trees. At the top it's sky. There is a building at right side of this image.",
       "latency_s": 1.055462,
-      "score": null,
+      "score": 0.4,
       "error": null,
       "image": "tasks/images/private_fixtures/progressive_photo_user.jpg",
       "truncated": false,
@@ -239,7 +257,9 @@
       "max_tokens_used": 256,
       "prompt_tokens": 498,
       "completion_tokens": 40,
-      "tokens_per_s": 37.9
+      "tokens_per_s": 37.9,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.4"
     }
   ]
 }
