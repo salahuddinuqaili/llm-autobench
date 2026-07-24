@@ -22,7 +22,7 @@
       "task": "changelog_generation",
       "response": "## \u2728 Improvements\n\n*   **Enhanced Reporting:** You can now easily export your full sprint reports directly from the dashboard as a downloadable CSV file for offline analysis.\n*   **Improved Stability & Performance:** We have strengthened our backend services to better manage high-volume requests, ensuring your workflows remain stable even when under heavy load.\n*   **More Reliable Connections:** The system is updated to automatically handle connection expirations, meaning your accounts stay logged in and synchronized without unexpected interruptions.\n*   **Better Integration Handling:** Automated updates (webhooks) are more resilient and will now successfully process incoming data, even if some required user details are missing, preventing service disruption.",
       "latency_s": 5.988166,
-      "score": null,
+      "score": 0.9,
       "error": null,
       "image": null,
       "truncated": false,
@@ -31,14 +31,16 @@
       "max_tokens_used": 768,
       "prompt_tokens": 112,
       "completion_tokens": 695,
-      "tokens_per_s": 116.1
+      "tokens_per_s": 116.1,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.9"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "```python\nimport re\nfrom typing import List\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits a given string into chunks of at most max_chars length.\n\n    Prioritizes breaking on sentence boundaries ('.', '!', '?') while ensuring\n    that no word is cut across chunk boundaries. If the remaining text is shorter \n    than max_chars, it is included as the final chunk.\n\n    Args:\n        text: The input string to be chunked.\n        max_chars: The maximum allowed length for any single chunk.\n\n    Returns:\n        A list of strings, where each string is a text chunk.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n    \"\"\"\n    if max_chars < 1:\n        raise ValueError(\"max_chars must be at least 1.\")\n\n    chunks: List[str] = []\n    remaining_text = text.strip()\n\n    if not remaining_text:\n        return []\n\n    while remaining_text:\n        current_chunk = \"\"\n        start_index = 0\n        best_break_index = -1 # Index where the chunk should end\n        \n        # If the remaining text is small enough, take it all and finish.\n        if len(remaining_text) <= max_chars:\n            chunks.append(remaining_text)\n            break\n\n        current_window = remaining_text[:max_chars]\n        \n        # --- Strategy: Find the optimal breakpoint within the next 'max_chars' ---\n        \n        potential_breaks = [i for i, char in enumerate(current_window) if char in ['.', '!', '?']]\n        \n        # 1. Try to find a sentence boundary break point (preferred)\n        if potential_breaks:\n            # Prioritize the longest valid chunk ending at punctuation\n            for p_index in potential_breaks[::-1]:\n                potential_chunk = remaining_text[:p_index + 1].strip()\n\n                # Check for word integrity before and after the punctuation break\n                # This is complex because we might be breaking mid-sentence but well within a chunk size limit.\n                if len(potential_chunk) <= max_chars:\n                    # Found a perfect, large break point at or before max_chars\n                    best_break_index = p_index + 1\n                    break # Take the first (latest) found sentence break point\n\n        # 2. Fallback: If no clean sentence boundary is found within max_chars, \n        #    find the best word boundary break near max_chars.\n        if best_break_index == -1:\n            # We iterate backwards from the max_chars limit until we hit a word boundary (space)\n            # or until we can't form a valid chunk of at least one character.\n            i = min(max_chars, len(remaining_text)) \n            while i >= 1:\n                # Check if breaking here leaves the previous segment ending on a non-word boundary (space)\n                if remaining_text[i - 1].isspace() and remaining_text[:i].strip():\n                    best_break_index = i\n                    break # Found the last possible word break that doesn't cut a word\n\n                # Safety check: If we are already at a space, breaking here is fine.\n                if remaining_text[i - 1].isspace() and best_break_index == -1:\n                     best_break_index = i # Default to the simple max_chars split if no better break is found\n\n                i -= 1\n\n        # --- Execute the Breakpoint ---\n\n        if best_break_index == -1:\n             # This should only happen if the remaining text was highly fragmented, \n             # or if the initial check for len(remaining_text) <= max_chars failed.\n            best_break_index = min(max_chars, len(remaining_text))\n\n\n        current_chunk = remaining_text[:best_break_index].strip()\n        chunks.append(current_chunk)\n\n        # Update the remaining text for the next iteration\n        remaining_text = remaining_text[best_break_index:].strip()\n\n    return chunks\n\n# --- Assert Test Cases ---\n\ndef test_chunk_function():\n    \"\"\"Tests various scenarios for chunking.\"\"\"\n    print(\"Running tests...\")\n\n    # Test Case 1: Standard sentence boundaries and chunk size limit\n    long_text = (\n        \"This is the first sentence. This section is much longer \"\n        \"and contains multiple words that need to be grouped correctly! \"\n        \"We must test how punctuation breaks work? Finally, this last part should fit.\"\n    )\n    # Max chars set high enough to allow two chunks: 120 max\n    chunks = chunk_text(long_text, max_chars=80)\n\n    assert len(chunks) >= 2, f\"Expected at least 2 chunks, got {len(chunks)}\"\n    print(\"Test Case 1 passed (Boundary Breaks).\")\n\n    # Test Case 2: Forced word boundary break (No punctuation available)\n    wordy_text = \"Thisisawordthatwillbebrokenbythelimitsofmaxcharsimplyandcleanly.\" # Note: No space between words for a strict test, but we need to simulate the limit.\n    wordy_text_spaced = \"Thequickbrownfoxjumpedoverthelazydogdogwalksfastindeedabcdefghijklmnopqrstuvwxzyz\"\n    # Max chars set low enough to force a word break in the middle of a run-on text (e.g., after 'fox').\n    chunks = chunk_text(wordy_text_spaced, max_chars=20)\n\n    expected_chunks = [\n        'The quick brown fox', # Ends cleanly on a space/word boundary\n        'jumped over the lazy dog', \n        'dog walks fast indeed abcdefghi jklmnopqrstuvwxzyz' # The remainder is handled by finalization logic\n    ]\n\n    # Adjusting the expectation slightly because my implementation prioritizes keeping context and only forces breaks when necessary.\n    # Let's verify the key constraint: no word cut.\n    assert all(c != \"\" for c in chunks), \"Chunks must not be empty.\"\n    print(\"Test Case 2 passed (Word Boundaries).\")\n\n    # Test Case 3: Small text, large chunk size (Should return one item)\n    short_text = \"Hello world.\"\n    chunks = chunk_text(short_text, max_chars=100)\n    assert chunks == [\"Hello world.\"], f\"Expected ['Hello world.'], got {chunks}\"\n    print(\"Test Case 3 passed (Small Text).\")\n\n    # Test Case 4: Max chars smaller than a single word (Should handle error or fail gracefully based on implementation choice)\n    try:\n        chunk_text(\"Test\", max_chars=0)\n        assert False, \"Expected ValueError for max_chars=0\"\n    except ValueError:\n        print(\"Test Case 4 passed (Error Handling).\")\n\n\n# Execute the tests\ntest_chunk_function()\n\n# Example Usage:\ntext = \"Python is fun! It is simple and powerful. You can use it for web development, data science, or just scripting. This is a test paragraph.\"\nmax_len = 45\n\nprint(\"\\n--- Example Run ---\")\nresult = chunk_text(text, max_len)\nfor i, chunk in enumerate(result):\n    print(f\"Chunk {i+1} (Length: {len(chunk)}): \\\"{chunk}\\\"\")\n```",
       "latency_s": 24.421463000000003,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -47,14 +49,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 83,
       "completion_tokens": 1895,
-      "tokens_per_s": 77.6
+      "tokens_per_s": 77.6,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "## Code Review\n\n### \ud83d\udc1e Bugs / Vulnerabilities (Critical)\n\n*   **SQL Injection Risk:** The function uses an f-string to embed the `user_id` directly into the SQL query (`query = f\"SELECT * FROM users WHERE id = {user_id}\"`). This is a major vulnerability. An attacker could pass manipulated input (e.g., `1 OR 1=1`) and modify the query's logic, potentially leading to data leakage or unauthorized access.\n\n### \ud83d\udee1\ufe0f Security Issues\n\n*   **SQL Injection:** *Fix:* Always use parameterized queries with `sqlite3` (`cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))`).\n*   **Resource Leakage:** The database connection (`conn`) is never explicitly closed or handled using a context manager, which can lead to resource exhaustion if the function is called frequently.\n\n### \u2728 Style & Best Practices\n\n*   **Connection Management:** Use `with` statements for both the connection and potentially the cursor to ensure resources are properly released automatically, even if errors occur.\n*   **Hardcoding:** Database files (`'users.db'`) should ideally be handled via configuration or passed as arguments, not hardcoded inside a utility function.\n\n### \ud83d\udca1 Suggested Refactoring (Example)\n\n```python\nimport sqlite3\n\ndef get_user(user_id: int):\n    # Use 'with' for automatic connection closing and resource safety\n    try:\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            # CRITICAL FIX: Use parameterized queries (?)\n            query = \"SELECT * FROM users WHERE id = ?\"\n            cursor.execute(query, (user_id,))\n            return cursor.fetchone()\n    except sqlite3.Error as e:\n        print(f\"Database error occurred: {e}\")\n        return None\n```",
       "latency_s": 4.462037,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -63,14 +67,16 @@
       "max_tokens_used": 512,
       "prompt_tokens": 105,
       "completion_tokens": 509,
-      "tokens_per_s": 114.1
+      "tokens_per_s": 114.1,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nGrape",
       "latency_s": 0.387654,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -79,7 +85,9 @@
       "max_tokens_used": 128,
       "prompt_tokens": 43,
       "completion_tokens": 7,
-      "tokens_per_s": 18.1
+      "tokens_per_s": 18.1,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -102,7 +110,7 @@
       "task": "sprint_narrative",
       "response": "We successfully delivered the user auth revamp and finalized the billing webhook retries, significantly improving core system stability. Progress on SSO integration was halted by unexpected vendor API downtime lasting three days, which blocked key testing efforts. Our immediate focus must be stabilizing the flaky mobile CI pipeline to ensure reliable deployments moving forward.",
       "latency_s": 2.405347,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -111,7 +119,9 @@
       "max_tokens_used": 768,
       "prompt_tokens": 80,
       "completion_tokens": 255,
-      "tokens_per_s": 106.0
+      "tokens_per_s": 106.0,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -134,7 +144,7 @@
       "task": "summarization",
       "response": "Our primary database system experienced an eight-minute outage because the server ran out of disk space, leading to a critical failure. The root cause was that the automated monitoring alert for low disk space was disabled during a recent maintenance window and was not reactivated afterward. We have since restored full functionality by promoting a backup system and implementing new procedural checks to ensure this resource alert is always monitored going forward.",
       "latency_s": 3.468986,
-      "score": null,
+      "score": 0.67,
       "error": null,
       "image": null,
       "truncated": false,
@@ -143,14 +153,16 @@
       "max_tokens_used": 512,
       "prompt_tokens": 128,
       "completion_tokens": 387,
-      "tokens_per_s": 111.6
+      "tokens_per_s": 111.6,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.67"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "arithmetic_reasoning",
       "response": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Problem:**\n    *   Train A leaves at $2:00$. Speed = $60 \\text{ km/h}$.\n    *   Train B leaves at $3:00$ (from the same station). Speed = $90 \\text{ km/h}$.\n    *   Goal: Find the time when Train B catches up to Train A.\n\n2.  **Define Variables:**\n    *   Let $t_A$ be the travel time of Train A in hours since its departure (or simply use total distance formula).\n    *   Let $D(t)$ be the position function relative to the station, where $t=0$ corresponds to a specific starting point.\n\n3.  **Establish Equations for Distance:**\n    *   It's usually easiest to set time $t = 0$ at the moment Train B leaves ($3:00 \\text{ PM}$). Why? Because it simplifies one of the variables, but calculating from $2:00$ is often more intuitive. Let's do both mental checks or just stick to a standard convention.\n    *   *Option 1 (Time since first train left):*\n        *   Train A leaves at $t=0$. Distance covered by A = Rate $\\times$ Time = $60 \\cdot t_A$. Note that when B catches up, $t_B = t_A - 1$. So distance of B is $90(t_A - 1)$. But actually, let's just use the absolute time.\n    *   Let's measure time from 3:00 ($PM$).\n        *   Train A has a head start. It leaves at 2:00 and starts traveling for 1 hour by 3:00. So at $t=0$ (which is 3:00), Train A is already $60 \\text{ km}$ ahead.\n    *   Let $x$ be the time in hours after 3:00 ($PM$) when they meet.\n\n4.  **Formulate Distance Equation:**\n    *   Position of Train A at time $t$: It traveled for $(1 + t)$ hours total by that moment (since it left an hour earlier).\n        $$D_A = \\text{Speed}_A \\times (\\text{Time elapsed})$$\n        Since we are measuring from 3:00, the \"total\" time since Train A's start is $1 + x$. Wait, let's just set up relative to a common reference. Let's say 2:00 is Time = 0 hours (absolute).\n\n    *   At any absolute time $t$ (where $t=0$ corresponds to 2:00):\n        *   Position of Train A ($x_A$) $= 60 \\cdot t$.\n            *(Note: For this equation to be valid, it applies for all times. However, the problem states B leaves at absolute time corresponding to $t_{abs}=1$ (since we count hours after 2).* Let's stick to relative distance from station).\n\n    *   Distance of Train A ($D_A$) = Rate $\\times$ Time traveled by A\n        $$D_A = 60 \\cdot t$$\n        *(Where $t$ is hours elapsed since 1:59? No, let's just set the meeting point).*\n\n    Let's use a simpler method often used in physics/algebra classes.\n    *   **Head Start Distance:** Train A travels for 1 hour (from 2:00 to 3:00) before B starts.\n        $$\\text{Distance of head start} = 60 \\cdot 1 = 60 \\text{ km}$$.\n\n    *   **Relative Speed:** How fast is Train B catching up?\n        Since they are traveling in the same direction on a straight line:\n        $$V_{rel} = V_B - V_A$$\n        $$V_{rel} = 90 - 60 = 30 \\text{ km/h}$$.\n\n    *   **Time to Catch Up:** How long does it take for Train B to close the gap of $60 \\text{ km}$ at a relative speed of $30 \\text{ km/h}$?\n        $$\\text{Time} = \\frac{\\text{Distance}}{\\text{Relative Speed}}$$\n        $$t_{catchup} = \\frac{60}{30} = 2 \\text{ hours}$$.\n\n5.  **Calculate the Clock Time:**\n    *   Train B starts at $3:00$.\n    *   It needs to travel for $2$ hours to catch up.\n    *   Meeting time $= 3:00 + 2 \\text{ hours} = 5:00$.\n\n6.  **Verification:**\n    *   Train A starts at 2:00, goes until meeting. If they meet at 5:00, that's a duration of 3 hours for Train A ($5 - 2 = 3$).\n        $$Distance_A = 60 \\text{ km/h} \\times 3 \\text{ h} = 180 \\text{ km}$$.\n    *   Train B starts at 3:00, goes until meeting. Duration is $5 - 3 = 2$ hours ($t_{catchup}$).\n        $$Distance_B = 90 \\text{ km/h} \\times 2 \\text{ h} = 180 \\text{ km}$$.\n    *   Since both distances are equal, the solution is correct.\n\n7.  **Drafting the Response:**\n    *   Step 1: Identify speeds and departure times. $V_A=60$, Dep$_A$=2:00; $V_B=90$, Dep$_B$=3:00.\n    *   Step 2: Determine head start distance for Train A from the moment Train B starts (or just use relative velocity). Let's write it out clearly using time elapsed ($t$) since 3:00 PM to avoid confusion with absolute clock times initially, then solve. Or simply calculate the gap closed per hour vs initial gap.\n    *   Step 3: Solve for $t$.\n        Initial Gap = Distance A traveled between 2:00 and 3:00 = $60 \\text{ km}$.\n        Rate of catch-up = $90 - 60 = 30 \\text{ km/h}$.\n        Time required to close gap = $\\frac{60}{30} = 2$ hours.\n    *   Step 4: Add time duration to departure time of Train B.\n        Start at 3:00 + 2 hours = 5:00.\n\n8.  **Final Output Formatting:**\n    *   \"Show your work\" -> Use the logic above (Head start method is clearest).\n    *   Final Answer line format specific instructions must be followed.\n\n    Let's double check if there are any trick questions or edge cases. \"Leaves at 2:00\", \"leaves... at 3:00\". \"Same route\" implies parallel motion on same path, overtaking scenario. No acceleration mentioned (constant velocity assumed).\n    Calculations: $180 = 60 \\times 3$. Correct.\n\n    *Structure of the explanation:*\n    1. Calculate distance traveled by first train during its head start period.\n    2. Set up equation where Distance(T1) = Distance(T2). Or use relative speed approach. Both yield same result, but Head Start/Relative Speed is usually faster to explain textually.\n\n    *Let's write down the steps for \"Show your work\":*\n    - First train (T1): 60 km/h starting at $t=0$ (2:00). Position $d_1(t) = 60t$. Here let $t$ be time in hours from 3:00? No, usually easier to define variables based on meeting point.\n    - Let's just stick to the logic derived in step 4/5 for clarity.\n\n    *   Head Start Logic:\n        From 2:00 to 3:00 (1 hour), Train A travels $60 \\text{ km}$. This is the lead it has when Train B starts at 3:00.\n        The gap between them needs to be closed by the \"catch-up speed\".\n        Catch-up speed = Speed(Train B) - Speed(Train A) = $90 - 60 = 30 \\text{ km/h}$.\n        Time needed to close a $60 \\text{ km}$ gap at $30 \\text{ km/h}$ is $\\frac{60}{30} = 2$ hours.\n    - Total time for Train B is 2 hours starting from its departure (3:00).\n    - Clock time calculation: $3:00 + 2\\text{h} = 5:00$.\n\n    *Algebraic Logic:*\n    Let $t$ be the number of hours after 3:00 PM.\n    At this moment, Train A has been traveling for $(1 + t)$ hours (since it started an hour earlier).\n    Distance of Train B = $90 \\times t$.\n    Distance of Train A = $60 \\times (t + 1)$.\n    Equate distances: $90t = 60(t + 1)$.\n    $90t = 60t + 60$.\n    $30t = 60$.\n    $t = 2$ hours.\n\n    This seems the most robust way to present it as \"work\". I will use this method or a clear text description of relative speed. The algebraic one is standard and hard to argue with regarding units.\n\n    Let's check the prompt requirements again: \"state your final answer on the last line as 'Final answer: HH:MM'\".\n    Result: 5:00. Format: Final answer: 05:00 or just 5:00? Usually, standard time format is requested without leading zero unless specified (e.g., military). \"HH:MM\" implies two digits might be safer to ensure compliance with the pattern shown in the prompt example if there was one, but usually it means readable clock time. I will provide \"05:00\" or just \"5:00\". The prompt says \"Final answer: HH:MM\", likely asking for a format like 13:45 or similar. Given standard convention $2$ hours after $3:00$, the result is $5:00$. I will write it as `5:00`. If strictly adhering to a strict regex pattern that might want leading zeros, usually questions specify \"pad with zero\". Without specific instruction on padding, 12-hour or standard display format is best. However, looking at the placeholder \"HH:MM\", it strongly suggests two digits for each hour and minute (e.g., 5 becomes 05). I will use `05:00` to be safe with the template hint, though usually just writing 5:00 is accepted in natural language. Let's look at standard practice for these models... usually they interpret HH as generic placeholder for hour/minute values. If it were military time or specific input fields, leading zeros are required. I'll stick to a clean presentation `5:00` unless the prompt implies strict formatting (like Python f-strings). Wait, looking at similar math problems online, \"Final answer: 14:30\" is common for \"HH:MM\". Let's provide \"5:00\". Actually, usually \"2 hours after 3 o'clock\" results in 5. I will write `5:00`. If the prompt meant strictly two digits it would probably define a specific format like ISO time. But let's assume standard clock notation unless specified otherwise.\n\n    Wait, re-reading: 'state your final answer on the last line as \"Final answer: HH:MM\"'. This is an instruction for *formatting* or just a template? It usually means literally filling that string. If I put 5:00, does it match HH:MM where H can be single digit? Usually yes. However, if strict formatting is required (like in coding), `05` is better. Let's look at the context. \"At what time...\". It doesn't imply military time. $3$ becomes $3$, not $13$. If it were 24 hour format usually specified.\n    Actually, let's just write `5:00`. Most users prefer standard representation. But looking strictly at \"HH\", that often implies two characters (like %H:%M in Python). However, I'll provide a clear calculation and likely stick to the readable time. Let me check if there is ambiguity. No ambiguity really. The answer is 5 o'clock.\n    Wait, usually for these specific LLM prompts generated from datasets or textbooks, \"Final Answer: [Value]\" implies just filling in the value. I will write `05:00` to match HH literally? Or `5:00`. Let's go with standard readable time but ensure it looks like a timestamp.\n    Actually, looking at similar examples (e.g., math datasets), if the result is 5:00 PM, usually just \"5:00\" or \"17:00\". Since start times are given as \"2:00\", I assume AM/PM isn't strictly changing to military unless implied. The inputs use \":\" separator. So `5:00` fits the visual style of `2:00`.\n    Okay, calculation is solid.\n\n    Work steps:\n    1. Time difference in departure = $3:00 - 2:00 = 1$ hour.\n    2. Distance covered by Train A during head start = Speed $\\times$ Head Start Time = $60 \\text{ km/h} \\times 1 \\text{ h} = 60 \\text{ km}$.\n    3. Relative speed of catch-up = Speed B - Speed A = $90 - 60 = 30 \\text{ km/h}$.\n    4. Time to catch up = Distance / Relative Speed = $60 \\text{ km} / 30 \\text{ km/h} = 2$ hours.\n    5. Catch-up time = Departure B + Catch-up duration = $3:00 + 2\\text{h} = 5:00$.\n\n    Final check of the prompt's formatting request again: \"state your final answer on the last line as 'Final answer: HH:MM'\".\n    Does it want me to write `HH` or replace it? It says \"as\", implying substitution. If I put `5:00`, strictly speaking H is a digit, so 1-2 digits might be ambiguous in a literal replacement sense (if the prompt meant regex `%d:%d`). However, standard clock format usually doesn't force leading zero on single hour unless it's AM/PM or military context. Given \"Final answer:\" prefix, I will just put `5:00`. Wait, if strict HH is required for 24h? The inputs are `2:00`, not `14:00` (unless assumed). If the station is in a place where AM/PM matters or implies 24hr... usually \"leaves at 3:00\" means just time. I'll stick to `5:00`.\n\n    Actually, looking at how people read prompts like this: \"Final answer: HH:MM\" acts as a pattern matching string for the user to parse. It's safer to output exactly what is needed without overthinking the leading zero unless mathematically forced (e.g. 12 hour format usually omits it or adds AM/PM, but standard time strings often use leading zeros). I will write `5:00`.\n\n    Let me reconsider providing a specific timestamp format if possible to be safe? No, simpler is better. The input used \"3:00\". If the output was 14 hours later it would likely need AM/PM handling or military time. Since duration < 24h usually implies relative clock addition in these logic puzzles, `5:00` corresponds to standard display for a clock face.\n    Let's check if I should calculate minutes? $60 \\text{ km} / 30 = 2$. Exactly integer hours. So no need for MM component other than :00.\n\n    Wait, could it be interpreted as \"Final answer: HH:MM\" meaning strictly the string with placeholders replaced by numbers where H is one or two digits? Usually in these tasks `5:00` is acceptable. I'll stick to that.\n    \n    Actually, let's look at the example again: \"2:00\", \"3:00\". These are standard clock times. If the answer was 17:00 (military) or just 5:00? Given input format is single digit hour + colon + double zero minute, I will output `5:00`.\n    \n    Wait, what if it's interpreted as AM/PM isn't required but time continues indefinitely. $2$ and $3$. If the question meant PM, usually stated \"leaves at 1400\" or context implies day cycle? No need to complicate.\n\n    Let's refine the solution text for clarity.\n    \n    Work:\n    1. Calculate Head Start Distance: The first train leaves at 2:00 and travels alone until the second train leaves at 3:00 (a duration of 1 hour). In this time, it covers $60 \\text{ km/h} \\times 1 \\text{ h} = 60$ km.\n    2. Determine Relative Speed: The first train moves at 60 km/h and the second at 90 km/h. Since they travel in the same direction, the relative speed (at which the distance between them decreases) is $90 - 60 = 30 \\text{ km/h}$.\n    3. Calculate Catch-up Time: The time required to close a gap of 60 km at a rate of 30 km/h is $\\frac{\\text{Distance}}{\\text{Relative Speed}} = \\frac{60}{30} = 2$ hours.\n    4. Determine Meeting Clock Time: This duration starts when the second train leaves (3:00). Adding 2 hours to 3:00 results in a time of 5:00.\n\n    Final Answer line check: \"Final answer: HH:MM\". I will write `",
       "latency_s": 70.975391,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -159,14 +171,16 @@
       "max_tokens_used": 4096,
       "prompt_tokens": 84,
       "completion_tokens": 4096,
-      "tokens_per_s": 57.7
+      "tokens_per_s": 57.7,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_generation",
       "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most `max_chars` characters each, \n    preferring to break on sentence boundaries ('.', '!', '?') and never cutting words mid-word.\n    \n    Args:\n        text (str): The input text string to chunk.\n        max_chars (int): Maximum number of characters per chunk.\n\n    Returns:\n        List[str]: A list where each element is a substring with at most `max_chars` chars.\n                   Splits occur preferentially at sentence boundaries when possible, \n                   preserving whole words without truncation or mid-word breaks.\n\n    Raises:\n        ValueError: If max_chars <= 0\n        AssertionError: Used in test for validation of expected behavior.\n\n    Examples:\n        >>> chunk_text(\"Hello world!\", 6)\n        ['Hello', 'world!']\n        \n        >>> chunk_text(\"This is a longer sentence that should be split into chunks.\", 15)\n        ['This is a long', 'er sente nce tha t s hould b e split in to chunks.'] \n    \"\"\"\n    \n    # Validate max_chars must be positive\n    assert isinstance(max_chars, int), \"max_chars must be an integer\"\n    if max_chars <= 0:\n        raise ValueError(\"max_chars must be a positive integer\")\n\n    # Handle empty text case\n    if not text or len(text) == 0:\n        return []\n\n    # Split the input into words and punctuation as individual units.  \n    import re\n    \n    tokens = tokenize_text_with_punctuation_preservation(text)\n    \n    chunks = []\n    current_chunk_chars = \"\"\n    \n    for word in tokens:\n        if len(current_chunk_chars + \" \") > 0 or (not current_chunk_chars):\n            test_line = (current_chunk_chars.rstrip(\" .!?\") + \" \" + word).lstrip()\n\n        # If adding this token exceeds limit, finalize the chunk and start a new one. \n        temp_text = \"\" if not current_chunk_chars else (current_chunk_chars)  # ensure correct text for break check\n        potential_line_length_with_word = len(temp_text.rstrip(\" .!?\") + \" \") + len(word)\n\n    ... \n\n```",
       "latency_s": 20.584115,
-      "score": null,
+      "score": 0.85,
       "error": null,
       "image": null,
       "truncated": false,
@@ -175,14 +189,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 72,
       "completion_tokens": 898,
-      "tokens_per_s": 43.6
+      "tokens_per_s": 43.6,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Task: Review Python code for bugs, security issues, and style.\n    *   Input Code: A simple SQLite function using a raw f-string query to fetch user data.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n    *   **Security (Critical):** SQL Injection vulnerability. The `query` string uses an f-string to interpolate `{user_id}` directly into the SQL command without parameterization. If `user_id` is not strictly validated/converted or contains malicious input, it could break out of the query structure. While SQLite in Python usually requires numeric IDs for this specific field (if defined as INTEGER PRIMARY KEY), best practice mandates using placeholders (`?`) and parameter binding to prevent injection regardless of type validation capabilities elsewhere.\n    *   **Resource Management:** No `try...finally` block or context manager usage for the connection/cursor. If an exception occurs, resources might leak in production environments (though SQLite connections usually handle cleanup well on process exit/exception). Best practice is using a context manager (`with`).\n    *   **Style:** Variable naming could be more descriptive but `user_id` and function name are okay. Code structure is minimal. The lack of error handling for `fetchone()` returning None (expected?) or database errors makes it brittle if called outside this scope, though strictly functional as a utility inside an app context.\n    *   **Logic:** `select *` can be inefficient; specific columns might return less data. However, functionally valid for debugging/small schemas.\n\n4.  **Draft the Review:**\n    *   **Security:** Highlight SQL injection risk due to f-string interpolation. Recommend using parameterized queries.\n    *   **Resources/Robustness:** Mention connection handling (context manager). Add error handling suggestions? Keep it concise, so focus on context managers and security first.\n    *   **Style:** Minor points like `fetchone()` return None check if needed elsewhere, but standard practice for such functions is returning the row or None.\n\n5.  **Refine for Conciseness:**\n    *   Combine resource handling into one point (Context Manager).\n    *   Put security first as it's critical.\n    *   Keep style brief.\n\n6.  **Final Polish:**\n    *   Bug: Resource leak potential (minor but good to mention context manager).\n    *   Security: SQL Injection risk. Use `%s` or `?`. Sanitize inputs if necessary, though binding handles it for SQLite usually.\n    *   Style: Return type hinting (`Optional[... ]`).\n\n7.  **Construct Output:** (Self-Correction during drafting) -> Keep bullets short. Focus on the big ones first.\n\n    *   Security: SQL Injection risk via f-string interpolation. Use parameterized queries.\n    *   Resources: Use context managers to ensure DB connections close properly.\n    *   Style/Robustness: Handle `None` return and add type hints (`Optional[Row]`).\n    *   Code Example (optional but helpful for conciseness): Provide a fixed snippet? The prompt asks to \"Review\", so listing issues is primary, maybe a corrected version at the end. Let's stick strictly to reviewing unless I need to show fix. Usually showing the pattern makes it concise and actionable.\n\n    Let's draft:\n    1. **Security Critical**: SQL Injection vulnerability due to f-string interpolation (`{user_id}`). Always use parameterized queries (`%s` or `?`).\n    2. **Resource Management**: No context manager usage for `conn`. Use `with sqlite3.connect(...) as conn:`. Add `try/except`.\n    3. **Style/Bugs**: Missing type hints (e.g., `Optional[... ]`) and error handling if DB raises errors.\n\n    Wait, strictly speaking about \"Review\". I will list the points clearly.\n\n    *   Security: SQL Injection risk (`f\"... {user_id}...\"`). Fix with placeholders.\n    *   Resources: Connection not closed on exception. Use `with`.\n    *   Style: Add return type hints and validate input or let binding handle it (binding is enough).\n\n    Okay, ready to write.\n\n8.  **Final Check against \"Be Concise\":** Do not ramble. Bullet points are best.\n\n    *   Security: SQL Injection risk using f-strings for user inputs. Use parameterized queries (`?`).",
       "latency_s": 16.542911,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -191,7 +207,9 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 89,
       "completion_tokens": 1024,
-      "tokens_per_s": 61.9
+      "tokens_per_s": 61.9,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -214,7 +232,7 @@
       "task": "vision_ocr",
       "response": "The text \"HELLO\" with a size of 123 characters is printed. The color of the square in the top-left corner is red.",
       "latency_s": 5.981105,
-      "score": null,
+      "score": 0.5,
       "error": null,
       "image": "tasks/images/ocr_card.png",
       "truncated": false,
@@ -223,14 +241,16 @@
       "max_tokens_used": 256,
       "prompt_tokens": 236,
       "completion_tokens": 32,
-      "tokens_per_s": 5.4
+      "tokens_per_s": 5.4,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.5"
     },
     {
       "model": "custom:ollama/minicpm-v:latest",
       "task": "vision_progressive",
       "response": "In this picture we can see sky with clouds, here are some green color plants and flowers on ground.",
       "latency_s": 0.888744,
-      "score": null,
+      "score": 0.6,
       "error": null,
       "image": "tasks/images/private_fixtures/progressive_photo_user.jpg",
       "truncated": false,
@@ -239,7 +259,9 @@
       "max_tokens_used": 256,
       "prompt_tokens": 498,
       "completion_tokens": 22,
-      "tokens_per_s": 24.8
+      "tokens_per_s": 24.8,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.6"
     }
   ]
 }
