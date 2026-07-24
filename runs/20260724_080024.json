@@ -22,7 +22,7 @@
       "task": "changelog_generation",
       "response": "### \u2728 Improvements\n\n*   **Export Reports:** You can now export your complete sprint report directly to a CSV file from the dashboard, making data analysis easier than ever.\n*   **Improved Reliability:** Enhanced handling for connection issues means your reports and integrations will refresh seamlessly, even if temporary login permissions expire mid-request.\n*   **Stable Integrations:** The system is more resilient to incomplete data, ensuring that external webhook payloads are processed correctly without crashing.",
       "latency_s": 3.140471,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -31,14 +31,16 @@
       "max_tokens_used": 768,
       "prompt_tokens": 112,
       "completion_tokens": 343,
-      "tokens_per_s": 109.2
+      "tokens_per_s": 109.2,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "```python\nimport re\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits a large text string into smaller chunks of at most max_chars.\n\n    The function prioritizes breaking on natural sentence boundaries \n    (., !, ?) and ensures that no word is ever cut. If an entire \n    sentence is too long, it breaks down the chunk at whole words.\n\n    Args:\n        text (str): The input text to be chunked.\n        max_chars (int): The maximum allowed length of any chunk.\n\n    Returns:\n        list[str]: A list of strings, where each string is a readable chunk.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n    \"\"\"\n    if max_chars < 1:\n        raise ValueError(\"max_chars must be at least 1.\")\n    if not text:\n        return []\n\n    # Step 1: Normalize and Tokenize the text.\n    # We use a pattern that captures words, or separators (punctuation/whitespace), \n    # while preserving them as distinct tokens for accurate length calculation.\n    tokens = re.findall(r\"[\\w']+|[^\\w\\s]+|\\s+\", text)\n\n    chunks: list[str] = []\n    current_chunk: str = \"\"\n    word_buffer: list[tuple[str, int]] = []  # Stores (token, token_length_with_space)\n    \n    def get_char_len(text: str) -> int:\n        \"\"\"Calculates the effective character length.\"\"\"\n        return len(text)\n\n    for i, token in enumerate(tokens):\n        is_punctuation = re.match(r\"[.!?]\", token) and not any(token.strip()) # Check for sentence enders\n        is_space = re.match(r\"\\s+\", token)\n        \n        # Calculate the length this token would add, including a space if necessary\n        added_length = len(token) + (1 if current_chunk and not is_space else 0)\n\n        # If the chunk is empty, just use the raw token length\n        if not current_chunk:\n            added_length = len(token)\n\n        # Check if adding this token would exceed the limit\n        if get_char_len(current_chunk + \" \" * (1 if current_chunk and not is_space else 0) + token) > max_chars:\n            \n            # A. Finalize the current chunk if it has content\n            if current_chunk:\n                chunks.append(current_chunk.strip())\n            \n            # B. Start a new chunk with the current token\n            current_chunk = token\n            word_buffer = [(token, added_length)]\n            continue\n\n        # If adding this token fits, update the buffer/chunk normally\n        if is_space and word_buffer:\n             # If it's a space token, just rely on the next word to re-add separation.\n             pass \n        else:\n            current_chunk += (\" \" if current_chunk else \"\") + token\n\n        word_buffer.append((token, added_length))\n\n\n    # Post-processing step: If we finished a full chunk, and the next potential chunk is small enough,\n    # but the accumulated chunk contains natural boundaries, we *might* want to break earlier \n    # (This logic handles \"soft breaks\" by checking if the current accumulating chunk ends in punctuation)\n\n    final_chunks: list[str] = []\n    current_chunk_list: list[str] = []\n\n    for token in tokens:\n        # Temporary string representing the potential chunk state\n        potential_chunk = \"\".join(current_chunk_list)\n        if current_chunk_list:\n            potential_chunk += \" \"\n        potential_chunk += token\n\n        # Check 1: If adding this token makes the chunk too long.\n        if len(potential_chunk) > max_chars and current_chunk_list:\n            \n            # Before breaking, check if we can break at a natural boundary within the *current* accumulated list.\n            break_index = -1\n            for i in range(len(current_chunk_list) - 1, -1, -1):\n                segment = current_chunk_list[i]\n                if re.search(r'[.!?]', segment): # Check if the token ends a sentence\n                    break_index = i\n                    break\n\n            # If we found a good break point that keeps us within size limits:\n            if break_index != -1:\n                break_chunk_at_boundary = \" \".join(current_chunk_list[:break_index + 1])\n                final_chunks.append(break_chunk_at_boundary.strip())\n                current_chunk_list = current_chunk_list[break_index + 1:]\n            else:\n                 # Fallback: If no clear sentence break, but we still overflowed,",
       "latency_s": 25.433883,
-      "score": null,
+      "score": 0.85,
       "error": null,
       "image": null,
       "truncated": true,
@@ -47,14 +49,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 83,
       "completion_tokens": 2048,
-      "tokens_per_s": 80.5
+      "tokens_per_s": 80.5,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "## Review\n\n### \ud83d\udc1e Bugs & Logic\n*   **Missing Connection Closure:** The connection (`conn`) is never explicitly closed, leading to potential resource leaks, especially if this function is called frequently or in a larger application.\n*   **Error Handling:** If the database file (`users.db`) does not exist or if the table `users` doesn't exist, the code will crash without graceful handling.\n\n### \ud83d\udee1\ufe0f Security Issues (Critical)\n*   **SQL Injection Vulnerability:** This is the most critical issue. The function constructs the SQL query using an f-string (`f\"SELECT * FROM users WHERE id = {user_id}\"`). If `user_id` comes from untrusted input, a malicious user could inject commands (e.g., setting `user_id` to `' OR 1=1 -- '`) allowing them to bypass authentication or retrieve unauthorized data.\n\n### \u2728 Style & Best Practices\n*   **Resource Management:** Using the `with` statement for the database connection is the standard Python best practice, as it guarantees that resources are properly closed even if errors occur.\n*   **Database Interaction Pattern:** The direct passing of a query string and then execution outside of parameterization is highly unpythonic and insecure.\n\n---\n\n### \ud83d\ude80 Recommended Fix (Refactored Code)\n\nThe core fix involves replacing the f-string query with parameterized queries and wrapping the connection in a context manager.\n\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    \"\"\"Retrieves a user record by ID securely.\"\"\"\n    try:\n        # Use 'with' for automatic resource management (connection closing)\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            # CRITICAL FIX: Use parameter substitution (?) to prevent SQL injection\n            query = \"SELECT * FROM users WHERE id = ?\"\n            cursor.execute(query, (user_id,)) # Pass parameters as a tuple\n            return cursor.fetchone()\n    except sqlite3.Error as e:\n        print(f\"Database error occurred: {e}\")\n        return None\n\n```",
       "latency_s": 9.178864,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -63,14 +67,16 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 105,
       "completion_tokens": 544,
-      "tokens_per_s": 59.3
+      "tokens_per_s": 59.3,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "apple\nbanana\ngrape",
       "latency_s": 0.385388,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -79,7 +85,9 @@
       "max_tokens_used": 128,
       "prompt_tokens": 43,
       "completion_tokens": 7,
-      "tokens_per_s": 18.2
+      "tokens_per_s": 18.2,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -102,7 +110,7 @@
       "task": "sprint_narrative",
       "response": "We successfully completed the user auth revamp and implemented billing webhook retries, significantly improving core system stability this sprint. Progress was blocked for three days by the vendor API downtime, which halted all progress on SSO integration. Moving forward, we must prioritize stabilizing the mobile pipeline's flaky CI to ensure reliable deployment velocity.",
       "latency_s": 3.099147,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -111,7 +119,9 @@
       "max_tokens_used": 768,
       "prompt_tokens": 80,
       "completion_tokens": 344,
-      "tokens_per_s": 111.0
+      "tokens_per_s": 111.0,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -134,7 +144,7 @@
       "task": "summarization",
       "response": "The core issue was that our database system experienced an unexpected outage after the storage disk filled up, resulting in approximately eight minutes of downtime. This failure occurred because the automatic monitoring alert for low disk space was silenced during maintenance and was not reactivated afterward. We have fixed this by immediately re-enabling the warning alerts and updating our post-maintenance checklist to prevent the issue from happening again.",
       "latency_s": 2.322676,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -143,14 +153,16 @@
       "max_tokens_used": 512,
       "prompt_tokens": 128,
       "completion_tokens": 246,
-      "tokens_per_s": 105.9
+      "tokens_per_s": 105.9,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "arithmetic_reasoning",
       "response": "Here's a thinking process that leads to the suggested solution:\n\n1.  **Analyze the Problem:**\n    *   **Train A (First Train):** Leaves at $T_{start,1} = 2:00$. Speed ($v_1$) = $60 \\text{ km/h}$.\n    *   **Train B (Second Train):** Leaves at $T_{start,2} = 3:00$. Speed ($v_2$) = $90 \\text{ km/h}$.\n    *   **Route:** Same route implies same starting point and direction.\n    *   **Goal:** Find the time when Train B catches up to (overtakes) Train A.\n\n2.  **Define Variables and Units:**\n    *   Let $t$ be the time in hours measured from a specific reference point. It's usually easiest to measure time relative to the first event or convert everything into minutes/hours after midnight/noon, but measuring from the later start is often faster for setting up equations directly with speed. However, standard practice is distance = speed $\\times$ time *after departure*.\n    *   Let $x_1(t)$ be the position of Train 1 at hour $t$.\n    *   Let $x_2(t)$ be the position of Train 2 at hour $t$.\n\n3.  **Determine Time Difference:**\n    *   The second train leaves exactly one hour after the first ($3:00 - 2:00 = 1$ hour).\n    *   So, when Train B has been traveling for time $\\tau$, Train A has been traveling for time $(\\tau + 1)$.\n\n4.  **Formulate Equations (Distance vs. Time):**\n    *   Distance traveled by Train 2: $d_2 = v_2 \\cdot \\tau$\n        *   where $\\tau$ is hours after 3:00.\n    *   Distance traveled by Train 1 at that same moment: The first train has a head start of 60 km (distance covered in the first hour). Or simply, use time $t$. Let's stick to the \"relative time\" method as it prevents confusion with absolute times for now.\n\n    *   Method A: Absolute Time ($T$) measured from midnight/noon is messy.\n    *   Method B: Variable $\\tau = \\text{hours after } 3:00$.\n        *   At catch-up point, Distance Train 1 = Distance Train 2 + Head Start distance? No, simply: Position of A = Position of B (relative to station).\n\n    Let's look at distances relative to the start line.\n    *   For any time $\\tau$ after 3:00:\n        *   $x_2(\\tau) = 90 \\cdot \\tau$\n        *   $x_1(T_A) = x_1(1+\\tau)$ (since Train A started an hour earlier).\n        *   Wait, let's use absolute time to be precise. Let $\\tau$ be the hours since midnight? No, too much zero-padding issues mentally without a number line.\n\n    **Let's simplify:**\n    Time difference = 1 hour.\n    Distance of Train A at $T=0$ (Start moment) is defined by its speed and duration already passed. But relative to time $\\tau$ for Train B:\n    *   Distance covered by Train 2 in time $\\tau$: $90\\tau$.\n    *   Distance covered by Train 1 in the same \"elapsed\" window? No, let's look at it this way:\n\n    At any moment after 3:00 (let's say $\\tau$ hours have passed since 3:00):\n    *   Total time for A = $1 + \\tau$.\n    *   Distance of A ($d_A$) = $60(1 + \\tau)$.\n    *   Distance of B ($d_B$) = $90(\\tau)$.\n\n5.  **Set Condition for Catching Up:**\n    $$d_A = d_B$$ (assuming same starting point distance).\n    Note: They are traveling away from the station, so \"catch up\" means they have traveled equal distances from the station relative to their respective start times? Yes, provided $t$ represents time elapsed since 3:00. If we treat position as coordinate on a line where Station = 0.\n\n6.  **Solve for $\\tau$:**\n    $$60(1 + \\tau) = 90\\tau$$\n    *   Divide both sides by 30 (optional, but easy): $2(1+\\tau) = 3\\tau$\n    *   Expand: $2 + 2\\tau = 3\\tau$\n    *   Subtract $2\\tau$: $2 = \\tau$.\n\n7.  **Interpret Result:**\n    $\\tau$ represents the hours Train B has been traveling since its departure at 3:00.\n    So, it catches up after 2 hours of travel for Train B.\n\n8.  **Calculate Final Time:**\n    *   Start time of second train = 15:00 (or just 3:00).\n    *   Duration $\\tau$ = 2 hours.\n    *   Catch-up time = $3:00 + 2 \\text{ hours}$.\n\n9.  **Verification:**\n    *   Time of meeting relative to first train start ($t=1$ at the hour difference): The headstart was $60 \\text{ km/h} \\times 1 \\text{ h} = 60 \\text{ km}$.\n    *   Relative speed (gap closing rate) = $v_2 - v_1 = 90 - 60 = 30 \\text{ km/h}$.\n    *   Time needed to close gap = $\\frac{\\text{Distance Gap}}{\\text{Relative Speed}}$\n    *   Distance Gap = 60 km.\n    *   Relative Speed = 30 km/h.\n    *   Time required ($\\tau_{catch}$) = $60 / 30 = 2 \\text{ hours}$.\n    *   This time is calculated from the start of Train B (or simply when they are traveling). Since we want absolute clock time, it's Start(B) + $\\tau_{catch}$.\n\n10. **Calculation:**\n    *   $3:00$ plus 2 hours = $5:00$.\n\n11. **Drafting the steps clearly:**\n    *   State speeds and start times.\n    *   Calculate head start distance for Train A at the moment Train B departs (or express distances in terms of elapsed time $\\tau$).\n        *   Head start method is usually more intuitive to read. \"Train 1 has traveled alone for 1 hour\".\n        *   Distance = $60 \\text{ km/h} \\times 1 \\text{ h} = 60 \\text{ km}$.\n    *   Train B must close this gap of 60 km at a relative speed.\n    *   Relative Speed = $90 - 60 = 30 \\text{ km/h}$.\n    *   Time to catch up = $\\frac{\\text{Gap}}{\\text{Relative Speed}} = \\frac{60}{30} = 2$ hours.\n    *   Add this duration to the departure time of Train B (since relative speed is relevant only once both are moving). Alternatively, if you use absolute distance equations starting from $t=0$ for A and defining offset for B:\n        *   PosA at catch-up ($T_{absolute}$): Distance = $60 \\times (15-2)$? No.\n    *   Let's check the logic again to ensure no silly math errors.\n        *   Start A: 2:00. Speed 60. At 3:00, A is at mile mark 60. B starts from 0. Gap = 60km.\n        *   Speed diff = $90 - 60 = 30$.\n        *   Time to bridge gap = $60/30 = 2$ hours.\n        *   Start time for calculation is 3:00 (when B starts moving). Add 2 hours. Result: 5:00.\n\n12. **Formatting the Output:**\n    *   Show work clearly using equations or step-by-step logic.\n    *   Final answer in specific format \"Final answer: HH:MM\". Note: Should be AM/PM? The input uses \"HH:MM\" with a colon, implying standard time notation (12-hour usually preferred by human users unless specified 24h). Since the prompt asks for HH:MM and doesn't specify 24h format or AM/PM explicitly, but implies a clock reading.\n    *   Context is likely \"5:00\". Should I write it as `17:00`? The input says \"leaves at 3:00\" not 15:00. Usually in these problems, standard time format matching the input (2:00, 3:00) is best unless specified otherwise. However, if strict HH:MM without AM/PM suffixes are requested, `5:00` or `17:00`. Given \"At what time\", usually implies a clock face answer. I will provide it in the same format as the input (e.g., 5:00).\n\n    Let's re-read the prompt constraint carefully:\n    *   Input uses AM/PM implicitly? No, just hours and minutes like 2:00. It likely assumes standard time context. I'll write `5:00`. If it implies a specific format for computer grading (like an API response), usually 17:00 is safer if not specified, but here this looks like a general reasoning prompt.\n    *   Actually, let's look at the instruction \"state your final answer on the last line as 'Final answer: HH:MM'\". If it was meant to be 24-hour format it usually specifies `HH` (uppercase) implies digits. I will assume standard interpretation of time matching the prompt style (e.g., if input is 3:00, output 5:00). But wait, strictly speaking \"Final answer: HH:MM\" might imply a placeholder like H and M are variables to be replaced by numbers.\n    *   Let's check if there is any ambiguity about AM/PM. Since the problem doesn't state it starts at night or morning explicitly (just 20h vs 14h?), but usually these riddles assume standard day progression from start time relative to departure. If a train leaves \"at\" 3:00, and another catches up...\n    *   Wait, is there any chance the question implies `Final answer:` + format? No, it asks for the actual string on that line.\n\n    Let's stick to standard logic. The math says $t = \\text{Start}_{B} + 2\\text{h}$. Start$_B$ was given as 3:00. So result is 5:00 (or 17:00). Given the prompt uses \"2:00\" and \"3:00\", I will output `Final answer: 5:00`.\n\n    *Self-Correction on Formatting:* If a math problem asks for HH:MM, usually it implies digits. Is it 24-hour or 12-hour?\n    Usually, in these types of text problems (like from GMAT/GRE contexts), \"at what time\" expects the answer to look like the input numbers. The inputs are single digit hours with a colon. I will use `5:00`. If it was strictly required as military time, 24h usually looks more formal ($17:00$). However, without specific instruction for 24-hour format, keeping consistent with the prompt's \"3:00\" is safest.\n\n    Let's double check calculation one more time.\n    $d_1 = v_1 t + d_{start}$ (relative to start of B) -> $60t$ vs $90(t-1)$? No, let variable be hours after 3:00 ($x$).\n    Pos A at catch up: Distance traveled in $(1+x)$ hours. Dist = $60(1+x)$.\n    Pos B at catch up: Distance traveled in $x$ hours. Dist = $90(x)$.\n    Equate: $60 + 60x = 90x \\rightarrow 30x = 60 \\rightarrow x=2$.\n    Time is 3:00 (start of B) + 2 hrs = 5:00.\n\n    The work section needs to be clear. I will use the \"Relative Speed\" approach as it's cleaner to explain, or set up a simple algebraic equation $60(t+1) = 90t$. Both result in the same thing.\n    \n    Final Answer String construction: `Final answer: HH:MM`. The prompt says state final answer... on the last line *as* \"Final answer: HH:MM\". This usually means replacing HH and MM with values. It doesn't strictly mandate leading zeros (like 5 vs 05), though standard time notation uses them or not?\n    Standard is `5:00` for minutes, but single digit hour is fine if input was `2:00`. I will stick to the input format.\n\n    Wait, looking at the user prompt \"Final answer: HH:MM\". This looks like a placeholder string instruction rather than a formatting requirement (like strict JSON).\n    \n    One more check on AM/PM ambiguity. If 3 PM is meant vs 3 AM? Usually implies morning or noon unless specified. However, relative time makes it ambiguous but usually these problems imply \"what hour of the day\" regardless if AM or PM applies to both inputs being consistent. I'll write `5:00`.\n\n    Let's produce the response.\n    \n    **Step-by-step Plan:**\n    1. Calculate head start distance for Train A when Train B starts. (Distance = Speed $\\times$ Time).\n       - Gap time = $3:00 - 2:00 = 1 \\text{ hour}$.\n       - Head Start Distance = $60 \\text{ km/h} \\times 1 \\text{ h} = 60 \\text{ km}$.\n    2. Calculate relative speed of Train B with respect to Train A (how fast it closes the gap).\n       - Relative Speed = Speed(B) - Speed(A) = $90 - 60 = 30 \\text{ km/h}$.\n    3. Calculate time required for Train B to close the initial head start distance.\n       - Time to Catch Up = Gap Distance / Relative Speed.\n       - Time = $60 \\text{ km} / 30 \\text{ km/h} = 2 \\text{ hours}$.\n    4. Determine absolute time by adding this duration to the departure time of Train B (or simply noting that at catch-up, Train A has traveled $1 + 2 = 3$ hours).\n       - Start Time for calculation: $3:00$.\n       - Catch up time: $3:00 + 2 \\text{ h} = 5:00$.\n\n    The logic holds up. Ready to write solution.\n\n    Wait, checking the instruction \"Final answer on the last line as 'Final answer: HH:MM'\". Does it want me to put `17:00`? Or just match input style? Usually user prompts like this are from automated evaluators or simple QA bots where they expect 24h format if requested. But here, \"HH\" in the prompt might be a template for *any* time representation. However, often with these problems `5:00` is accepted. I will stick to matching input style (12-hour) unless it looks weird. Actually, looking at standard conventions on platforms like this, 5:00 or 05:00 are both usually fine. But since the inputs were \"2:00\" and \"3:00\", `5:00` is consistent. If I have to choose between AM/PM ambiguity, it's best not to add text like PM if just HH:MM format requested.\n\n    Let's refine the final line.\n    Input style: `2:00`, `90 km/h`.\n    Output should likely be `5:00`.\n\n    One subtle thing: The prompt says \"state your final answer on the last line as 'Final answer: HH:MM'\". This could imply literally that string but with digits. I will provide the time in 24-hour format? No, if someone asks for a bus schedule at `5:00`, writing `17:00` is technically correct mathematically (hours) but confusing practically unless specified \"in military time\". However, usually these riddles are abstract. If I write `Final answer: 5:00` it matches the inputs perfectly.\n\n    Let's verify if there is any hidden trick.\n    Train A speed = 60 km/h. Time to catch up? No, just relative velocities.\n    Distance at t=2 for B (3 hours for A) -> $90 \\times 2 = 180$.\n    Distance at t=2+1 (relative to start?) Wait.\n    Let's check the math again carefully.\n    \n    Time $\\tau$ is time since Train B starts (at 3:00).\n    Pos A relative to station after $(\\tau + 1)$ hours? No, if we define $t=0$ at 2:00.\n    Then Catch up happens when distance traveled by both from start equals position of catch up point. Wait, they travel on same route starting from *same* station (implied by \"Another leaves the **same** station\").\n    \n    So Station is Origin $x=0$.\n    At $t$ hours past 2:00:\n    Pos A = $60 \\times t$.\n    Train B starts at $t=1$ hour. For any time $\\ge 1$:\n    Pos B = $90 \\times (t - 1)$.\n    \n    Set equal:\n    $60t = 90(t-1)$\n    $60t = 90t - 90$\n    $30t = 90$\n    $t = 3$.\n    \n    So catch up happens at $t=3$ hours after the first train leaves (2",
       "latency_s": 70.394915,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -159,14 +171,16 @@
       "max_tokens_used": 4096,
       "prompt_tokens": 84,
       "completion_tokens": 4096,
-      "tokens_per_s": 58.2
+      "tokens_per_s": 58.2,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_generation",
       "response": "Here's a thinking process that leads to the suggested solution:\n\n1.  **Analyze the Request:**\n    *   **Function Name:** `chunk_text`\n    *   **Parameters:** `text` (str), `max_chars` (int).\n    *   **Return Type:** `list[str]`.\n    *   **Goal:** Split text into chunks where each chunk has length $\\le$ `max_chars`.\n    *   **Constraints:** Prefer breaking at sentence boundaries ('.', '!', '?'), never cut a word.\n    *   **Requirements:** Include docstring, include one assert test (in the code or comments).\n\n2.  **Determine Algorithm Logic:**\n    *   I need to tokenize the text into words/sentences first to understand where breaks happen. Splitting by spaces usually works well for English-style text processing if we assume whitespace separates words nicely. However, handling punctuation attached to sentences is important (e.g., \"word.\" counts as one token).\n    *   A simpler approach: Iterate through the string keeping a running sum of characters and indices.\n    *   *Constraint Check:* Never cut a word. This implies if I'm at index `i`, I must find where the current chunk ends, ideally before space/punctuation that ends a sentence. If no such boundary exists within `max_chars` distance from start (or previous break point), I might need to make a hard cut between words or just accept it violates the preference but adheres strictly to \"never cutting a word\" implies we should find valid boundaries *between* chunks based on spaces/sentence ends?\n    *   Let's refine: If `max_chars` is small, can we guarantee never cutting a word? Yes. The algorithm must greedily accumulate characters until adding the next character would exceed `max_chars`. At that point, if there is punctuation like `.`, `!`, or `?` right before the overflow limit *and* followed by whitespace (end of sentence), break there first.\n    *   Actually, a simpler logic usually satisfies these constraints better:\n        1. Start with an empty chunk buffer and current position.\n        2. Iterate through words/tokens separated by spaces/punctuation? No, splitting by space keeps punctuation attached to the word (e.g., \"Hello.\"). This is safer for \"never cut a word\".\n        3. Accumulate tokens into chunks until adding another token would exceed `max_chars`.\n        *   Wait, if I split strictly on whitespace first: `text.split(' ')` creates words including punctuation attached to them.\n        *   Let's look at the constraint: \"prefer to break on sentence boundaries\". This implies heuristics are needed when a simple space-split doesn't satisfy limits or allows multiple breaks per sentence? No, it means if I can put a period inside `max_chars`, do that rather than cutting in the middle of words.\n        *   Actually, strict interpretation: We must not break mid-word (e.g., \"Hel-lo\"). So chunks are always aligned between spaces and preferably at punctuation ending sentences.\n\n3.  **Drafting the Algorithm:**\n    *   Split text into individual tokens based on whitespace? Let's check `text.split()`. Note that this removes extra whitespace but preserves internal structure better if we track indices, or use regex to find word boundaries keeping them intact for length checking?\n    *   Simpler approach: Iterate character by character (or tokenized words) while tracking the current chunk string.\n    *   Let's try an iterative greedy approach with priority on sentence breaks.\n    *   1. Split text into sentences or logical tokens based on spaces first to ensure whole words are kept together? `text.split()` is risky if punctuation exists like \"word! next\". If we split by whitespace, the chunk includes \"! \".\n    *   Wait, standard Python string slicing usually works best for character counts. But checking word boundaries means splitting text into a list of tokens (strings separated by space).\n    *   Proposed logic:\n        1. Split `text` by spaces to get words/tokens. Note that this preserves the punctuation attached (e.g., \"word.\"). This effectively treats \"word.\" as an atomic unit, satisfying \"never cut a word\". But it might fail if multiple lines or specific whitespace handling is needed? The prompt doesn't specify preserving newlines specifically other than splitting text into chunks.\n        2. Iterate through tokens and accumulate them in the current chunk string, joined by spaces to approximate length (roughly).\n        3. However, \"max_chars\" applies to character count including punctuation/spaces usually.\n        4. Optimization: If adding a token exceeds `max_chars`, look back at the previous sentence boundary (`.` or `!` or `?`) inside this chunk and cut there instead of truncating the current word accumulation (assuming we don't need spaces for that specific split). But if no sentence boundary exists, just truncate after whitespace.\n        5. Correction: If I accumulate words in a buffer list `[w1, w2]`, length becomes `len(\"\".join(w_list))` roughly? No, including the delimiter space between them matters. Let's say we have tokens `['Hello', 'world.']`. String `\"Hello world.\"` is 13 chars (including space).\n        6. If adding next word exceeds limit: Check if current buffer has a sentence-ending punctuation that would be better place to cut? Usually, standard logic for \"prefer breaking on sentences\" implies checking the last token in the chunk. Does it end with `.`, `!` or `?` followed by space (implicit from next split)? Or just does the character count allow taking until limit and then cutting *after* a sentence delimiter if one exists before hitting the limit?\n\n    Let's simplify to a robust, clean Python solution often used in these types of prompts.\n    \n    **Logic:**\n    1. Split `text` into raw words using regex that captures delimiters or simply split by whitespace and handle punctuation attached. Simplest: `[w for w in text.split() if len(w) > max_chars]`. Wait, we shouldn't filter them out; we must chunk the whole thing.\n    \n    **Better Approach:**\n    Iterate through characters accumulating a string `chunk_str` until length reaches `max_chars + 1`. Then check where to cut:\n       - Look at the buffer of text processed so far (maybe maintain indices). If there is a word that *ends* with `.`, `!` or `?`, prefer cutting before it. Wait, if \"word.\" exceeds limit when added, we need to remove everything since last break and check for sentence breaks backwards from current end position in the chunk string until finding one within allowed space range?\n       \n    Actually, let's stick to tokenization based on spaces first (so words are safe).\n    \n    `tokens = text.split()`\n    Iterate tokens:\n       Current Chunk Length = sum of len(word) + 1 * (spaces inserted previously) ?? No. Just build a string and check length.\n       \n    Wait, the prompt says \"prefer to break on sentence boundaries\". This usually implies if we have enough room for two sentences in `max_chars`, split at end of first sentence rather than just filling space arbitrarily. But since word order must be preserved:\n    \n    Let's implement a generator that builds chunks greedily but looks back before appending the next token? No, look forward/backward to see where breaks are allowed.\n\n    **Simpler Constraint Logic:**\n    1. `chunks = []`\n    2. Start with empty buffer text `current_chunk`.\n    3. Iterate words (split by space) and punctuation handling might be tricky if split() is used. Let's use regex to extract `\\w+(?:[^\\s]+)`? No, standard splitting usually works fine for general cases in these coding tasks unless whitespace matters strictly as delimiters inside chunks. I will treat the string as a sequence of words separated by spaces + punctuation attached to them.\n    \n    *Actually*, handling \"prefer sentence boundaries\" is tricky with just `split()`.\n    Example: \"Hello world.\" (10 chars) vs max 8. We can't fit it. But if text is \"A very long story ends here.\", max chars might allow up to end of line? No, we must stop.\n\n    **Revised Plan:**\n    To handle sentence boundaries effectively without cutting words:\n    1. Identify potential break points in the original string indices that are preceded by punctuation (`.`, `!`, `?`) and followed by whitespace/newline or text continuation start/end. Actually, simpler: split logic on spaces is usually safer to avoid cutting mid-word. We just need to detect where we can \"cut\" cleanly between words while respecting sentence priority if a period exists inside the limit but doesn't fit fully yet (which contradicts max_chars).\n    \n    Let's assume standard splitting by space `text.split()` gives us whole words with attached punctuation like `\"Hello.\"`. This ensures we never cut *a word*. If \"Hello\" is in one chunk and \". world\" starts next? No, split() merges them. So the atomic unit for length counting should be a Word+Punctuation (if applicable).\n    \n    **Correct Algorithm:**\n    1. Initialize `chunks = []`.\n    2. Iterate through tokens (words + attached punctuation) from left to right using regex or manual scan? Manual split is faster/cleaner: `[w.strip('.!?') for w in text.split()]` No, that destroys the attachment logic needed if a chunk ends with \"Hello.\". The length constraint counts spaces too usually.\n    \n    Let's use `re.findall(r'[\\",
       "latency_s": 32.507834,
-      "score": null,
+      "score": 0.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -175,14 +189,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 72,
       "completion_tokens": 2048,
-      "tokens_per_s": 63.0
+      "tokens_per_s": 63.0,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "*   **Security Critical**: Vulnerable to SQL injection because `{user_id}` is interpolated directly into the query string. Use parameterized queries (`?`) instead: `cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))`.\n*   **Resource Management**: Connections and cursors are not closed explicitly if an error occurs or after execution. Use a context manager (`with conn:`) to ensure cleanup.\n*   **Error Handling**: No try/except block exists; database errors will crash the application without logging context.\n\n**Corrected Version:**\n```python\ndef get_user(user_id):\n    with sqlite3.connect('users.db') as conn:\n        cursor = conn.cursor()\n        try:\n            return cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,)).fetchone()\n        except sqlite3.Error as e:\n            # Handle logging or re-raising here\n            raise",
       "latency_s": 13.788274,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -191,7 +207,9 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 89,
       "completion_tokens": 766,
-      "tokens_per_s": 55.6
+      "tokens_per_s": 55.6,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -214,7 +232,7 @@
       "task": "vision_ocr",
       "response": "HELLO 123 red. The square in the top-left corner is a solid red rectangle.",
       "latency_s": 5.458553,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": "tasks/images/ocr_card.png",
       "truncated": false,
@@ -223,14 +241,16 @@
       "max_tokens_used": 256,
       "prompt_tokens": 236,
       "completion_tokens": 22,
-      "tokens_per_s": 4.0
+      "tokens_per_s": 4.0,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/minicpm-v:latest",
       "task": "vision_progressive",
       "response": "In this picture I can see some grass and plants on a ground. In the background there are few trees, buildings, clouds in the sky.",
       "latency_s": 0.977258,
-      "score": null,
+      "score": 0.4,
       "error": null,
       "image": "tasks/images/private_fixtures/progressive_photo_user.jpg",
       "truncated": false,
@@ -239,7 +259,9 @@
       "max_tokens_used": 256,
       "prompt_tokens": 498,
       "completion_tokens": 30,
-      "tokens_per_s": 30.7
+      "tokens_per_s": 30.7,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.4"
     }
   ]
 }
