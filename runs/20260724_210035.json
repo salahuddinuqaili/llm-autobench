@@ -22,7 +22,7 @@
       "task": "changelog_generation",
       "response": "### \u2728 Improvements\n\n*   You can now export your sprint reports directly to CSV format from the dashboard for easy analysis.\n*   Enhanced stability for connected accounts; refreshes and retries connection credentials automatically if they expire mid-process.\n*   Improved reliability of webhook handling, ensuring data processing doesn't fail even if certain required user IDs are missing in the payload.",
       "latency_s": 2.417744,
-      "score": null,
+      "score": 0.85,
       "error": null,
       "image": null,
       "truncated": false,
@@ -31,14 +31,16 @@
       "max_tokens_used": 768,
       "prompt_tokens": 112,
       "completion_tokens": 252,
-      "tokens_per_s": 104.2
+      "tokens_per_s": 104.2,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "This solution uses a combination of regular expressions and iterative chunking to meet the specified constraints, prioritizing sentence boundaries while ensuring that no words are cut.\n\n```python\nimport re\nfrom typing import list\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits a string into chunks of at most max_chars.\n\n    The function prioritizes breaking on natural sentence boundaries \n    (., !, ?). If a full sentence unit exceeds the limit, it attempts to \n    break at the latest possible whitespace within that chunk. It never \n    cuts a word.\n\n    Args:\n        text (str): The input text to be chunked.\n        max_chars (int): The maximum allowed characters per chunk.\n\n    Returns:\n        list[str]: A list of strings, where each string is a chunk\n                   of the original text meeting the length constraints.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n\n    Example:\n        >>> chunks = chunk_text(\"Hello world! This is a test.\", 12)\n        >>> print(chunks[0])\n        'Hello world! '\n        >>> print(chunks[1])\n        'This is a test.'\n    \"\"\"\n    if max_chars < 1:\n        raise ValueError(\"max_chars must be at least 1.\")\n\n    # Normalize whitespace and handle empty input\n    text = text.strip()\n    if not text:\n        return []\n\n    # Regex to split the text into manageable \"units.\"\n    # Units are defined as sentences or sequences of words/spaces up to punctuation,\n    # ensuring we keep the boundary punctuation attached.\n    # This pattern matches any sequence that ends with [.?!] and includes all preceding content.\n    sentence_pattern = re.compile(r'([^.!?]+[.!?])(\\s+|$)|([A-Za-z0-9\\s]+?)(?=[\\.\\!\\?]|\\s*$)', re.DOTALL)\n    \n    # Find all candidate units (sentences or trailing groups of words)\n    units = []\n    last_end = 0\n    \n    while last_end < len(text):\n        match = sentence_pattern.search(text, last_end)\n        if match:\n            start = match.start()\n            end = match.end()\n            unit = text[start:end].strip()\n            if unit:\n                units.append((unit, start, end))\n            last_end = end\n        else:\n             # Handle any remaining trailing text that might not end cleanly \n             # with standard punctuation but needs to be processed\n            trailing_text = text[last_end:]\n            if trailing_text:\n                units.append((trailing_text, last_end, len(text)))\n            break\n\n    chunks = []\n    current_chunk = \"\"\n    \n    for unit, _, _ in units:\n        # If the current chunk is empty, just start with the unit\n        if not current_chunk:\n            current_chunk = unit\n            continue\n\n        unit_len = len(unit)\n        current_len_increase = 0\n        \n        # Account for whitespace needed between units (a single space is usually sufficient)\n        if current_chunk and ' ' not in current_chunk[-1:]:\n             # Check if the unit starts with spacing, and adjust the needed space.\n             # Since our unit extraction handles boundary spaces, we just ensure a proper break.\n            space_needed = 1\n        else:\n            space_needed = 0\n\n        potential_len = len(current_chunk) + space_needed + unit_len\n\n        if potential_len <= max_chars:\n            # The unit fits, so append it and update the current chunk\n            if space_needed > 0:\n                current_chunk += \" \"\n            current_chunk += unit\n        else:\n            # The unit does NOT fit. Time to flush the current chunk (if non-empty)\n            if current_chunk:\n                chunks.append(current_chunk.strip())\n            \n            # Start a new chunk with the current unit, unless it already exceeds max_chars\n            if len(unit) > max_chars and not chunks:\n                 # Edge case: If a single unit is larger than max_chars, \n                 # we must hard break at the last word.\n                words = unit.split()\n                break_point = min(len(words) - 1, max_chars // 4) # Heuristic for multiple words\n                if break_point > 0:\n                     current_chunk = \" \".join(words[:break_point]) + \" ...\"\n                     chunks.append(current_chunk)\n                     continue\n\n            # Start fresh with the new unit\n            current_chunk = unit\n    \n    # Append any remaining content in current_chunk\n    if current_chunk:\n        chunks.append(current_chunk.strip())\n        \n    return chunks\n\n# --- Test Cases ---\n\ndef test_chunk_text():\n    \"\"\"Test function containing assertions for chunk_text.\"\"\"\n    print(\"Running tests...\")\n\n    # 1. Basic functional test (Sentence break preferred)\n    text1 = \"This is the first sentence! This is the second one? And a third.\"\n    max_chars1 = 25\n    result1 = chunk_text(text1, max_chars1)\n    assert len(result1) == 3, f\"Test 1 failed: Expected 3 chunks, got {len(result1)}\"\n    # Check that the breaks happen appropriately (e.g., \"This is the first sentence! \")\n    assert result1[0].startswith(\"This is the first sentence!\")\n    assert result1[-1].startswith(\"And a third.\")\n\n    # 2. Max size equals unit size test\n    text2 = \"Short chunk here.\"\n    max_chars2 = 17\n    result2 = chunk_text(text2, max_chars2)\n    assert len(result2) == 1\n    assert result2[0] == \"Short chunk here.\"\n\n    # 3. Hard break required (Word boundary enforced)\n    text3 = \"Supercalifragilisticexpialidocious is a very long word that must be broken if needed.\"\n    max_chars3 = 15\n    result3 = chunk_text(text3, max_chars3)\n    # Since the word itself is longer than 15, it will break at spaces.\n    assert len(result3) >= 2\n    print(f\"Word Break Example Chunk: {result3[0]}\") # Should start with 'Supercalifragili...'\n\n    # 4. Empty and edge case handling\n    text4 = \"\"",
       "latency_s": 25.618308,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": true,
@@ -47,14 +49,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 83,
       "completion_tokens": 2048,
-      "tokens_per_s": 79.9
+      "tokens_per_s": 79.9,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "## Review\n\n### \ud83d\udc1b Bugs & Logic Flaws\n\n1. **Resource Leakage:** The database connection (`conn`) is opened but never explicitly closed in case of an error or successful execution path (though `sqlite3` sometimes handles this, it's best practice to ensure closure).\n2. **Potential Failure on Connection:** The function assumes the database file exists and is accessible. While not a bug, robust code should handle connection errors.\n\n### \ud83d\udd12 Security Issues (Critical)\n\n1. **SQL Injection Vulnerability:** This is the most critical flaw. Using an f-string to build the SQL query (`query = f\"SELECT * FROM users WHERE id = {user_id}\"`) directly interpolates user input into the command string. If `user_id` were a malicious string (e.g., `'1 OR 1=1 --'`), it would execute arbitrary SQL code, leading to data exposure or modification.\n\n### \u2728 Style & Best Practices\n\n1. **Context Managers:** Always use `with sqlite3.connect(...) as conn:` to ensure the connection is automatically closed and resources are properly managed, even if exceptions occur.\n2. **Parameterization (Refactoring):** Instead of f-strings, you should always pass variables as parameters (using `?` placeholders) to the `cursor.execute()` method.\n\n---\n\n## Recommended Fix (The Correct Way)\n\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    # Use 'with' for automatic connection closing (Resource Management)\n    try:\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            \n            # CRITICAL FIX: Use parameterized queries (?) to prevent SQL injection.\n            query = \"SELECT * FROM users WHERE id = ?\"\n            cursor.execute(query, (user_id,)) # Pass the input tuple\n            return cursor.fetchone()\n    except sqlite3.Error as e:\n        print(f\"Database error occurred: {e}\")\n        return None \n\n# Note: This assumes user_id is typically an integer; if it might be a string, ensure proper type casting before passing.\n```",
       "latency_s": 9.487805,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -63,14 +67,16 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 105,
       "completion_tokens": 572,
-      "tokens_per_s": 60.3
+      "tokens_per_s": 60.3,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nGrape",
       "latency_s": 0.398572,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -79,7 +85,9 @@
       "max_tokens_used": 128,
       "prompt_tokens": 43,
       "completion_tokens": 7,
-      "tokens_per_s": 17.6
+      "tokens_per_s": 17.6,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -102,7 +110,7 @@
       "task": "sprint_narrative",
       "response": "We successfully completed the user auth revamp and implemented billing webhook retries this sprint. However, progress on SSO was significantly blocked by three days of vendor API downtime, impacting our velocity. Our primary focus next sprint must be stabilizing the mobile pipeline's flaky CI process to ensure reliable deployments.",
       "latency_s": 2.508538,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -111,7 +119,9 @@
       "max_tokens_used": 768,
       "prompt_tokens": 80,
       "completion_tokens": 268,
-      "tokens_per_s": 106.8
+      "tokens_per_s": 106.8,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -134,7 +144,7 @@
       "task": "summarization",
       "response": "Our primary database failed this afternoon because the underlying server storage ran out of space, causing an eight-minute service disruption. The root cause was that a critical disk-space monitoring alert was inadvertently silenced during maintenance and not re-enabled afterward. We have fixed this by restoring full monitoring functionality and updating our procedures to ensure disk capacity checks are mandatory after all future maintenance windows.",
       "latency_s": 3.045553,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -143,14 +153,16 @@
       "max_tokens_used": 512,
       "prompt_tokens": 128,
       "completion_tokens": 334,
-      "tokens_per_s": 109.7
+      "tokens_per_s": 109.7,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "arithmetic_reasoning",
       "response": "Here's a thinking process that leads to the solution:\n\n1.  **Analyze the Problem:**\n    *   Train 1 leaves at $t_0 = 2:00$ (let's set this reference time or convert everything to minutes/hours from an origin).\n    *   Speed of Train 1 ($v_1$) = $60 \\text{ km/h}$.\n    *   Train 2 leaves at $t_{start\\_T2} = 3:00$ (which is 1 hour after Train 1).\n    *   Speed of Train 2 ($v_2$) = $90 \\text{ km/h}$.\n    *   Both travel on the same route.\n    *   Goal: Find the time when Train 2 catches up to Train 1 (i.e., their distances from the station are equal).\n\n2.  **Define Variables and Units:**\n    *   Let $d$ be the distance traveled by both trains.\n    *   It's often easiest to measure time in hours starting from a common reference point, say when Train 1 leaves ($t=0$ at 2:00) or just calculate relative times.\n\n3.  **Formulate Equations:**\n\n    *   *Method A: Distance Equation*\n        Let $T_1$ be the time elapsed since 2:00 for Train 1 to reach point X.\n        Then distance of Train 1 = $d_1 = v_1 \\times T_1$.\n        \n        Since Train 2 starts one hour later, if Train 2 has been traveling for $T_{elapsed}$ hours (since it left), then the time elapsed since Train 1 started is $(T_{elapsed} + 1)$.\n\n    *   Let's set up a common timeline.\n        Start at $t=0$ representing 2:00 PM (or just \"time zero\").\n        \n        Time for Train 1 ($h_1$):\n        Distance = $60 \\times h_1$.\n        \n        Time for Train 2 ($h_2$) starts at $h = 1.0$ hour (which is 3:00).\n        So, if the catch-up happens when it has been traveling for time $t$, then for Train 2, that's just distance traveled by train 2 in $t$. For Train 1, since it started earlier, its total time would be $(t + 1)$.\n\n    *   Let $x$ be the number of hours after 3:00 when they meet.\n        Distance of Train 1 = Speed $\\times$ Time (since leaving at 2). Total time for T1 = $(x + 1)$ hours.\n        $d_1 = 60(x + 1)$.\n        \n        Distance of Train 2 = Speed $\\times$ Time (since leaving at 3). Total time for T2 = $x$ hours.\n        $d_2 = 90 \\times x$.\n\n    *   At the catch-up point, distances are equal: $d_1 = d_2$.\n        $$60(x + 1) = 90x$$\n\n4.  **Solve for Time ($x$):**\n    *   Distribute on LHS: $60x + 60 = 90x$\n    *   Subtract $60x$ from both sides: $60 = 30x$\n    *   Divide by 30: $x = 2$.\n\n5.  **Interpret the Result:**\n    *   $x$ represents hours after Train 2 left (which was at 3:00).\n    *   So, catch-up time is 2 hours after 3:00.\n\n6.  **Calculate Final Time:**\n    *   Start time for calculation = 3:00.\n    *   Duration added = 2 hours.\n    *   Catch-up time = $3:00 + 2 \\text{ hours} = 5:00$.\n\n7.  **Verify the Solution (Sanity Check):**\n    *   At 4:00 PM (1 hour after T1, 1 hour before meeting):\n        *   Train 1 has traveled for 1 hr + extra time? Wait, let's use absolute times relative to 2:00.\n        *   Let Time = $t$ hours past 2:00.\n    *   At $t=3$ (which is 5:00):\n        *   Train 1 has been traveling for $(5-2) = 3$ hours. Distance = $60 \\times 3 = 180$ km.\n        *   Train 2 has been traveling for $(5-3) = 2$ hours. Distance = $90 \\times 2 = 180$ km.\n    *   Distances match ($180 \\text{ km} = 180 \\text{ km}$). The calculation is correct.\n\n8.  **Structure the Output:**\n    *   Step-by-step derivation (setting up equations, solving for time difference, adding to start time).\n    *   State final answer clearly in requested format.\n\n9.  **Drafting the Content:**\n    *   Train A speed: $v_A = 60$. Start: 2:00.\n    *   Train B speed: $v_B = 90$. Start: 3:00 (1 hour late). Head start for A is distance $D_{head} = v_A \\times 1\\text{h} = 60$ km.\n    *   Relative speed approach ($v_B - v_A$): Train B gains on Train A at a rate of $(90 - 60) = 30$ km/h.\n    *   Time to close the gap: $\\frac{\\text{Distance Gap}}{\\text{Relative Speed}}$.\n    *   Distance Gap (at time T2 leaves) = $60 \\times 1\\text{h} = 60 \\text{ km}$.\n    *   Catch up time after 3:00 ($t_{catch}$): $\\frac{60}{30} = 2$ hours.\n    *   Final Time: 3:00 + 2 hours = 5:00.\n\n10. **Refining the text for clarity:** Make sure to explicitly state how \"time\" is defined (hours after a certain reference).\n\n    Let $t$ be the time in hours past 2:00 PM.\n    \n    *   Position of Train 1 at time $t$: $d_1 = 60(t)$. (Valid for all $t \\geq 0$, where distance is measured from start line, assuming they travel continuously). Wait, this assumes the coordinate system starts at 2:00.\n    *   Position of Train 2: It leaves at $t=1$ (3:00 PM). So its position function needs to be shifted or defined for time $\\geq 1$. Let's define distance from station as a function of clock time.\n    \n    Alternatively, just use the variables derived in step 4 ($x$ is hours past 3:00) as it avoids domain confusion issues until the final calculation.\n\n    Step-by-step presentation:\n    1. Determine head start distance or set up equality equation based on travel times.\n       Train 2 travels for $t$ hours (after its departure at 3:00).\n       During this time, Train 2 covers $90t$.\n       Train 1 has been traveling for $(t + \\text{head start}) = t + 1$ hours.\n    2. Equate distances.\n    3. Solve for $t$.\n    4. Add to the clock time (3:00).\n\n    Result is consistent and robust. Ready to write out.\n\n    Double check formatting requirements: \"Final answer: HH:MM\".\n\n    Wait, what if it's AM/PM? The problem says \"2:00\" usually implying 2 PM in train contexts unless specified as a puzzle involving AM vs PM. However, standard convention for these math problems implies continuous time flow. Whether it is 5 AM or 5 PM depends on context not provided, but usually \"HH:MM\" just wants the numbers. I will output HH:MM (e.g., 05:00).\n\n    Let's write out the response.\n    \n    Train 1 speed $v_1 = 60$ km/h. Start time $t_{start\\_1}$.\n    Train 2 speed $v_2 = 90$ km/h. Start time $t_{start\\_2} = t_{start\\_1} + 1 \\text{ hour}$.\n    \n    Let $\\Delta T$ be the hours traveled by the second train when they meet.\n    Distance of Train 1: $(\\Delta T + 1) \\times 60$. (Since it started an hour earlier).\n    Distance of Train 2: $\\Delta T \\times 90$.\n    \n    $$(\\Delta T + 1)(60) = (\\Delta T)(90)$$\n    $$60\\Delta T + 60 = 90\\Delta T$$\n    $$60 = 30\\Delta T$$\n    $$\\Delta T = 2 \\text{ hours}.$$\n    \n    Train 2 leaves at 3:00. It travels for 2 hours.\n    Catch up time = $3:00 + 2:00 = 5:00$.\n\n    Seems straightforward. No trick questions detected (e.g., circular tracks, different routes). \"Same route\" implies linear distance from station is sufficient metric.\n\n    Final check of the question text:\n    - Leave at 2:00 traveling 60 km/h.\n    - Another leaves same station at 3:00 traveling 90 km/h on same route.\n    - At what time does second catch first?\n\n    The logic holds up perfectly.\n\n    Calculation steps to show in final response:\n    1. Calculate the head start distance of train 1 (or simply establish relative travel times). Train 1 travels for 1 hour before Train 2 leaves, covering $60 \\times 1 = 60$ km gap at that specific moment? No, better to treat \"time elapsed since second left\" as variable.\n    Let's stick to the time elapsed after train 2 starts ($t_{hours}$).\n    \n    Or simpler:\n    Time of Train 1 = $T_1$. Distance $d_1 = 60 T_1$.\n    Time of Train 2 = $T_2$. Distance $d_2 = 90 T_2$.\n    We know that when they meet, the time elapsed for Train 1 is exactly 1 hour more than Train 2. So $T_1 - T_2 = 1$. Also $60 T_1 = 90 T_2 \\implies 2/3 T_1 = T_2$ -> No, simplify fractions: $d_1/d_2 = v_1/v_2 \\implies (v_1)(t+1) / v_2(t)$?\n    \n    Equation:\n    Distance traveled by Train 2 ($D_2$) must equal Distance traveled by Train 1 ($D_1$).\n    Let $x$ be the number of hours after 3:00 when they meet.\n    Time for Train 2 = $x$.\n    Time for Train 1 = $x + 1$.\n    \n    $90 \\cdot x = 60(x+1)$\n    Divide by 30: $3x = 2(x+1)$\n    $3x = 2x + 2$\n    $x = 2$.\n    \n    So it takes Train 2 two hours to catch up.\n    Start time for Train 2 was 3:00.\n    End time is 5:00.\n\n    Looks solid. I will generate the response now. Use \"Final answer:\" format strictly as requested on the last line. The prompt doesn't ask to specify AM/PM, just HH:MM. So 05:00 or 17:00? Usually standard clock problems assume local time of day continuity. 2:00 -> 3:00 implies a progression in the same cycle (likely afternoon). I will stick with 5:00.\n\n    One minor potential ambiguity: If it's 2 AM, is the next train at 3 AM or does \"catches up\" mean catching the *same* day? The logic remains mathematically identical regardless of clock face cycles unless there are wrap-around constraints (not applicable here). I will write just HH:MM.\n\n    Wait, should it be 5:00 PM or just 5:00? Usually these puzzles imply a generic timeline. \"HH:MM\" format suggests standard digital display hours.\n    \n    Final Answer string needs to match \"Final answer: HH:MM\". I will write \"Final answer: 17:00\"? Or is it ambiguous if input was AM/PM? The prompt says \"2:00\", not \"2 PM\". Usually, in math riddles without specifying AM/PM, we assume a generic timeline or that the result keeps within standard hours (5:00). If I write 17:00, I am assuming 48-hour format or military time. The user likely expects \"HH:MM\" as seen on a digital clock face (e.g., 5:00) unless they strictly mean 24h format. Given the inputs are single digits for hour? No, inputs use colon notation.\n    If I write `Final answer: 17:00`, it implies AM/PM context wasn't there but result is specific. But simpler to output \"5:00\" or \"17:00\"? Let's look at the prompt again. It uses standard clock format (2:00, 3:00). Usually implies HH:MM in that notation style. I will provide it as just `5:00` assuming a continuous progression within an hour cycle, but since inputs were single digit hours usually implying AM/PM is irrelevant to the *calculation* magnitude difference (180km), maybe 24h is safer?\n    Actually, standard interpretation for \"At what time\" with simple numbers like this without specifying PM is often just adding to the clock. If I leave at 2:00 and it takes a while... well, usually trains don't run from midnight to noon in these problems unless specified. It's likely afternoon or morning. The number of hours added (5-3 = 2) puts us in hour 17 if input was PM? No wait.\n    If I start at 2:00 and add hours, usually people mean \"What time on the clock\".\n    Let's stick to adding the duration directly to the starting digit provided or just using standard 5:00 format as it matches the inputs (single digits for hour). Wait, `Final answer: HH:MM`. If I put 17:00, does that match input \"2:00\"? No.\n    However, if the problem implies a timeline where you track absolute time relative to an epoch or just clock face math? Clock face math works like $3+2=5$.\n    \n    Let's look at similar problems online (common GMAT/GRE type questions). They usually output \"5:00\". I will stick with that.\n\n    Wait, is there any ambiguity about the input being AM/PM? If 2:00 was night and they travel for 3 hours... it catches up later in night or morning. The math result $d = d$ leads to a specific time interval.\n    \n    Let's re-read carefully: \"A train leaves at 2:00\". This is ambiguous (AM/PM). However, the logic of *relative* speed doesn't change based on AM/PM. It just shifts the clock face. Since we want an output HH:MM matching the style, I will provide `5:00` as it maintains consistency with the 12-hour cycle format used in inputs (e.g., if input was 2:30 PM, answer is usually written as 5:30 PM or just 5:30 depending on prompt strictness).\n    Since I cannot be sure of AM/PM without more context, and the question asks for a specific time \"At what time\", providing `17:00` (if assumed military) or `02:XX` + duration...\n    \n    Let's stick to 5:00. It is consistent with adding 2 hours to 3:00 on any standard clock face representation, assuming the question isn't about day/night cycles but purely kinematics relative to a specific time $T_0$.\n\n    Actually, looking at the inputs \"60 km/h\", \"90 km/h\". These are simple integers.\n    \n    Let's write out the solution clearly.\n    1. Determine head start distance: Train 1 starts 2 hours before (Wait, no) 3-2 = 1 hour headstart). Distance gap at $t=0$ for T2 is not relevant yet... Wait, if we measure time from when T1 leaves ($T=0$), T1 position $60T$. At $T=1$, T2 starts. Gap is $60(1) = 60km$.\n    Relative speed: $90 - 60 = 30 km/h$.\n    Time to close gap of 60km at relative speed 30km/h = $60/30$ hours = 2 hours.\n    So T2 catches up after traveling for 2 hours (which is also the time duration calculated).\n    \n    Total elapsed time from T1's start ($T_{start}=2:00$) to catchup?\n    Duration of travel + headstart time.\n    Let $\\tau$ be hours *after* Train 2 leaves when they meet. We found $\\tau = 2$.\n    So, we need the total clock time relative to the start times mentioned in prompt (relative to T1's departure).\n    \n    Wait, simpler: \"Train 2 catches up after traveling for $x$ hours\".\n    When does Train 2 catch it? It started at 3:00.\n    So we just add 2 hours to 3:00.\n    Result is 5:00.\n\n    What about the format of \"",
       "latency_s": 70.924779,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -159,14 +171,16 @@
       "max_tokens_used": 4096,
       "prompt_tokens": 84,
       "completion_tokens": 4096,
-      "tokens_per_s": 57.8
+      "tokens_per_s": 57.8,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_generation",
       "response": "```python\nimport re\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most max_chars characters each.\n    \n    Each split prefers sentence boundaries ('.', '!', '?'), and ensures that\n    no word is cut in half unless absolutely necessary to stay within the character limit.\n\n    Args:\n        text (str): The input string to be chunked.\n        max_chars (int): Maximum number of characters allowed per chunk.\n\n    Returns:\n        list[str]: A list of substrings, each no longer than `max_chars`.\n\n    Example:\n        >>> chunk_text(\"Hello world. How are you?\", 12)\n        ['Hello world.', 'How', ...]\n    \n        If a word is long and fits only when broken at its edge after previous chunks, it will still be kept whole if possible.\n    \"\"\"\n    def get_word_start(text: str):\n        # Find the position of all words (non-space characters) and their start indices\n        return [(m.start(), m.group()) for m in re.finditer(r'\\S+', text)]\n\n    chunks = []\n    remaining = text\n\n    while remaining.strip():  # Process non-whitespace portions only\n        chunk, idx_in_remaining = _find_best_break(remaining, max_chars)\n        \n        if not chunk:\n            break\n            \n        remaining = remaining[idx_in_remaining:]\n        \n        if len(chunk) <= max_chars:\n            chunks.append(chunk.rstrip(' \\t\\n'))  # Trim whitespace before adding to result\n        else:\n            # Should never happen with current logic, but guard against it just in case\n            chunk = chunk[:max_chars] + ('' if remaining[idx_in_remaining - len(chunk)] == '' or not remaining[idx_in_remaining:] else '')\n\n    return chunks\n\n\ndef _find_best_break(text: str, max_chars: int) -> tuple[str, int]:\n    \"\"\"Helper to find the best break point in text without cutting words.\"\"\"\n    \n    # First try breaking at sentence boundary within length limit\n    for i in range(1, len(text) + 1):\n        if '.' in text[:i] or '!' in text[:i] or '?' in text[:i]:\n            # Preferable to break after a full sentence token\n            pass\n        \n        candidate = text[:i].rstrip()\n        \n        # Find word end within this chunk, i.e., last index before any space/word boundary. \n        if len(candidate) <= max_chars:\n            \n            # If the rest is empty or only whitespace and doesn't need processing:\n            remaining_part_text = text[i:]\n\n            # Try to find a sentence delimiter in the remainder after this chunk\n            best_end_idx = i\n            \n            for j, char_match in enumerate(text):\n                if char_match.isspace() or len(candidate) <= max_chars - 1:\n                    continue\n                \n                else:\n                     break\n                    \n            return candidate.strip(), best_end_idx\n    \n    # If no sentence boundary is found within limit and chunk fits fully without cutting words\n    full_chunk = text[:max_chars + 1].rstrip().strip() if len(text) > max_chars else text.rstrip().strip()\n\n    # Ensure we are not in the middle of a word when slicing\n    while True:\n        # Check if last character is whitespace - find previous space to avoid cutting inside words\n            idx = full_chunk.rfind(' ')\n            \n            if idx != -1 and len(full_chunk[:idx]) < max_chars:  # Found safe break point before word\n                return full_chunk[:idx], idx\n\n    return text.rstrip(), len(text)\n\n\n# Run assert tests for basic sanity checks\nassert chunk_text(\"Hello world. How are you?\", 20) == ['Hello world.', 'How', 'are']\n```",
       "latency_s": 24.55043,
-      "score": null,
+      "score": 0.85,
       "error": null,
       "image": null,
       "truncated": false,
@@ -175,14 +189,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 72,
       "completion_tokens": 1274,
-      "tokens_per_s": 51.9
+      "tokens_per_s": 51.9,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "*   **Critical Security Bug:** Vulnerable to SQL injection because `user_id` is directly interpolated into the query string (`f\"... = {user_id}\"`). **Fix:** Use parameterized queries: `cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))`.\n*   **Resource Leak:** The database connection and cursor are not closed after use. If called repeatedly in a long-running process, it will exhaust file descriptors or connections. **Fix:** Wrap execution in a context manager (`with conn:`) or ensure cleanup",
       "latency_s": 16.591506000000003,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -191,7 +207,9 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 89,
       "completion_tokens": 1024,
-      "tokens_per_s": 61.7
+      "tokens_per_s": 61.7,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -214,7 +232,7 @@
       "task": "vision_ocr",
       "response": "HELLO 123 red.",
       "latency_s": 5.619924,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": "tasks/images/ocr_card.png",
       "truncated": false,
@@ -223,14 +241,16 @@
       "max_tokens_used": 256,
       "prompt_tokens": 236,
       "completion_tokens": 9,
-      "tokens_per_s": 1.6
+      "tokens_per_s": 1.6,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/minicpm-v:latest",
       "task": "vision_progressive",
       "response": "In the picture I can see sky with clouds and ground covered with grass. These plants have flowers which are white and yellow in color. There are few persons on the right side of the image. In the background I can see group of trees. This picture is taken during a day time outside a city or town where we can see buildings at far away from here.",
       "latency_s": 1.329651,
-      "score": null,
+      "score": 0.8,
       "error": null,
       "image": "tasks/images/private_fixtures/progressive_photo_user.jpg",
       "truncated": false,
@@ -239,7 +259,9 @@
       "max_tokens_used": 256,
       "prompt_tokens": 498,
       "completion_tokens": 74,
-      "tokens_per_s": 55.7
+      "tokens_per_s": 55.7,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.8"
     }
   ]
 }
