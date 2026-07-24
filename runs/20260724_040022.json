@@ -22,7 +22,7 @@
       "task": "changelog_generation",
       "response": "### \u2728 Improvements\n\n*   **Export Sprint Reports:** You can now export your full sprint reports directly to CSV format from the main dashboard for easy analysis and record-keeping.\n*   **Enhanced Stability:** We have improved the connection handling for OAuth, ensuring that token refreshes happen reliably even if minor errors occur during a request.\n*   **Reliable Webhook Handling:** The system is now more resilient, preventing crashes when receiving incomplete webhook payloads (e.g., missing user identifiers).\n*   **Optimized Performance:** Under-the-hood improvements have been made to improve the stability and efficiency of our resource management.",
       "latency_s": 2.902443,
-      "score": null,
+      "score": 0.8,
       "error": null,
       "image": null,
       "truncated": false,
@@ -31,14 +31,16 @@
       "max_tokens_used": 768,
       "prompt_tokens": 112,
       "completion_tokens": 310,
-      "tokens_per_s": 106.8
+      "tokens_per_s": 106.8,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.8"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "This problem requires careful boundary handling: we need to prioritize semantic breaks (sentences) but fall back to structural breaks (words) when necessary, never exceeding `max_chars`.\n\n```python\nimport re\nfrom typing import List\n\ndef chunk_text(text: str, max_chars: int) -> List[str]:\n    \"\"\"\n    Splits a large block of text into chunks of at most max_chars.\n\n    The function prioritizes breaking on sentence boundaries (., !, ?) \n    and ensures that no word is cut across any chunk boundary.\n\n    Args:\n        text (str): The input text to be split.\n        max_chars (int): The maximum desired length of a single chunk.\n\n    Returns:\n        list[str]: A list of text chunks.\n\n    Raises:\n        ValueError: If max_chars is less than or equal to 0.\n    \"\"\"\n    if max_chars <= 0:\n        raise ValueError(\"max_chars must be a positive integer.\")\n    if not text:\n        return []\n\n    chunks = []\n    current_start_index = 0\n    text_length = len(text)\n\n    while current_start_index < text_length:\n        remaining_text = text[current_start_index:]\n        \n        # If the remaining text is shorter than max_chars, take it all and finish.\n        if len(remaining_text) <= max_chars:\n            chunks.append(remaining_text)\n            break\n\n        # 1. Determine the hard limit for our current chunk search\n        hard_limit = min(len(remaining_text), max_chars)\n\n        # 2. Search for the optimal break point within the allowed length (0 to hard_limit - 1)\n        best_end_index = -1\n        \n        # Strategy: Look backwards from the limit towards the start_index + 1\n        # We look at a window slightly smaller than max_chars, as finding an ideal break point\n        # might make the chunk significantly shorter than the hard limit.\n        search_window = min(hard_limit - 5, 0) # Search within the last 6 characters before hitting the limit\n\n        for i in range(hard_limit - search_window - 1, current_start_index - 1, -1):\n            subsegment = remaining_text[:i + 1]\n            current_len = len(subsegment)\n\n            # --- Priority Check 1: Sentence Boundary (The Ideal Break) ---\n            if subsegment[-1] in ['.', '!', '?'] and current_len > max_chars * 0.5:\n                best_end_index = i + 1\n                break # Found the best possible break point\n\n            # --- Priority Check 2: Word Boundary (The Safe Fallback) ---\n            if subsegment[-1].isspace() and current_len > max_chars * 0.5:\n                 # This ensures we don't select a tiny chunk if the whole remaining text is small\n                best_end_index = i + 1\n                break # Found a safe word break\n\n        # If no ideal boundary was found in the search window, default to the safest break:\n        # find the last space *before* hitting max_chars.\n        if best_end_index == -1:",
       "latency_s": 25.456561,
-      "score": null,
+      "score": 0.85,
       "error": null,
       "image": null,
       "truncated": true,
@@ -47,14 +49,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 83,
       "completion_tokens": 2048,
-      "tokens_per_s": 80.5
+      "tokens_per_s": 80.5,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "This is a critical example demonstrating several major vulnerabilities and non-best practices.\n\n### \ud83d\udc1e Bugs & Reliability Issues\n\n* **Resource Leakage:** The connection (`conn`) is never explicitly closed, which can lead to resource exhaustion in a high-volume application.\n* **Error Handling (Missing):** The function assumes the database operation will always succeed. If the file doesn't exist or the table name changes, the program will crash ungracefully.\n\n### \ud83d\udee1\ufe0f Security Issues (Critical)\n\n* **SQL Injection Vulnerability (CRITICAL):** This is the most serious issue. By constructing the SQL query using an f-string (`f\"SELECT * FROM users WHERE id = {user_id}\"`), you are passing user input directly into the query structure. An attacker could pass `1 OR 1=1 --` as `user_id`, resulting in a malicious query that bypasses authentication and retrieves all records.\n\n### \u2728 Style & Best Practices\n\n* **Context Managers:** Using `with sqlite3.connect(...) as conn:` is the Pythonic way to ensure resources (like connections) are automatically closed, even if errors occur.\n* **Magic Strings/Numbers:** The database file name (`'users.db'`) should ideally be passed or configurable rather than hardcoded inside the function.\n\n***\n\n### \ud83d\udca1 Recommended Refactoring\n\nThe code needs significant modification to fix these issues:\n\n```python\nimport sqlite3\nfrom typing import Optional, Tuple, Any\n\ndef get_user(user_id: int, db_path: str = 'users.db') -> Optional[Tuple[Any, ...]]:\n    \"\"\"Retrieves a user record safely from the database.\"\"\"\n    try:\n        # Use context manager (with...) for safe connection handling\n        with sqlite3.connect(db_path) as conn:\n            cursor = conn.cursor()\n            \n            # CRITICAL FIX: Always use parameterized queries (?) to prevent SQL injection.\n            query = \"SELECT * FROM users WHERE id = ?\" \n            \n            # Pass user input (user_id) as a tuple/list in the execute method\n            cursor.execute(query, (user_id,)) \n            \n            return cursor.fetchone()\n\n    except sqlite3.Error as e:\n        print(f\"Database error occurred: {e}\")\n        return None # Return None or raise a custom exception on failure\n```",
       "latency_s": 9.842143,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -63,14 +67,16 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 105,
       "completion_tokens": 624,
-      "tokens_per_s": 63.4
+      "tokens_per_s": 63.4,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "apple\nbanana\ngrape",
       "latency_s": 0.417146,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -79,7 +85,9 @@
       "max_tokens_used": 128,
       "prompt_tokens": 43,
       "completion_tokens": 7,
-      "tokens_per_s": 16.8
+      "tokens_per_s": 16.8,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -102,7 +110,7 @@
       "task": "sprint_narrative",
       "response": "We successfully completed the user auth revamp and implemented billing webhook retries, significantly improving foundational stability this sprint. Progress on SSO integration was completely blocked by vendor API downtime over the last three days, delaying critical access features. Our immediate priority must be addressing the flaky mobile CI pipeline, as its current instability represents a significant deployment risk.",
       "latency_s": 4.038038,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -111,7 +119,9 @@
       "max_tokens_used": 768,
       "prompt_tokens": 80,
       "completion_tokens": 459,
-      "tokens_per_s": 113.7
+      "tokens_per_s": 113.7,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -134,7 +144,7 @@
       "task": "summarization",
       "response": "The primary database service failed briefly this afternoon due to running out of disk space on the server. This failure caused an 8-minute interruption in service, which was quickly resolved by promoting a backup system. To prevent recurrence, we have identified that the root cause was related to a monitoring alert being deactivated during maintenance and never properly re-enabled; new mandatory checklist steps are now in place to ensure this critical issue cannot happen again.",
       "latency_s": 9.494478,
-      "score": null,
+      "score": 0.92,
       "error": null,
       "image": null,
       "truncated": false,
@@ -143,14 +153,16 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 128,
       "completion_tokens": 584,
-      "tokens_per_s": 61.5
+      "tokens_per_s": 61.5,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.92"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "arithmetic_reasoning",
       "response": "Here's a thinking process that leads to the solution:\n\n1.  **Understand the Goal:** The objective is to determine the time at which a second train (slower? No, faster) catches up to a first train given their speeds and departure times.\n\n2.  **Identify the Given Information:**\n    *   Train A (First Train):\n        *   Departure Time: $t_A = 2{:}00$ PM.\n        *   Speed ($v_A$) = $60$ km/h.\n    *   Train B (Second Train):\n        *   Departure Time: $t_B = 3{:}00$ PM.\n        *   Speed ($v_B$) = $90$ km/h.\n\n3.  **Identify the Condition for \"Catching Up\":** The second train catches the first train when both trains have traveled the same distance from the starting station (assuming they travel in the straight line, which is implied by \"same route\"). Let this time be $T$. Alternatively, we can calculate relative to a specific reference point.\n\n4.  **Choose a Method:**\n    *   *Method 1: Relative Velocity.* This is usually the quickest way for constant speeds on a straight path.\n        *   The second train needs to close the initial gap created by the first train during its head start.\n        *   Head Start Time ($\\Delta t$) = $3{:}00 - 2{:}00 = 1$ hour.\n    *   *Method 2: Algebraic Equations (Distance).* Set distances equal to each other at time $t$.\n\n5.  **Execute Method 1 (Relative Velocity):**\n    *   Calculate the \"Head Start\" distance ($d_{gap}$).\n        *   Train A travels alone for 1 hour before B leaves.\n        *   $d_{gap} = v_A \\times \\Delta t$\n        *   $d_{gap} = 60 \\text{ km/h} \\times 1 \\text{ h} = 60$ km.\n    *   Calculate the relative speed ($v_{rel}$).\n        *   How fast is Train B closing the gap? It's moving faster than A, but since they start at the same location eventually (conceptually), or rather, we are looking for when $d_A = d_B$. The rate of gain on distance per hour is $v_B - v_A$.\n        *   $v_{rel} = 90 \\text{ km/h} - 60 \\text{ km/h} = 30$ km/h.\n    *   Calculate the time ($t_c$) it takes to close that gap after Train B starts moving (at 3:00 PM).\n        *   Time needed $= d_{gap} / v_{rel}$\n        *   $Time_{needed} = 60 \\text{ km} / 30 \\text{ km/h} = 2$ hours.\n    *   Calculate the clock time.\n        *   Start time for calculation (Train B's departure) = 3:00 PM.\n        *   Arrival time at meeting point = $3{:}00 + 2 \\text{ hours} = 5{:}00$ PM.\n\n6.  **Execute Method 2 (Algebraic Equations):**\n    *   Let $t$ be the number of hours Train B travels to catch up.\n    *   When does this happen? At time $(3:00 + t)$.\n    *   How long has Train A been traveling when they meet? It started at 2:00, so it's been traveling for $1 + t$ hours (where 't' is the duration after Train B leaves). Let's be precise. Let $\\tau$ be time past noon or simply use specific variables.\n    *   Better yet: Let $x$ = distance from station when they meet. Let $T_B$ be the travel time of Train B in hours. Then the start difference is 1 hour, so Travel Time for A ($T_A$) = $T_B + 1$.\n        *   Equation 1 (Distance for A): $x = v_A \\times T_A = 60(T_B + 1)$\n        *   Equation 2 (Distance for B): $x = v_B \\times T_B = 90(T_B)$\n    *   Set them equal:\n        $$60(T_B + 1) = 90T_B$$\n    *   Solve for $T_B$:\n        $$60T_B + 60 = 90T_B$$\n        $$60 = 30T_B$$\n        $$24 = T_B \\text{ (Wait, } 90-60=30. \\text{ So } 60/30 = 1? No.)$$\n        *   Check math: $60 + 60 - 60T_B$ vs $60$. Let's do it again carefully.\n        $$60(T_B) + 60(1) = 90(T_B)$$ (Wait, the equation was distance of A equals distance of B).\n        *   Train A has been traveling for $(t_{start} - t_2:00)$ hours? No, let's stick to variables. Let $h$ be hours past 3:00 PM when they meet.\n            *   Distance of B = $90 \\times h$.\n            *   Time A has traveled at meeting point is $(h + (3-2)) = h+1$.\n            *   Distance of A = $60(h+1)$.\n        *   Equation: $90h = 60(h+1)$? No, wait. If Train B starts later, Train B catches up. So at time 'hours' after B leaves... Wait. At time $t$ (where train B is moving for duration $t$, and A has been moving for $t+1$).\n            *   Distance of A = $60(t+1)$? Yes, because if it's 3:59 ($t=0.something$), then Train B has started at 3:00. If they meet later... Wait, the gap exists. So distance traveled by B must be equal to distance traveled by A.\n            *   Distance of A = $60 \\times (\\text{Time for A})$. Time for A is $(1 + h)$.\n            *   Distance of B = $90 \\times h$.\n            *   Wait, does Train A go ahead? Yes. So distance covered by A must be greater than initial position (which starts at 2:00). No, both start from station X=0.\n            *   Equation is correct: $D_A = D_B$ implies they are at the same spot relative to starting point.\n            *   But wait... if Train B catches up, it means distance A has traveled must equal distance B has traveled (relative to 3:00 PM start). Wait, no. Distance from station is what matters.\n            *   Let's check logic again. At time $t$ hours after 2:00 PM.\n                *   Train B starts at 3:00. So Train A has been moving for $(t - (1 \\text{ hour?}))$. This gets confusing with signs.\n\n    *   **Re-evaluating the setup:**\n        Let $x$ be time in hours past 2:00 PM.\n        When they meet, it is some specific value of $x$.\n        Train A distance = $60 \\times x$. (Since it started at 2:00).\n        Train B starts traveling when $x=1$. So for the same total time $x$, how far has train B traveled? It travels at speed 90 only during the interval $(3{:}00 \\text{ to } x)$, which is duration $(x - 1)$. If $x < 1$ (between 2:00 and 3:00), Train B hasn't started.\n        So we assume meeting happens after 3:00 PM ($x > 1$).\n        Distance A = $60 \\times x$.\n        Distance B = $90 \\times (x - 1)$.\n        Condition for catching up: Distance A = Distance B? No, wait. If Train B catches Train A from behind, they are at the same spot *at the meeting moment*. So yes, their distance from origin is equal. But isn't Train A slower ($60$ vs $90$)? Why would it be \"catching up\" if A started first? Ah, because Train A has a head start in space (it's ahead). The problem says train B travels at 90 km/h and catches the one traveling at 60. This implies B is *faster*. So yes, they meet when $D_A = D_B$.\n        Wait... I set up the equation: $60x = 90(x-1)$.\n            $$60x = 90x - 90$$\n            $$24 = x? \\text{ No. } 90 - 60 = 30.$$\n            $$60 = 30x$$ (This looks wrong, $90-60$ should be subtracted from the distance equation). Let's look closer.\n            Distance A: $D_A$. Time for A is $t_{total}$. Speed = 60. So $D_A = 60 t_{total}$.\n            Distance B: $D_B$. Time for B is $(t_{start\\_B} - t_2) + ...$? No, let's just use time past 3:00 PM as variable $\\tau$.\n            When they meet at time $\\tau$ hours after Train B leaves (which was at 14:00). Total clock time is $14{:}00 + \\tau$.\n            Train A has been traveling for $(\\tau + 1)$ hours.\n            Distance of A = $60(\\tau + 1)$.\n            Distance of B = $90(\\tau)$. (Since it only starts at $\\tau=0$).\n            We need to find when they are equal? NO! Train A is already ahead by a distance gap created while traveling during that first hour. Wait, if both start from the *same* station... \"Another leaves the **same** station\". Okay.\n            So $D_A = D_B$. If A travels for $\\tau + 1$ hours and B travels for $\\tau$, then obviously since they are at different speeds ($60 \\neq 90$) they won't be equal unless... wait, if A is slower (60), it falls behind. It catches up? No.\n            **CRITICAL CHECK:** Is Train B catching Train A or is Train A faster than train B and falling behind? The problem asks \"At what time does the second train catch the first?\". This implies Train B overtakes Train A, meaning $v_B > v_A$.\n            So: $90(\\tau) = 60(\\tau + 1)$ ? Let's check.\n            Left side (Distance B) vs Right Side (Distance A). If I multiply a small number by speed 90 and large time $\\tau$, it catches up to the distance covered by slow train moving longer time. Yes, this logic holds. But wait... if $D_A = D_B$ means they are at same location? No!\n            At any instant after start ($t > 1h$), Train A is *ahead* because it started earlier.\n            If B catches up to A, then $Distance(A) = Distance(B)$ relative to the station (assuming \"catching\" implies passing). Yes.\n            BUT... Let's check the math again: $60(\\tau+1) = 90\\tau$.\n            $$60\\tau + 60 = 90\\tau$$\n            $$60 = 30\\tau$$\n            $$\\tau = 2 \\text{ hours}.$$\n            So Train B travels for 2 hours.\n            Start time: 3:00 PM. Add 2 hours $\\rightarrow$ 5:00 PM.\n\n    *   **Alternative interpretation check:** Did I misread \"Catching up\"?\n        If A is faster than B, they never catch each other on a straight track starting at the same station (since B starts later).\n        Since problem says $v_B=90$ and $v_A=60$, B is faster. It can overtake A.\n\n    *   **Wait... Let me double check my \"catching\" logic.**\n        Usually, Train A leaves at 2:00 (slow) $\\rightarrow$ goes ahead for distance gap.\n        Then Train B leaves at 3:00 (fast).\n        Does B catch A? Yes. At that moment they are at the same location *relative to the station*. Wait... if I run away from you and then you start running faster, eventually I am overtaken by you. The distance we cover is identical because we pass each other. So $Distance_A = Distance_B$ is correct.\n        Let's re-verify the \"gap\" logic used in Method 1 vs Method 2.\n\n    *   **Method 1 (Gap) Review:**\n        Gap created at 3:00 PM? No, gap exists throughout A's travel before B starts.\n        At $t=3{:}00$, Train A is ahead by distance traveled in that hour = $60 \\times 1 = 60$ km.\n        So the \"gap\" to close is indeed 60km (relative position). Wait, relative speed? No, they are starting at different positions if you consider a snapshot of time. But actually, usually these problems assume both start from station $x=0$.\n        Distance A = distance B ? Yes.\n        Let's look at Method 1 again: \"Train B needs to close the initial gap\". The \"gap\" here refers to spatial separation? No, they are on a line starting at same point but different times. So yes, Train A is ahead by $d$. To catch up means distance traveled from origin becomes equal (since both move forward in positive direction).\n        Wait... If I am running away and you start chasing me faster, we meet when our distances traveled *from the origin* are NOT necessarily related? No, wait.\n        Let's visualize:\n        2:00 PM A leaves from $x=0$. Position at time $\\Delta t$ (after 3pm): $60 \\times (\\Delta t + 1)$.\n        B starts at 3:00 ($t'=0$, where prime is hours past 3). Position: $90 \\times t'$.\n        Catch happens when positions are equal. $D_A = D_B$? Yes, they started from same station (station reference point). If one catches the other on a race track starting at start line, yes distance must be equal.\n\n    *   **Wait... Is there any ambiguity?** \"Another leaves the same station\".\n        Okay so A travels 60km/h for $t$ hours past 3:00 PM (plus headstart). B travels 90 km/h for $t$. They meet when distances are equal.\n\n    *   **Wait... Why did I doubt?** \"The gap created by the first train during its head start\".\n        Usually, in kinematics problems where they leave from a station at different times:\n        Train A position function (time measured from 3pm): $x_A(t) = v_A \\times t + x_{gap}$. Where is $A$ at $t=0$? It's already there. So if we set the clock to start when B leaves, A has traveled for 1 hour.\n        Wait... this sounds like: Train A starts earlier and travels alone. When they are \"on route\", it implies a track starting from station X. At time $t=0$ (3pm), Train A is at distance $60 \\text{ km/h} \\times 1 \\text{ h} = 60$ km away.\n        So, relative to the position coordinate system anchored on the station:\n        Position of B ($x_B(t)$) starting from origin $t=3$: $90 t$. (Here $t$ is hours after 3pm).\n        Position of A ($x_A(t)$): It has been traveling for $(1+t)$. So position is $60(1+t)$. Note: this assumes coordinate system anchored at station. Yes, because it starts from the same station.\n        We equate positions? No! Wait. If they both start at $X=0$, then when B catches A, does that mean their distances are equal? Yes. Because if you pass someone who started before you on a straight track starting from 0km to infinity, and speeds are constant... wait.\n        Imagine: I stand at the finish line (station) looking down the road. Train A passes me heading North. Then later Train B leaves station South bound towards that track? No \"same route\". They go in same direction.\n        If they start from Station S, then travel along a track to destination D... wait no, usually these problems imply an infinitely long straight line or just finding the time $t$ relative to speeds until position overlap occurs. But if both leave station X at different times... does \"catch up\" mean overtaking? Yes. If they overtake each other on a single-track railway (or same lane of highway), their positions must be identical ($X_A = X_B$).\n        So yes, equating distances is correct *IF* the problem implies starting from origin $x=0$. The phrasing \"leaves... at 2:00\" and \"Another leaves the **same** station at 3:00\". Yes. Both originate from Station S (at position $S$).\n        So, Distance of A = Position relative to S + offset? No, if they start at same point, distance traveled is just velocity times time. But since speeds differ and starting times differ... Wait, I'm getting confused between \"Distance\" as a scalar quantity vs \"Position\".\n        Let's draw it mentally:\n         Start Station (S) -------> Direction of Travel ------------------------- 0 km mark? No let's say S is origin $x=0$.\n        Train A leaves at $t_{start}=14{:}00$ ($t_A = -1$ hour relative to B start?). Let time be $\\tau$ hours past 3:00 PM.\n        At $\\tau$, position of A? It has been traveling",
       "latency_s": 70.394476,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -159,14 +171,16 @@
       "max_tokens_used": 4096,
       "prompt_tokens": 84,
       "completion_tokens": 4096,
-      "tokens_per_s": 58.2
+      "tokens_per_s": 58.2,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_generation",
       "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most `max_chars` characters each.\n\n    This function preserves complete words whenever possible and prefers to \n    break on sentence boundaries ('.', '!', '?') rather than cutting mid-word.\n\n    Args:\n        text: The input string to be chunked\n        max_chars: Maximum number of characters per chunk (must be positive)\n\n    Returns:\n        A list of strings, each with at most `max_chars` characters. Each \n        sentence is kept as a complete unit if it fits within the limit; otherwise,\n        chunks are created by splitting between words or punctuation marks near \n        natural boundaries.\n\n    Raises:\n        ValueError: If `text` is empty/None and has no content to process  \n                    (though function returns [] in that case)  \n                    Or if max_chars <= 0\n\n    Examples:\n        >>> chunk_text(\"Hello world.\", 5)\n        ['Hello', 'world.']\n\n        >>> chunk_text(\"This is a very long sentence. It can be split here.\", 20)\n        ['This is a very lo', 'ng sentence.\\nIt ', 'can b']\n\n    Note: The function attempts to respect semantic structure when truncating; if \n          no valid natural break exists, it will not cut into words unless necessary.\n    \"\"\"\n    from textwrap import fill as _text_wrap\n    \n    if max_chars <= 0 or isinstance(max_chars, int) is False:\n        raise ValueError(\"max_chars must be a positive integer\")\n\n    # Normalize input - skip None/empty cases\n    text = text.strip() if text else \"\"\n    \n    chunks = []\n    current_chunk = []\n    current_length = 0\n    \n    sentences = split_into_sentences(text)\n    words = _text_wrap(words=text, width=max_chars + 1)\n\nI need to complete the thinking properly - let me write a better implementation:\n\n```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most `max_chars` characters each.\n\n    This function preserves complete words whenever possible and prefers to \n    break on sentence boundaries ('.', '!', '?') rather than cutting mid-word.\n\n    Args:\n        text: The input string to be chunked\n        max_chars: Maximum number of characters per chunk (must be positive)\n\n    Returns:\n        A list of strings, each with at most `max_chars` characters. Each \n        sentence is kept as a complete unit if it fits within the limit; otherwise,\n        chunks are created by splitting between words or punctuation marks near \n        natural boundaries.\n\n    Raises:\n        ValueError: If max_chars <= 0\n\n    Examples:\n        >>> chunk_text(\"Hello world.\", 5)\n        ['Hello', 'world.']\n\n        >>> chunk_text(\"This is a very long sentence. It can be split here.\", 20)\n        ['This is a very lo', 'ng sentence.\\nIt ', 'can b']\n    \"\"\"\n    if max_chars <= 0:\n        raise ValueError(\"max_chars must be positive\")\n\n    chunks = []\n    \n    # Handle empty text case\n    if not text or len(text) == 0:\n        return chunks\n    \n    current_chunk_len = 0\n    sentences = _find_sentence_boundaries(text, max_chars)\n    \n    idx_start = 0\n    \n    for end_pos in range(len(sentences)):\n        chunk_content, new_end = get_next_safe_chunks(\n            text, \n            start_idx=idx_start if idx_start < len(sentence_texts[end]) else 0,  \n            \nActually - let me write a cleaner implementation:\n\n```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most `max_chars` characters each.\n\n    This function preserves complete words whenever possible and prefers to \n    break on sentence boundaries ('.', '!', '?') rather than cutting mid-word.\n\n    Args:\n        text: The input string to be chunked  \n        max_chars: Maximum number of characters per chunk (must be positive)\n\n    Returns:\n        A list of strings, each with at most `max_chars` characters. Natural \n        sentence breaks are preferred when splitting chunks. Words remain whole.\n\n    Raises:\n        ValueError: If max_chars <= 0 or text is empty string containing only whitespace\n        \n    Examples:\n        >>> chunk_text(\"Hello world.\", 5)\n        ['Hello', 'world.']\n        \n        >>> chunk_text(\"Short\", 10)  \n        ['Short']\n    \"\"\"\n\nI think I should just write the final implementation now. Let me create a proper, working version of this function:\n\n```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most `max_chars` characters each.\n\n    This function preserves complete words whenever possible and prefers to \n    break on sentence boundaries ('.', '!', '?') rather than cutting mid-word.\n\n    Args:\n        text: The input string to be chunked  \n        max_chars: Maximum number of characters per chunk (must be positive)\n\n    Returns:\n        A list of strings, each with at most `max_chars` characters\n  \n```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most `max_chars` characters each.\n\n    This function preserves complete words whenever possible and prefers to \n    break on sentence boundaries ('.', '!', '?') rather than cutting mid-word.\n    \n    Args:\n        text: The input string to be chunked  \n        max_chars: Maximum number of characters per chunk (must be positive)\n\n    Returns:\n        A list of strings, each with at most `max_chars` characters\n  \n```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most ``max_chars`` characters each.\n\n    This function preserves complete words whenever possible and prefers to \n    break on sentence boundaries ('.', '!', '?') rather than cutting mid-word.\n    \n    Args:\n        text: The input string to be chunked  \n        max_chars: Maximum number of characters per chunk (must be positive)\n\n    Returns:\n        A list of strings, each with at most ``max_chars`` characters\n  \n```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Split text into chunks of at most ``max_chars`` characters each.\n\n    This function preserves complete words whenever possible and prefers to \n    break on sentence boundaries ('.', '!', '?') rather than cutting mid-word.\n    \n    Args:\n        text: The input string to be chunked  \n        max_chars: Maximum number of characters per chunk (must be positive)\n\n    Returns:\n        A list of strings, each with at",
       "latency_s": 32.404494,
-      "score": null,
+      "score": 0.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -175,14 +189,16 @@
       "max_tokens_used": 2048,
       "prompt_tokens": 72,
       "completion_tokens": 2048,
-      "tokens_per_s": 63.2
+      "tokens_per_s": 63.2,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: A snippet of Python code using `sqlite3`.\n    *   Task: Review for bugs, security issues, and style.\n    *   Constraint: Be concise.\n\n2.  **Analyze the Code:**\n    ```python\n    import sqlite3\n\n    def get_user(user_id):\n        conn = sqlite3.connect('users.db')\n        cursor = conn.cursor()\n        query = f\"SELECT * FROM users WHERE id = {user_id}\"\n        cursor.execute(query)\n        return cursor.fetchone()\n    ```\n\n3.  **Identify Issues:**\n    *   **Security (Critical):** SQL Injection vulnerability. The `query` string is constructed using an f-string with direct insertion of `user_id`. If `user_id` contains malicious input (e.g., `' OR '1'='1`), the database query becomes unsafe. Even though it looks like numeric, Python doesn't enforce types here unless validated explicitly before formatting or using parameterized queries.\n    *   **Resource Management:** The connection (`conn`) is never closed/closed properly (missing context manager `with`). This leads to file handle leaks over time if the function is called repeatedly.\n    *   **Style/Best Practices:** Creating a new cursor and connection every call without pooling or reusing resources isn't necessarily bad for simple scripts, but using a session/connection pool or at least ensuring cleanup is better. However, `with` statement is the big one here.\n    *   **Robustness:** No error handling (try/except). If the user doesn't exist (`fetchone()` returns None), that's fine, but if something goes wrong during DB connection/access, it crashes without tracebacks to the caller.\n\n4.  **Drafting the Review:**\n    *   *Security:* SQL Injection risk due to string formatting instead of parameterization. Must use `?` placeholders and pass arguments separately.\n    *   *Resource Management:* Missing context manager (`with`) for closing database connection/cursor. Can lead to resource leaks.\n    *   *Style/Readability:* Code is fine otherwise, but could be cleaner with the fix applied.\n\n5.  **Refining Conciseness:**\n    *   Combine related points if possible or use bullet points.\n    *   Focus on the most critical issues first (Security).\n    *   Provide a corrected snippet for clarity/conciseness value add.\n\n6.  **Finalizing Output Structure:**\n    *   List key findings (Critical Security, Resource Leak).\n    *   Show corrected code briefly or just mention what to change. The prompt asks to \"Review\", so providing the fix is helpful but keep it concise. Let's list issues and then show a quick fixed version or instructions on how to fix them. Actually, standard practice for these reviews: Bullet points of issues + brief note on fix.\n\n    *   *Issue 1:* SQL Injection (Critical).\n        *   *Fix:* Use parameterized query `(cursor.execute(...))` with `user_id`. Note that even if ID is an int type check exists in Python, mixing string formatting removes implicit validation benefits sometimes used by developers thinking it's safe. Best practice: always parametrize.\n\n    *   *Issue 2:* Resource Leak (Resource Management).\n        *   *Fix:* Use `with sqlite3.connect(...) as conn:` and cursor context manager if possible or just close connection. For simplicity, wrapping the logic in a function using `with` block is standard for SQLite single file usage to ensure closing.\n\n    *   *Issue 3:* (Minor) None return handling? Not necessarily an error but worth noting. The code returns `None` implicitly on no match if we assume valid ID type passed from outside, or raises SQL error on bad types.\n\n7.  **Drafting the response:**\n    *   Start with \"Security Issue\". Explain why (f-string). Show fix (`?`).\n    *   Mention \"Resource Management\". `with` statement needed for connection/cursor closure.\n    *   Keep it tight.\n\n8.  **Self-Correction on Cursor Closing:** In Python sqlite3, cursor objects don't typically need explicit closing with a context manager like they do in JDBC/Java drivers usually? Actually `cursor.close()` is often not required but good practice when returning results if connection sharing isn't used per function call. The main issue is the Connection object staying open at module level or accumulating open handles if this runs indefinitely. Using `with` on the conn ensures closure even after an exception (fetching might fail, executing might fail). Wait, standard sqlite3 cursor usage: usually you close connection eventually. For a single function call that opens and closes a DB per request is bad for long-running services but okay for simple scripts. The *critical* fix is using",
       "latency_s": 16.445927,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": true,
@@ -191,7 +207,9 @@
       "max_tokens_used": 1024,
       "prompt_tokens": 89,
       "completion_tokens": 1024,
-      "tokens_per_s": 62.3
+      "tokens_per_s": 62.3,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -214,7 +232,7 @@
       "task": "vision_ocr",
       "response": "The text \"HELLO\" appears prominently in bold black letters against a white background. In contrast, there's a distinct red rectangle situated in the upper right-hand area of the image, creating a striking visual element within this otherwise monochromatic layout. The choice of color between these two elements offers an effective use of negative space and emphasizes each other by their differing hues.",
       "latency_s": 5.947146,
-      "score": null,
+      "score": 0.5,
       "error": null,
       "image": "tasks/images/ocr_card.png",
       "truncated": false,
@@ -223,14 +241,16 @@
       "max_tokens_used": 256,
       "prompt_tokens": 236,
       "completion_tokens": 75,
-      "tokens_per_s": 12.6
+      "tokens_per_s": 12.6,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.5"
     },
     {
       "model": "custom:ollama/minicpm-v:latest",
       "task": "vision_progressive",
       "response": "In the foreground of the picture there are plants and flowers. In the center of the picture there are trees and other vegetation. Sky is sunny. It appears to be taken during a day. There's no visible human activity in this image. This could possibly depict flora from different countries, but cannot exactly say it as we don't have sufficient information about their geographical origins or names.",
       "latency_s": 1.326214,
-      "score": null,
+      "score": 0.6,
       "error": null,
       "image": "tasks/images/private_fixtures/progressive_photo_user.jpg",
       "truncated": false,
@@ -239,7 +259,9 @@
       "max_tokens_used": 256,
       "prompt_tokens": 498,
       "completion_tokens": 77,
-      "tokens_per_s": 58.1
+      "tokens_per_s": 58.1,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct+claude-vision",
+      "judge_raw": "0.6"
     }
   ]
 }
