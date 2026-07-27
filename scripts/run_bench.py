@@ -51,7 +51,12 @@ def load_tasks(task_dir):
 
 
 def call_model(model, prompt, max_tokens, image_path=None):
-    """Call a model. Returns (text, latency_s, error)."""
+    """Call a model. Returns (text, latency_s, error, meta).
+
+    `meta` carries provider signals used downstream: `done_reason` (Ollama's
+    stop reason — "stop" vs "length"/truncated), and token counts for telemetry.
+    An empty dict is returned when a provider does not expose them.
+    """
     # Local / custom Ollama endpoint. We call Ollama's NATIVE /api/chat REST
     # endpoint directly (no OpenAI SDK) so the harness has zero third-party
     # dependencies and never breaks on a missing/broken `pydantic_core`.
@@ -105,9 +110,17 @@ def call_model(model, prompt, max_tokens, image_path=None):
             # qwen3, deepseek-r1) emit before the actual answer. Score only the
             # deliverable, not the reasoning trace.
             text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
-            return text, latency, None
+            # done_reason == "length" means Ollama cut the response at the token
+            # budget — the model likely never reached its answer. Captured here so
+            # the caller can retry / refuse to score it (see call_model_guarded).
+            meta = {
+                "done_reason": resp.get("done_reason"),
+                "prompt_tokens": resp.get("prompt_eval_count"),
+                "completion_tokens": resp.get("eval_count"),
+            }
+            return text, latency, None, meta
         except Exception as e:
-            return None, 0.0, f"ollama api error: {e}"
+            return None, 0.0, f"ollama api error: {e}", {}
     # Anthropic models: call via `claude -p` CLI which uses OAuth / Claude Max
     # quota — no ANTHROPIC_API_KEY env var needed or wanted.
     if model.get("provider") == "anthropic":
@@ -124,15 +137,120 @@ def call_model(model, prompt, max_tokens, image_path=None):
             result = _sp.run(cmd, capture_output=True, text=True, timeout=120)
             latency = (dt.datetime.now() - t0).total_seconds()
             if result.returncode != 0:
-                return None, latency, f"claude cli error: {result.stderr.strip()}"
+                return None, latency, f"claude cli error: {result.stderr.strip()}", {}
             data = json.loads(result.stdout)
             text = data.get("result", "") or ""
             # Strip CoT thinking blocks if any
             text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
-            return text, latency, None
+            return text, latency, None, {}
         except Exception as e:
-            return None, 0.0, f"claude cli error: {e}"
-    return None, 0.0, f"provider {model.get('provider')} not wired in skeleton"
+            return None, 0.0, f"claude cli error: {e}", {}
+    return None, 0.0, f"provider {model.get('provider')} not wired in skeleton", {}
+
+
+def call_model_guarded(model, prompt, max_tokens, image_path=None):
+    """Call the model and guard against token-budget truncation.
+
+    If Ollama reports `done_reason == "length"` (the response was cut off before
+    the model finished — the single biggest distortion in this benchmark, since
+    reasoning models spend their budget on chain-of-thought and never reach the
+    answer), re-run ONCE at 2x `max_tokens`. Returns (text, latency, error, meta)
+    where `meta["truncated"]` is True only if it was STILL cut off after the retry
+    — the caller must then score it `null`, never `0.0`.
+    """
+    text, latency, err, meta = call_model(model, prompt, max_tokens, image_path)
+    meta = dict(meta or {})
+    meta["attempts"] = 1
+    meta["max_tokens_used"] = max_tokens
+    # `gen_latency_s` is the wall-clock of the attempt whose tokens we keep, so
+    # tokens-per-second is computed against the matching generation (not the summed
+    # latency of a wasted-then-retried pair, which would understate throughput).
+    meta["gen_latency_s"] = latency
+    if err is None and meta.get("done_reason") == "length":
+        bigger = max_tokens * 2
+        text2, latency2, err2, meta2 = call_model(model, prompt, bigger, image_path)
+        latency += latency2  # report total wall-clock incl. the wasted first attempt
+        if err2 is None:
+            text, err = text2, err2
+            meta2 = dict(meta2 or {})
+            meta2["attempts"] = 2
+            meta2["max_tokens_used"] = bigger
+            meta2["gen_latency_s"] = latency2
+            meta = meta2
+        else:
+            # Retry itself errored: keep the first (truncated) response but record
+            # that a second attempt happened and why it failed — don't silently drop it.
+            meta["attempts"] = 2
+            meta["retry_error"] = err2
+    meta["truncated"] = bool(err is None and meta.get("done_reason") == "length")
+    return text, latency, err, meta
+
+
+# Clock time HH:MM, but NOT the H:MM slice of an HH:MM:SS timestamp and NOT the
+# tail of a longer number (lookarounds reject an adjacent digit or colon on either
+# side). A trailing am/pm is allowed (it is a non-digit, so extraction still fires).
+_TIME_RE = re.compile(r"(?<![\d:])(\d{1,2}):(\d{2})(?![\d:])")
+# A number token: optional sign, digits with optional thousands separators, and an
+# optional fractional part. Lookarounds keep "720" from being pulled out of "x720y"
+# and keep a range/minus hyphen ("2-5") from being read as the number's own sign.
+_NUM_RE = re.compile(r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?(?![\w])")
+# The model is asked to end with "Final answer: X"; we score THAT, not an
+# intermediate value mentioned mid-working.
+_FINAL_RE = re.compile(r"final\s*answer", re.I)
+
+
+def _norm_time(s):
+    """Normalise a clock time so "05:00" and "5:00" compare equal, but "15:00"
+    stays distinct (this is the exact false-positive the substring scorer had:
+    "5:00" is a substring of "15:00")."""
+    m = re.match(r"0*(\d{1,2}):(\d{2})$", s.strip())
+    return f"{int(m.group(1))}:{m.group(2)}" if m else s.strip()
+
+
+def _to_float(tok):
+    try:
+        return float(tok.replace(",", ""))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _answer_region(response):
+    """Prefer the model's explicitly labelled final answer. The reasoning tasks
+    instruct the model to end with "Final answer: X", and their rubrics award full
+    marks only for that final answer — so a correct intermediate value paired with a
+    WRONG final answer must not score. Falls back to the whole response when the
+    model omitted the label."""
+    hits = list(_FINAL_RE.finditer(response))
+    return response[hits[-1].end():] if hits else response
+
+
+def score_exact(expected, response):
+    """Match the model's stated answer against `expected` by *extracting* answer
+    tokens from the final-answer region and comparing on value/word boundaries —
+    never raw substring containment. Keeps "15:00" from scoring as a correct "5:00",
+    and a "Final answer: 6:00" (with 5:00 mentioned earlier) from scoring correct."""
+    if not response:
+        return 0.0
+    exp = expected.strip()
+    region = _answer_region(response)
+    # Clock-time answers (e.g. "5:00"): compare normalised HH:MM tokens.
+    if re.fullmatch(r"\d{1,2}:\d{2}", exp):
+        want = _norm_time(exp)
+        found = {_norm_time(f"{h}:{m}") for h, m in _TIME_RE.findall(region)}
+        return 1.0 if want in found else 0.0
+    # Numeric answers (e.g. "720"): compare by VALUE so 720 == 720.0 == 720.00, while
+    # "1720"/"7200"/"x720y" (different value / not a standalone token) still fail.
+    want_f = _to_float(exp)
+    if want_f is not None and re.fullmatch(r"-?\d[\d,]*(?:\.\d+)?", exp):
+        for tok in _NUM_RE.findall(region):
+            if _to_float(tok) == want_f:
+                return 1.0
+        return 0.0
+    # General string answer: case-insensitive, boundary-guarded, but only on sides
+    # where `exp` itself ends in a word char (so "C++"/".NET"/"(a)" still match).
+    left = r"(?<!\w)" if exp[:1].isalnum() else ""
+    right = r"(?!\w)" if exp[-1:].isalnum() else ""
+    return 1.0 if re.search(left + re.escape(exp) + right, region, re.I) else 0.0
 
 
 def score(task, response):
@@ -144,7 +262,7 @@ def score(task, response):
         if not expected:
             # No expected answer string — fall through to rubric-llm
             return None
-        return 1.0 if response and expected in response else 0.0
+        return score_exact(expected, response)
 
     if method == "json-exact":
         # Parse both sides and compare dicts (key order / whitespace insensitive)
@@ -157,6 +275,40 @@ def score(task, response):
 
     # rubric-llm / reference-compare: implement with a scorer model.
     return None  # None = unscored (report as ±)
+
+
+def _record_telemetry(tracker, run_id, model, task, latency, meta, err):
+    """Best-effort telemetry write. Uses the token counts Ollama already returned
+    (meta) rather than a streaming wrapper, so it adds no extra model call."""
+    try:
+        import telemetry
+        prov = model.get("provider", "") or ""
+        provider = "ollama" if prov.startswith("custom") else (prov or "unknown")
+        prompt_toks = meta.get("prompt_tokens") or 0
+        completion_toks = meta.get("completion_tokens") or 0
+        gen_latency = meta.get("gen_latency_s") or latency
+        tps = (completion_toks / gen_latency) if gen_latency > 0 else 0.0
+        tracker.record(telemetry.TelemetryRecord(
+            timestamp=dt.datetime.now().isoformat(),
+            run_id=run_id,
+            model_id=model["id"],
+            model_provider=provider,
+            task_id=task["id"],
+            task_category=task.get("category", ""),
+            prompt_tokens=prompt_toks,
+            completion_tokens=completion_toks,
+            total_tokens=prompt_toks + completion_toks,
+            latency_seconds=latency,
+            ttft_seconds=None,
+            tokens_per_second=tps,
+            vram_peak_mib=telemetry.get_vram_used_mib(),
+            vram_delta_mib=None,
+            cost_usd=telemetry.calculate_cost(model["id"], prompt_toks, completion_toks),
+            success=(err is None),
+            error=err,
+        ))
+    except Exception as e:  # noqa: BLE001 — telemetry must never break a run
+        print(f"[{run_id}] telemetry record failed: {e}", file=sys.stderr)
 
 
 def main():
@@ -175,6 +327,16 @@ def main():
     models = [m for m in models if m.get("enabled", True)]
 
     run_id = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Telemetry (tokens / tok-per-s / VRAM / cost) — optional; a broken import
+    # must never take down a bench run, so it is best-effort.
+    tracker = None
+    try:
+        import telemetry
+        tracker = telemetry.TelemetryTracker(run_id)
+    except Exception as e:  # noqa: BLE001
+        print(f"[{run_id}] telemetry disabled: {e}", file=sys.stderr)
+
     results = []
     for model in models:
         for task in tasks:
@@ -182,17 +344,40 @@ def main():
             ttags = set(task.get("tags", []))
             if not (mtags & ttags) and not task.get("requires_frontier"):
                 continue
-            text, latency, err = call_model(model, task["prompt"], task.get("max_tokens", 512),
-                                          image_path=task.get("image"))
-            sc = score(task, text) if text else None
+            text, latency, err, meta = call_model_guarded(
+                model, task["prompt"], task.get("max_tokens", 512),
+                image_path=task.get("image"))
+            # A response cut off at the token budget is a non-answer: score it
+            # `null` (unscored/±), NEVER 0.0 — a truncated CoT is not a wrong answer.
+            truncated = bool(meta.get("truncated"))
+            if truncated:
+                sc = None
+            else:
+                sc = score(task, text) if text else None
+            tps = None
+            gen_latency = meta.get("gen_latency_s") or latency
+            if meta.get("completion_tokens") and gen_latency > 0:
+                tps = round(meta["completion_tokens"] / gen_latency, 1)
             results.append({
                 "model": model["id"], "task": task["id"],
                 "response": text, "latency_s": latency,
                 "score": sc, "error": err,
                 "image": task.get("image"),
+                "truncated": truncated,
+                "done_reason": meta.get("done_reason"),
+                "attempts": meta.get("attempts", 1),
+                "max_tokens_used": meta.get("max_tokens_used", task.get("max_tokens", 512)),
+                "prompt_tokens": meta.get("prompt_tokens"),
+                "completion_tokens": meta.get("completion_tokens"),
+                "tokens_per_s": tps,
             })
-            print(f"[{run_id}] {model['id']} x {task['id']}: "
-                  f"{'ERR' if err else ('score='+str(sc) if sc is not None else 'unscored')}")
+            if tracker is not None:
+                _record_telemetry(tracker, run_id, model, task, latency, meta, err)
+            flag = ("ERR" if err else
+                    ("TRUNC/unscored" if truncated else
+                     ("score=" + str(sc) if sc is not None else "unscored")))
+            print(f"[{run_id}] {model['id']} x {task['id']}: {flag}"
+                  + (f" (attempts={meta.get('attempts')})" if meta.get("attempts", 1) > 1 else ""))
 
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, f"{run_id}.json"), "w") as f:
