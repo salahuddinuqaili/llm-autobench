@@ -1,6 +1,6 @@
 # llm-autobench
 
-**An autonomous, local-first LLM benchmarking pipeline, and a public portfolio piece.**
+**An autonomous, local-first LLM benchmarking pipeline.**
 
 `llm-autobench` watches for new open-source model releases, **pulls** them onto a
 local GPU, **benchmarks** them against a fixed task battery, **reports** the results,
