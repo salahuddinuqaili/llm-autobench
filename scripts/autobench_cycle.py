@@ -67,10 +67,17 @@ def estimate_model_vram_mib(param_billions, quantization="q4_k_m"):
 
 
 def has_vram_headroom(required_mib, buffer_mib=1024):
-    """Check if free VRAM >= required + buffer."""
+    """Check if free VRAM >= required + buffer.
+
+    Fails CLOSED: if the nvidia-smi probe fails we cannot prove there is room, so
+    we refuse the pull rather than risk OOM-ing a shared 12GB box mid-bench.
+    """
     free = get_vram_free_mib()
     if free is None:
-        return True  # if we can't check, allow (fail fast at pull time)
+        print("[autobench] VRAM probe failed (nvidia-smi unavailable); "
+              "failing CLOSED — skipping pull to protect the shared GPU",
+              file=sys.stderr)
+        return False
     return free >= (required_mib + buffer_mib)
 
 

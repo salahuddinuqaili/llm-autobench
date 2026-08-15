@@ -2,3 +2,11 @@ __pycache__/
 *.pyc
 .venv/
 
+# Runtime telemetry (per-run token/latency/VRAM logs) — not committed; the
+# leaderboard is derived from committed runs/, telemetry is local perf data.
+telemetry/
+
+# Scratch registries / temp run dirs used while proving fixes locally.
+.autobench_tmp_registry.yaml
+.tmp_*
+

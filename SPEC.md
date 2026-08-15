@@ -46,10 +46,10 @@ claim is *"a pipeline that tests models while I sleep, then cleans up after itse
 │   ├─ delete()        ollama rm <model>                                       │
 │   └─ commit()        git add runs/ reports/ && commit                       │
 │                                                                               │
-│  judge_report.py  (scoring + reporting; run by free Hermes agent)            │
-│   ├─ score rubric tasks via local reward model / free judge panel           │
+│  score_run.py → nvidia_judge.py  (scoring + reporting; free NVIDIA judge)    │
+│   ├─ score rubric tasks via NVIDIA NIM Llama-3.3-70B (free tier, direct API) │
 │   ├─ telemetry.track()  log tokens, latency, VRAM, cost for ALL models       │
-│   └─ generate_report() → reports/<run_id>.md (leaderboard + detail)         │
+│   └─ build_report() → reports/<run_id>.md (leaderboard grouped by model)     │
 └───────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -65,7 +65,7 @@ enough for free cloud or local. This is the core trick that makes 12GB viable.
 | Task battery | `tasks/*.yaml` | 8 tasks, 4 categories (reasoning, coding, writing, structured) |
 | Runner | `scripts/run_bench.py` | Loads `baseline:` models × tasks; writes `runs/<run_id>.json` |
 | Lifecycle | `scripts/autobench_cycle.py` | discover → VRAM guard → pull → bench → delete → commit |
-| Judge/report | `scripts/judge_report.py` | rubric scoring + markdown report (free judge when key set) |
+| Judge/report | `scripts/score_run.py` → `scripts/nvidia_judge.py` | rubric scoring (free NVIDIA NIM 70B judge) + report grouped by model |
 | Telemetry | `scripts/telemetry.py` | `TelemetryTracker` + `TrackedCall` context manager (tokens, latency, VRAM, cost) |
 | Registry | `models/registry.yaml` | `baseline:` + `watcher:` (max 14B, judge, delete_after_bench) |
 | Cron | `llm-autobench daily cycle` | `0 2 * * *`, job `7ce664bda386` |

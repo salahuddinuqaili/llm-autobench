@@ -228,6 +228,96 @@ def _writeback(results, scored, run_path):
     run_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
+def _is_num(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
+def build_report(run_stem, scored):
+    """Render the run report GROUPED BY MODEL.
+
+    Fixes the attribution bug where a report was titled with one model
+    (`scored[0]["model"]`) but its single table iterated *every* model's rows —
+    so a two-model run showed one title over a mixed table and a blended average.
+    This emits: a per-run leaderboard (one row per model), one detail section per
+    model, and a Failures section — each row attributed to the model that produced it.
+    """
+    from collections import OrderedDict
+
+    by_model = OrderedDict()
+    for r in scored:
+        by_model.setdefault(r.get("model", "unknown"), []).append(r)
+
+    def avg_of(rows):
+        vals = [r["score"] for r in rows if _is_num(r.get("score"))]
+        return (sum(vals) / len(vals)) if vals else None
+
+    models = list(by_model)
+    lines = []
+    lines.append(f"# autobench report — {run_stem}")
+    lines.append("")
+    lines.append(f"**Run:** `{run_stem}.json`  ")
+    lines.append(f"**Models:** {', '.join('`' + m + '`' for m in models)}  ")
+    lines.append(f"**Judge:** `nvidia/{JUDGE_MODEL}` (70B text judge) + Claude vision describer (stage 1)  ")
+    lines.append("")
+
+    # ---- Leaderboard: one row PER MODEL ----
+    lines.append("## Leaderboard")
+    lines.append("")
+    lines.append("| Model | Avg score | Scored | Tasks | Avg latency | Errors |")
+    lines.append("|---|---:|---:|---:|---:|---:|")
+    lb = []
+    for m, rows in by_model.items():
+        avg = avg_of(rows)
+        scored_n = sum(1 for r in rows if _is_num(r.get("score")))
+        lats = [r.get("latency_s", 0) or 0 for r in rows]
+        latm = sum(lats) / len(lats) if lats else 0.0
+        errs = sum(1 for r in rows if r.get("error") or r.get("truncated"))
+        lb.append((m, avg, scored_n, len(rows), latm, errs))
+    lb.sort(key=lambda x: (x[1] is None, -(x[1] or 0)))  # best avg first, None last
+    for m, avg, scored_n, ntasks, latm, errs in lb:
+        avg_s = f"{avg:.2f}" if avg is not None else "—"
+        lines.append(f"| `{m}` | {avg_s} | {scored_n} | {ntasks} | {latm:.1f}s | {errs or '—'} |")
+    lines.append("")
+
+    # ---- Per-model detail ----
+    for m, rows in by_model.items():
+        lines.append(f"## {m}")
+        lines.append("")
+        lines.append("| Task | Score | Latency | Judge reason |")
+        lines.append("|---|---|---|---|")
+        for r in rows:
+            sc = r.get("score")
+            sc_s = (f"{sc:.2f}" if _is_num(sc)
+                    else ("trunc" if r.get("truncated") else "—"))
+            lat = r.get("latency_s", 0) or 0
+            reason = (r.get("judge_raw", "") or "")[:120].replace("\n", " ")
+            lines.append(f"| {r['task']} | {sc_s} | {lat:.1f}s | {reason} |")
+        lines.append("")
+
+    # ---- Failures: errored, truncated, or unscored (honest, per SPEC §12) ----
+    fails = [r for r in scored
+             if r.get("error") or r.get("truncated") or not _is_num(r.get("score"))]
+    lines.append("## Failures")
+    lines.append("")
+    if not fails:
+        lines.append("None.")
+    else:
+        for r in fails:
+            why = (r.get("error") or
+                   ("truncated at token budget (unscored, not 0.0)" if r.get("truncated")
+                    else "unscored (judge returned no parseable score)"))
+            lines.append(f"- **{r.get('model')} × {r.get('task')}**: {why}")
+    lines.append("")
+
+    # ---- Lifecycle ----
+    lines.append("## Lifecycle")
+    lines.append("")
+    lines.append("- Model pulled, benchmarked on Ollama, then deleted.")
+    lines.append("- Judge: nvidia/meta/llama-3.3-70b-instruct (NVIDIA NIM, free tier, direct API).")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def main():
     import argparse
     ap = argparse.ArgumentParser()
@@ -247,6 +337,14 @@ def main():
     scored = []
 
     for r in results:
+        # A response cut off at the token budget is a non-answer (run_bench's P0.1
+        # guard already set score=null, truncated=true). NEVER let the judge score a
+        # truncated chain-of-thought — that would reintroduce the exact distortion the
+        # guard removes (and make the row both "scored" and a Failure). Keep it unscored.
+        if r.get("truncated"):
+            r.setdefault("judge", "skipped: truncated (unscored)")
+            scored.append(r)
+            continue
         if r.get("score") is not None:
             scored.append(r)
             continue
@@ -298,38 +396,14 @@ def main():
     data["results"] = scored
     run_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
-    model = scored[0]["model"] if scored else "unknown"
-    scores = [r["score"] for r in scored if r.get("score") is not None]
-    avg = sum(scores) / len(scores) if scores else 0.0
-
-    lines = []
-    lines.append(f"# autobench report — {model}")
-    lines.append("")
-    lines.append(f"**Run:** `{run_path.name}`  ")
-    lines.append(f"**Judge:** `nvidia/{JUDGE_MODEL}` (70B text judge) + Claude vision describer (stage 1)  ")
-    lines.append(f"**Average score:** `{avg:.2f}` / 1.00")
-    lines.append("")
-    lines.append("## Per-task")
-    lines.append("")
-    lines.append("| Task | Score | Latency | Judge reason |")
-    lines.append("|---|---|---|---|")
-    for r in scored:
-        sc = r.get("score")
-        sc_s = f"{sc:.2f}" if sc is not None else "—"
-        lat = r.get("latency_s", 0)
-        reason = (r.get("judge_raw", "") or "")[:120].replace("\n", " ")
-        lines.append(f"| {r['task']} | {sc_s} | {lat:.1f}s | {reason} |")
-    lines.append("")
-    lines.append("## Lifecycle")
-    lines.append("")
-    lines.append("- Model pulled, benchmarked on Ollama, then deleted.")
-    lines.append("- Judge: nvidia/meta/llama-3.3-70b-instruct (NVIDIA NIM, free tier, direct API).")
-    lines.append("")
-
+    report = build_report(run_path.stem, scored)
     out_path = REPO / "reports" / f"{run_path.stem}.md"
-    out_path.write_text("\n".join(lines), encoding="utf-8")
+    out_path.write_text(report, encoding="utf-8")
+
+    overall = [r["score"] for r in scored if _is_num(r.get("score"))]
+    avg = sum(overall) / len(overall) if overall else 0.0
     print(f"\nReport written: {out_path}")
-    print(f"Average score: {avg:.2f}")
+    print(f"Overall average (all scored rows, all models): {avg:.2f}")
 
 
 if __name__ == "__main__":

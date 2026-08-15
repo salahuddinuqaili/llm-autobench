@@ -39,7 +39,11 @@ strong Technical-PM story ("I audited my own benchmark, then closed the audit").
 
 ## P0 — Credibility (the benchmark currently misreports)
 
-### P0.1 · Implement the truncation guard `[S]`
+> ✅ **All P0 items (P0.1-P0.5) shipped 2026-07-22**, each proven against its real failing
+> case. The claimed-vs-actual table above is the pre-fix snapshot; the code now matches the
+> 2026-07-18 remediation plan. See `DECISIONS.md` (2026-07-22 entries).
+
+### P0.1 · Implement the truncation guard · ✅ **shipped 2026-07-22** `[S]`
 **Problem.** No script reads Ollama's `done_reason`. Reasoning models spend their whole token
 budget on chain-of-thought and get cut off *before* stating an answer, which the scorer then
 reads as a wrong answer. This is the biggest single distortion in the data: `arithmetic_reasoning`
@@ -56,7 +60,7 @@ sits at **0.36** and `qwen3.5:9b` scores **0.16** on it and only **0.76** on `lo
 `logical_reasoning` stops returning 0.0 from cutoff; the truncated-zero count in
 `aggregate_results.py` drops sharply.
 
-### P0.2 · Fix the report model-attribution bug `[S]`
+### P0.2 · Fix the report model-attribution bug · ✅ **shipped 2026-07-22** `[S]`
 **Problem.** `nvidia_judge.py` titles each report with `scored[0]["model"]` but its table iterates
 **every** model's rows — so `reports/20260722_030027.md` is titled `gemma4:e4b` yet contains
 `qwen3.5:9b` rows, and its "0.72 average" mixes two models.
@@ -64,20 +68,20 @@ sits at **0.36** and `qwen3.5:9b` scores **0.16** on it and only **0.76** on `lo
 one section per model + a Failures section. **Files.** `nvidia_judge.py:298-331`.
 **Accept.** A 2-model run renders a 2-row leaderboard with rows under the correct model.
 
-### P0.3 · Real answer-extraction scorer `[S]`
+### P0.3 · Real answer-extraction scorer · ✅ **shipped 2026-07-22** `[S]`
 **Problem.** `run_bench.py:147` still does `expected in response`; the exact D1 false-positive
 (`"5:00"` matching inside `"15:00"`) is still latent for any response mentioning `15:00`/`25:00`.
 **Actions.** Extract the final answer (labelled line / last number / per-task regex) and match on
 word boundaries. **Files.** `run_bench.py` `score()`. **Accept.** A response containing `15:00`
 but not a standalone `5:00` scores **0** on `arithmetic_reasoning`.
 
-### P0.4 · VRAM guard fails closed `[S]`
+### P0.4 · VRAM guard fails closed · ✅ **shipped 2026-07-22** `[S]`
 **Problem.** `autobench_cycle.py:73` returns `True` when `nvidia-smi` fails — an oversized pull can
 OOM a shared 12GB box mid-bench. DECISIONS.md says this was fixed; it wasn't.
 **Actions.** Return `False` (skip + log) on probe failure. **Files.** `autobench_cycle.py:69-74`.
 **Accept.** A simulated `nvidia-smi` failure logs a skip and does not pull.
 
-### P0.5 · One judge path, no hard-coded status `[S]`
+### P0.5 · One judge path, no hard-coded status · ✅ **shipped 2026-07-22** `[S]`
 **Problem.** Two report generators disagree: `nvidia_judge.py` (NVIDIA, the real path) and the
 legacy `judge_report.py` (OpenRouter + hard-coded `"Free judge: yes"`). The README/registry say
 NVIDIA; the legacy file contradicts both.
@@ -119,8 +123,9 @@ the README matrix already exposes the gaps.
   "my tasks are easy for my models" bias (SPEC §4/§5.3).
 - **P2.3 Judge robustness `[M]`.** Self-consistency (judge each response 3× at temp 0, take the
   median) and/or a small judge panel with inter-rater κ (SPEC §5.2).
-- **P2.4 Wire telemetry `[S]`.** Import `telemetry.py` into `run_bench.py` for tokens / tok-per-s /
-  VRAM / cost (`$0` local) — kills the dead code (**D6**) and adds a perf axis to the leaderboard.
+- **P2.4 Wire telemetry `[S]` · ✅ shipped 2026-07-22.** `run_bench.py` now records tokens /
+  tok-per-s / VRAM / cost (`$0` local) per call to `telemetry/usage_*.jsonl` (gitignored),
+  killing the dead code (**D6**). Perf axis on the leaderboard is still TODO (data now exists).
 - **P2.5 Fix `discover()` tag parsing `[S]`.** Parse `:instruct`/`:latest`/quantized/`8x7b` and drop
   non-sized tags explicitly, not silently (**F1.3/D8**); add a unit test over sample tags.
 - **P2.6 Genuinely-unattended `[M]`.** Real scheduler + `git push` so "while I sleep" is wired
