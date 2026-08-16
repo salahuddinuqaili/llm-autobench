@@ -271,7 +271,8 @@ def build_report(run_stem, scored):
         scored_n = sum(1 for r in rows if _is_num(r.get("score")))
         lats = [r.get("latency_s", 0) or 0 for r in rows]
         latm = sum(lats) / len(lats) if lats else 0.0
-        errs = sum(1 for r in rows if r.get("error") or r.get("truncated"))
+        errs = sum(1 for r in rows
+                   if r.get("error") or r.get("truncated") or r.get("ingestion_failed"))
         lb.append((m, avg, scored_n, len(rows), latm, errs))
     lb.sort(key=lambda x: (x[1] is None, -(x[1] or 0)))  # best avg first, None last
     for m, avg, scored_n, ntasks, latm, errs in lb:
@@ -288,7 +289,8 @@ def build_report(run_stem, scored):
         for r in rows:
             sc = r.get("score")
             sc_s = (f"{sc:.2f}" if _is_num(sc)
-                    else ("trunc" if r.get("truncated") else "—"))
+                    else ("trunc" if r.get("truncated")
+                          else ("no-image" if r.get("ingestion_failed") else "—")))
             lat = r.get("latency_s", 0) or 0
             reason = (r.get("judge_raw", "") or "")[:120].replace("\n", " ")
             lines.append(f"| {r['task']} | {sc_s} | {lat:.1f}s | {reason} |")
@@ -296,7 +298,8 @@ def build_report(run_stem, scored):
 
     # ---- Failures: errored, truncated, or unscored (honest, per SPEC §12) ----
     fails = [r for r in scored
-             if r.get("error") or r.get("truncated") or not _is_num(r.get("score"))]
+             if r.get("error") or r.get("truncated") or r.get("ingestion_failed")
+             or not _is_num(r.get("score"))]
     lines.append("## Failures")
     lines.append("")
     if not fails:
@@ -305,7 +308,10 @@ def build_report(run_stem, scored):
         for r in fails:
             why = (r.get("error") or
                    ("truncated at token budget (unscored, not 0.0)" if r.get("truncated")
-                    else "unscored (judge returned no parseable score)"))
+                    else ("model reported no image was supplied — ingestion failure, "
+                          "NOT a vision-capability score (unscored, not 0.0)"
+                          if r.get("ingestion_failed")
+                          else "unscored (judge returned no parseable score)")))
             lines.append(f"- **{r.get('model')} × {r.get('task')}**: {why}")
     lines.append("")
 
@@ -343,6 +349,15 @@ def main():
         # guard removes (and make the row both "scored" and a Failure). Keep it unscored.
         if r.get("truncated"):
             r.setdefault("judge", "skipped: truncated (unscored)")
+            scored.append(r)
+            continue
+        # Same defeat pattern, second instance: run_bench flags a response that
+        # claims no image was supplied as `ingestion_failed`, but the judge would
+        # happily score that non-answer 0.0 — republishing a harness/ingestion
+        # failure as a capability result (it dragged gemma4:e4b from ~0.95 to 0.78).
+        # Keep it unscored; the Failures section reports what actually happened.
+        if r.get("ingestion_failed"):
+            r.setdefault("judge", "skipped: image not ingested (unscored)")
             scored.append(r)
             continue
         if r.get("score") is not None:
