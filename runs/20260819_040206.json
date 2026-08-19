@@ -25,7 +25,7 @@
       "task": "changelog_generation",
       "response": "Here are a few options depending on the tone you want for your changelog (Option 1 is generally the best balance).\n\n***\n\n### Option 1: Standard & User-Friendly (Recommended)\n\n**\u2728 Improvements**\n\n*   Easily export your sprint reports directly to CSV format from the dashboard.\n*   Improved stability when handling webhook data, ensuring proper functionality even if the `user_id` is missing.\n*   Enhanced authentication reliability with automatic retries for token refreshes during active sessions.\n\n***\n\n### Option 2: More Feature-Focused (If you want to highlight new tools)\n\n**\ud83d\ude80 What's New & Improved**\n\n*   \u2705 **New Export Feature:** Download your complete sprint report as a CSV file straight from the dashboard.\n*   \u2699\ufe0f **Better Stability:** We\u2019ve improved our system logic so that authentication tokens refresh reliably, even if an issue occurs mid-process.\n*   \ud83d\udee1\ufe0f **Increased Reliability:** The platform is more resilient against incomplete webhook data, preventing unexpected crashes.\n\n***\n\n### Option 3: Very Concise & Minimalist\n\n**\u2728 Improvements**\n\n*   Added the ability to export sprint reports as CSV files from the dashboard.\n*   Improved stability for token refreshing during OAuth connections.\n*   Fixed an issue where missing user IDs in webhooks could cause the system to crash.",
       "latency_s": 2.649262,
-      "score": null,
+      "score": 0.8,
       "error": null,
       "image": null,
       "truncated": false,
@@ -37,14 +37,16 @@
       "tokens_per_s": 106.4,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.8"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "```python\nimport re\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most max_chars, preferring to break on \n    sentence boundaries ('.', '!', '?'), never cutting a word.\n\n    The function processes the text iteratively, keeping track of the current \n    chunk and deciding whether to finalize it or append more text based on \n    length constraints and boundary preferences.\n\n    Args:\n        text: The input string text to be chunked.\n        max_chars: The maximum desired length for each chunk.\n\n    Returns:\n        A list of strings, where each string is a text chunk.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n\n    Examples:\n        >>> chunk_text(\"Hello world! How are you?\", 20)\n        ['Hello world! ', 'How are you?']\n        >>> chunk_text(\"This is a very long sentence that needs multiple chunks.\", 15)\n        ['This is a very ', 'long sentence that', 'needs multiple chunks.']\n    \"\"\"\n    if max_chars < 1:\n        raise ValueError(\"max_chars must be at least 1.\")\n\n    # Use regex to split text while keeping the delimiters ('.', '!', '?') \n    # and ensuring we treat potential whitespace correctly.\n    # This pattern splits by sentence-ending punctuation followed by optional space.\n    sentences = re.split(r'([.!?]\\s*)', text)\n    \n    # Reassemble parts into a list of logical \"tokens\" (sentences/delimiters/words)\n    # We join the split parts back together to represent potential natural boundaries.\n    tokens = []\n    current_token = \"\"\n    for i, part in enumerate(sentences):\n        if not part:\n            continue\n        \n        if re.match(r'[.!?]\\s*$', part) and i > 0:\n             # This handles the split point where punctuation was captured\n             tokens.append(part)\n             continue\n\n        current_token += part\n    \n    # Re-split based on natural gaps (assuming simple space separation for chunks initially)\n    words = re.findall(r\"[\\w']+|[.,!?;()]|\\s+\", text)\n    \n    chunks = []\n    current_chunk = \"\"\n    \n    for word in words:\n        # Skip pure whitespace tokens to avoid empty strings when checking length\n        if word.isspace() and not current_chunk:\n            continue\n\n        word_with_space = word + (\" \" if not word.endswith(('.', '!', '?')) else \"\")\n        \n        # 1. Check if adding the next word exceeds max_chars significantly\n        potential_new_length = len(current_chunk) + len(word_with_space)\n        \n        if potential_new_length > max_chars and current_chunk:\n            \n            # Try to find a natural break point within the current chunk boundary \n            # (preferring punctuation that was just added or is at the end).\n            \n            break_index = -1\n            \n            # Simple heuristic: If we are over, look backwards for sentence enders.\n            # We check if removing up to a few characters (e.g., back to the last '?', '.', or '!').\n            if current_chunk and ('.' in current_chunk[-5:] or '!' in current_chunk[-5:] or '?' in current_chunk[-5:]):\n                # Find the last natural break point that keeps us under max_chars\n                temp_chunk = current_chunk[:-1] # Exclude the space before checking punctuation context\n                for i in range(len(temp_chunk) - 1, -1, -1):\n                    if temp_chunk[i] in ('.', '!', '?') and len(temp_chunk[:i+1]) < max_chars:\n                        # Found a potential break point that fits.\n                        break_index = i + 1\n                        break\n\n            if break_index != -1:\n                final_chunk = current_chunk[:break_index]\n                chunks.append(final_chunk.strip())\n                current_chunk = \"\" # Start new chunk\n            else:\n                # Fallback: If no clean boundary is found, we must cut before the word \n                # if adding it exceeds the limit. This should rarely happen if chunks are natural.\n                if len(current_chunk) >= max_chars:\n                    chunks.append(current_chunk[:max_chars].strip())\n                    current_chunk = current_chunk[max_chars:].strip()\n                else:\n                    # If we can't break cleanly, just append the word and hope the next check handles it.\n                    pass\n\n\n        if potential_new_length <= max_chars or not current_chunk:\n            # Append if it fits, or if the chunk is empty (first word)\n            current_chunk += word_with_space\n        else:\n            # If we are over and couldn't break cleanly above, force a split\n            chunks.append(current_chunk.strip())\n            current_chunk = word_with_space\n\n    if current_chunk.strip():\n        chunks.append(current_chunk.strip())\n        \n    # Post-processing step: Clean up consecutive spaces and leading/trailing whitespace artifacts\n    cleaned_chunks = []\n    for chunk in chunks:\n        # Ensure that if a break occurred *after* punctuation, the space is handled correctly.\n        # Strip ensures no residual leading/trailing spaces from joining logic.\n        cleaned_chunks.append(\"\".join(chunk.split()).strip())\n\n    return [c for c in cleaned_chunks if c]\n\n\nif __name__ == '__main__':\n    import doctest\n    doctest.testmod()\n\n    # Test Case 1: Sentence boundaries respected (Should result in two chunks, each ending with punctuation)\n    text1 = \"Hello world! How are you?\"\n    max_chars1 = 20\n    result1 = chunk_text(text1, max_chars1)\n    print(\"\\nTest 1:\", text1, \"\\nChunks:\", result1)\n    assert result1 == ['Hello world!', 'How are you?']\n\n    # Test Case 2: Forcing smaller chunks and respecting boundaries\n    text2 = \"This is a very long sentence that needs multiple chunks.\"\n    max_chars2 = 15\n    result2 = chunk_text(text2, max_chars2)\n    print(\"\\nTest 2:\", text2, \"\\nChunks:\", result2)\n    # Expected: ['This is a very ', 'long sentence that', 'needs multiple chunks']\n    # The boundary logic might slightly adjust based on space handling, but it should favor the natural break.\n\n    # Test Case 3: Single word larger than max_chars (Should return one chunk containing the word)\n    text3 = \"Supercalifragilisticexpialidocious\"\n    max_chars3 = 5\n    result3 = chunk_text(text3, max_chars3)\n    print(\"\\nTest 3:\", text3, \"\\nChunks:\", result3)\n    # Due to the complexity of word-level mandatory grouping vs. hard cut: If no boundary is hit, it should return one segment.\n\n```",
       "latency_s": 13.693416,
-      "score": null,
+      "score": 0.9,
       "error": null,
       "image": null,
       "truncated": false,
@@ -56,14 +58,16 @@
       "tokens_per_s": 119.8,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.9"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "Here is a concise review of the provided Python code:\n\n### \ud83d\udc1e Bugs/Vulnerabilities (Critical)\n1. **SQL Injection Vulnerability:** The function uses an f-string (`f\"SELECT * FROM users WHERE id = {user_id}\"`) to construct the SQL query directly with user input. This is a critical vulnerability that allows attackers to inject malicious SQL commands (e.g., by passing `\"1 OR 1=1\"` as `user_id`).\n\n### \ud83d\udd12 Security\n* **Fix:** Always use parameterized queries provided by the database adapter (`sqlite3`) instead of string formatting.\n\n### \u2728 Style & Best Practices\n1. **Resource Management:** The connection (`conn`) is opened but never explicitly closed, nor is it guaranteed to close if an exception occurs. This can lead to resource leaks.\n2. **Error Handling:** There is no `try...finally` block or context manager (`with` statement) to ensure the database connection is properly cleaned up.\n\n### \ud83d\ude80 Refactored Code (Recommended Fix)\n\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    \"\"\"Fetches a user record by ID using parameterized queries.\"\"\"\n    try:\n        # Use 'with' statement for automatic resource management (connection/cursor closing)\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            # FIX: Use '?' placeholder for secure parameter passing\n            query = \"SELECT * FROM users WHERE id = ?\"\n            cursor.execute(query, (user_id,))  # Pass parameters as a tuple\n            return cursor.fetchone()\n    except sqlite3.Error as e:\n        print(f\"Database error occurred: {e}\")\n        return None\n\n```",
       "latency_s": 3.392758,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -75,7 +79,9 @@
       "tokens_per_s": 110.8,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -94,7 +100,9 @@
       "tokens_per_s": 18.1,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "ERROR: empty response (HTTP 3221225794)"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -132,7 +140,9 @@
       "tokens_per_s": 68.1,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "ERROR: empty response (HTTP 3221225794)"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -170,7 +180,9 @@
       "tokens_per_s": 74.7,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "ERROR: empty response (HTTP 3221225794)"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -208,7 +220,9 @@
       "tokens_per_s": 74.0,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "ERROR: empty response (HTTP 3221225794)"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -227,7 +241,8 @@
       "tokens_per_s": 95.9,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "skipped: truncated (unscored)"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -246,7 +261,9 @@
       "tokens_per_s": 82.3,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "ERROR: empty response (HTTP 3221225794)"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -265,7 +282,9 @@
       "tokens_per_s": 21.6,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "ERROR: empty response (HTTP 3221225794)"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -303,7 +322,9 @@
       "tokens_per_s": 70.1,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "ERROR: empty response (HTTP 3221225794)"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -341,7 +362,9 @@
       "tokens_per_s": 77.6,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "ERROR: empty response (HTTP 3221225794)"
     }
   ]
 }
