@@ -25,7 +25,7 @@
       "task": "changelog_generation",
       "response": "## Improvements: Enhancements in SaaS Changelog\n\n### - [Fix: Retry Logic on OAuth Token Refresh](https://github.com/Dolphin/changelog/pull/2) - Improves the user's experience by handling a 401 error during token refresh, ensuring uninterrupted access to the app.\n- [feat: Export Sprint Report to CSV from Dashboard](https://github.com/Dolphin/changelog/pull/3) - Enhances data accessibility and ease of use for users by enabling them to export sprint reports to CSV format directly from the dashboard.\n- [Refactor: Moved Rate-Limiter into Its Own Service](https://github.com/Dolphin/changelog/pull/4) - Streamlines the application's performance by decoupling the rate limiter service from its dependencies, promoting a cleaner and more efficient system architecture.\n- [Fix: Crash when Webhook Payload is Missing 'User_ID'](https://github.com/Dolphin/changelog/pull/5) - Enhances user safety and satisfaction by addressing a bug that caused the app to crash when the webhook payload was missing the required field 'user_id'. This ensures a seamless experience for users and prevents potential security risks.",
       "latency_s": 1.248997,
-      "score": null,
+      "score": 0.8,
       "error": null,
       "image": null,
       "truncated": false,
@@ -37,14 +37,16 @@
       "tokens_per_s": 216.2,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.8"
     },
     {
       "model": "custom:ollama/dolphin-phi:2.7b",
       "task": "code_generation",
       "response": "Sure, here is the Python function `def chunk_text(text: str, max_chars: int) -> list[str]` that does what you described:\n\n```python\nimport re\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    # Split text into words using regular expression. \n    words = re.findall('\\S+', text)\n\n    # Create an empty list to store chunks.\n    chunks = []\n\n    # Start a new chunk.\n    last_chunk_end = 0\n\n    for word in words:\n        # If adding this word to the current chunk would exceed max_chars, \n        # add the current chunk to the list and start a new one.\n        if last_chunk_end + len(word) > max_chars:\n            chunks.append(text[last_chunk_end:].strip())\n            last_chunk_end = 0\n\n        # If this word is one of '.', ',', '!', or '?', \n        # add it to the current chunk and then start a new one.\n        if word in ['.', ',', '!', '?']:\n            chunks.append(text[last_chunk_end:last_chunk_end+len(word)] + '\\'')\n            last_chunk_end += len(word) + 1\n\n    # If there's a chunk of text left, add it to the list.\n    if last_chunk_end < max_chars:\n        chunks.append(text[last_chunk_end:])\n    return chunks\n```\n\nAnd here is an assert test for this function:\n\n```python\ndef test_chunk_text():\n    assert chunk_text(\"Hello, world!\", 10) == ['Hello', ',', 'world']\n    assert chunk_text(\"This is a sentence. This is another sentence.\", 20) == \n        ['This is a sentence.', \"This is another sentence.\"]\n    assert chunk_text(\"Dolphin is a kind of sea mammal, Dolphin. Can you believe it?\", 30) == \n        ['Dolphin is a kind of sea mammal,', 'Dolphin. Can you believe it?']\n```\n\nThis test function checks that `chunk_text` returns the expected results for a variety of input texts and maximum chunk sizes.",
       "latency_s": 2.440835,
-      "score": null,
+      "score": 0.85,
       "error": null,
       "image": null,
       "truncated": false,
@@ -56,14 +58,16 @@
       "tokens_per_s": 223.3,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/dolphin-phi:2.7b",
       "task": "code_review",
       "response": "There are no syntax or semantic issues in the given Python code. However, it lacks certain best practices to make it more secure and maintainable:\n\n1. It's not a good practice to hard-code sensitive information such as database connection details (like `user_id`, `users.db`). This can lead to serious security issues if the code is ever misused or gets leaked.\n\n2. There are no proper error handling in the function. If the user id does not exist, it will throw an exception and terminate.\n\n3. It's also a best practice to use try-finally pattern when working with databases to ensure connections are always closed, even if exceptions are thrown.\n\n4. This function doesn't have any error checking for input data. For example, what happens if the `user_id` is not an integer or out of range?\n\nHere's a more secure and maintainable version:\n\n```python\nimport sqlite3\nfrom contextlib import closing\n\ndef get_user(user_id):\n    try:\n        connection = sqlite3.connect('users.db')\n        with closing(connection.cursor()) as cursor:\n            cursor.execute(f\"SELECT * FROM users WHERE id=?\", (user_id,))\n            return cursor.fetchone()\n    except Exception as e:\n        print(f\"Failed to fetch user: {str(e)}\")\n        return None\n```\n\nIn this version:\n- The `with closing(...):` statement is used for better error handling and resource management.\n- The connection is handled with the context manager (`closing()`), which will automatically close it when done, even if an exception occurs.\n- Error message are being printed out when there's an issue, instead of terminating the program abruptly.\n- It checks if `user_id` is valid before trying to fetch data from the database.",
       "latency_s": 1.91951,
-      "score": null,
+      "score": 0.67,
       "error": null,
       "image": null,
       "truncated": false,
@@ -75,14 +79,16 @@
       "tokens_per_s": 217.8,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.67"
     },
     {
       "model": "custom:ollama/dolphin-phi:2.7b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nOrange",
       "latency_s": 0.125889,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -94,7 +100,9 @@
       "tokens_per_s": 55.6,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/dolphin-phi:2.7b",
@@ -120,7 +128,7 @@
       "task": "sprint_narrative",
       "response": "In our sprint retrospective, we focused on several critical issues that required immediate attention and resolution. First and foremost, our user authentication system underwent a significant revamp, which we successfully completed by retrying our billing webhooks to ensure smooth integration with the new system. However, despite our best efforts, we encountered a major obstacle in the form of blocked SSO (Service Provider Outage) integration due to an unexpected vendor API downtime lasting three days, forcing us to re-evaluate our approach. Additionally, during our mobile pipeline's CI (Continuous Integration), we faced continuous flakiness, which we are now diligently working on rectifying with a more robust testing strategy in the future. Despite these challenges, we remain committed to achieving excellence and customer satisfaction.",
       "latency_s": 0.700156,
-      "score": null,
+      "score": 0.67,
       "error": null,
       "image": null,
       "truncated": false,
@@ -132,7 +140,9 @@
       "tokens_per_s": 218.5,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.67"
     },
     {
       "model": "custom:ollama/dolphin-phi:2.7b",
@@ -158,7 +168,7 @@
       "task": "summarization",
       "response": "A significant issue occurred in the 14th of an hour where a critical database service named PostgreSQL had its primary failure due to a full storage space on our server's /var/lib/postgresql. This problem was exacerbated by a lack of routine maintenance activities; for example, the Write-Aware Log (WAL) archives were not being rotated every 48 hours, and the necessary post-maintenance checks were also neglected. The main cause behind this issue was that a monitoring alert related to disk space during our recent system maintenance period had been silenced and never reactivated. The solution entails resuming this important alert and adding another check - specifically for maintaining disk space after any significant system maintenance tasks - into our post-maintenance task list. This has resulted in only 8 minutes of downtime.",
       "latency_s": 0.785784,
-      "score": null,
+      "score": 0.4,
       "error": null,
       "image": null,
       "truncated": false,
@@ -170,7 +180,9 @@
       "tokens_per_s": 206.2,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.4"
     }
   ]
 }
