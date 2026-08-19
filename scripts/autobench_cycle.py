@@ -81,26 +81,82 @@ def has_vram_headroom(required_mib, buffer_mib=1024):
     return free >= (required_mib + buffer_mib)
 
 
-def model_is_available_locally(model_tag):
-    """Check if the model tag exists in Ollama (already pulled).
-    Handles tag mismatches — e.g. 'qwen2.5:7b' matches 'qwen2.5:7b-instruct'.
-    Returns the actual local tag name if found, or False.
+def _tag_size_b(tag):
+    """Extract the model parameter size in billions from a tag, robust to
+    size suffixes such as '-instruct' (e.g. 'qwen2.5:7b-instruct' -> 7.0,
+    'gemma4:e4b' -> 4.0). Returns None when no size indicator is present.
+    """
+    m = re.search(r"(\d+(?:\.\d+)?)b", tag, re.IGNORECASE)
+    return float(m.group(1)) if m else None
+
+
+def _local_tags():
+    """Return the list of locally-pulled Ollama tags (first column of `ollama list`).
+
+    Returns [] on any failure so callers fail closed (treat as "not present").
     """
     try:
         out = subprocess.check_output(["ollama", "list"], text=True, stderr=subprocess.DEVNULL)
-        # Check against actual first-column tags (not substring match)
-        local_tags = [line.split()[0] for line in out.splitlines() if line.split()]
-        # Exact match first
-        if model_tag in local_tags:
-            return model_tag
-        # Fuzzy: base name match (e.g. 'qwen2.5:7b' -> 'qwen2.5:7b-instruct')
-        base = model_tag.split(":")[0]
-        for tag in local_tags:
-            if tag.startswith(base + ":"):
-                return tag  # return actual local tag
-        return False
+        return [line.split()[0] for line in out.splitlines() if line.split()]
     except Exception:
-        return False
+        return []
+
+
+def model_is_available_locally(model_tag):
+    """Check if the model tag exists in Ollama (already pulled).
+
+    An exact tag match always counts. A *fuzzy* match (same base name) only
+    counts when the parameter sizes are equal — e.g. 'qwen2.5:7b' matches
+    'qwen2.5:7b-instruct' (both 7B). Different sizes of the same base name are
+    NOT interchangeable: 'gemma4:12b' must NOT resolve to a locally-pulled
+    'gemma4:e4b'. In that case we return False so the caller pulls the requested
+    size (or skips honestly) instead of silently benchmarking the wrong model.
+
+    Returns the actual local tag name if found, or False.
+    """
+    local_tags = _local_tags()
+    # Exact match first
+    if model_tag in local_tags:
+        return model_tag
+    # Fuzzy: same base name AND same parameter size.
+    # (e.g. 'qwen2.5:7b' -> 'qwen2.5:7b-instruct', NOT 'gemma4:12b' -> 'gemma4:e4b'.)
+    base = model_tag.split(":")[0]
+    req_param = _tag_size_b(model_tag)
+    for tag in local_tags:
+        if tag == model_tag:
+            return tag
+        if not tag.startswith(base + ":"):
+            continue
+        if req_param is None:
+            # Requested tag carries no size spec; accept any same-base local tag
+            # (preserves legacy 'llama3' -> 'llama3:8b' behaviour).
+            return tag
+        loc_param = _tag_size_b(tag)
+        if loc_param is not None and loc_param == req_param:
+            return tag
+        # Requested tag has a size but this local tag has a different size (or
+        # no size) -> not a substitute for the requested model.
+    return False
+
+
+def _other_size_local(model_tag):
+    """Return a local tag sharing model_tag's base name but a DIFFERENT parameter
+    size (e.g. 'gemma4:e4b' when 'gemma4:12b' is requested), or None.
+
+    Used only to emit an honest log line when we cannot run the requested model,
+    so a cycle never silently substitutes a wrong-sized local model.
+    """
+    base = model_tag.split(":")[0]
+    req_param = _tag_size_b(model_tag)
+    for tag in _local_tags():
+        if tag == model_tag:
+            continue
+        if not tag.startswith(base + ":"):
+            continue
+        loc_param = _tag_size_b(tag)
+        if req_param is None or loc_param is None or loc_param != req_param:
+            return tag
+    return None
 
 
 def _param_from_tag(tag):
@@ -300,13 +356,23 @@ def main():
     match = re.search(r":(\d+(?:\.\d+)?)b?$", model, re.IGNORECASE)
     pulled = False
     if already_local and already_local != model:
-        print(f"[autobench] tag mismatch: '{model}' resolved to local '{already_local}'")
+        # Only reachable for genuine same-size variants (e.g. qwen2.5:7b ->
+        # qwen2.5:7b-instruct). Different sizes are never substituted (see
+        # model_is_available_locally), so this substitution is always honest.
+        print(f"[autobench] tag variant: '{model}' resolved to local "
+              f"'{already_local}' (same parameter size — safe to benchmark)")
         model = already_local  # use the actual local tag for benchmarking
     if match and not already_local:
         param_b = float(match.group(1))
         required = estimate_model_vram_mib(param_b)
         if not has_vram_headroom(required):
-            print(f"[autobench] SKIP {model}: insufficient VRAM headroom (need ~{required}MiB)")
+            note = ""
+            other = _other_size_local(model)
+            if other:
+                note = (f" (note: '{other}' is present locally but is a different "
+                        f"size and is NOT a substitute for '{model}')")
+            print(f"[autobench] SKIP {model}: insufficient VRAM headroom "
+                  f"(need ~{required}MiB){note}")
             return
         print(f"[autobench] VRAM check OK: {model} (~{required}MiB)")
         print(f"[autobench] pull {model}")
