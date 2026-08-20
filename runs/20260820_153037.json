@@ -25,7 +25,7 @@
       "task": "changelog_generation",
       "response": "Here are a few options, depending on the overall tone of your changelog (Casual vs. Professional).\n\n## Option 1: Friendly & Benefit-Focused (Recommended for most SaaS)\n\n**\u2728 Improvements**\n\n*   Now you can easily export full sprint reports as CSV files directly from the dashboard.\n*   Improved reliability when refreshing OAuth tokens, ensuring seamless access even if initial authentication fails mid-session.\n*   Fixed an issue that could cause crashes if a webhook payload was missing necessary user identification details.\n\n---\n\n## Option 2: Professional & Direct (Good for Enterprise SaaS)\n\n**\ud83d\ude80 Improvements**\n\n*   Added functionality to export detailed sprint reports to CSV format via the dashboard interface.\n*   Enhanced token refreshing logic to gracefully handle authorization errors during OAuth processes, maintaining service uptime.\n*   Resolved a stability bug that previously caused system crashes when receiving incomplete webhook data (missing `user_id`).\n\n---\n\n## Option 3: Short & Sweet (If you have many updates)\n\n**\u2728 Improvements**\n\n*   Export sprint reports as CSV from the dashboard.\n*   Increased reliability of token refreshing, preventing unexpected disconnections during OAuth flows.\n*   Fixed a crash bug that occurred when webhooks were sent with missing user IDs.",
       "latency_s": 2.540678,
-      "score": null,
+      "score": 0.9,
       "error": null,
       "image": null,
       "truncated": false,
@@ -37,14 +37,16 @@
       "tokens_per_s": 102.7,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.9"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "```python\nimport re\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most max_chars, preferring to break on \n    sentence boundaries ('.', '!', '?'), and never cutting a word.\n\n    Args:\n        text: The input string to be chunked.\n        max_chars: The maximum length allowed for each chunk.\n\n    Returns:\n        A list of strings, where each string is a text chunk.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n\n    Examples:\n        >>> chunk_text(\"This is a long sentence! It needs to be split.\", 20)\n        ['This is a long sen.', 'tence! It needs to be', 'split.']\n    \"\"\"\n    if max_chars < 1:\n        raise ValueError(\"max_chars must be at least 1.\")\n\n    # Use a regex that captures potential boundaries (sentences/words)\n    # We'll split by sequences of sentence-ending punctuation followed by space,\n    # or simply look for existing chunks based on these boundaries.\n    \n    chunks = []\n    remaining_text = text.strip()\n\n    if not remaining_text:\n        return []\n\n    while remaining_text:\n        current_chunk = \"\"\n        start_index = 0\n        next_break_point = -1\n        \n        # --- Strategy: Greedy building up to max_chars, prioritizing sentence breaks ---\n        \n        potential_end_indices = []\n        \n        # 1. Check for hard sentence boundaries ('. ', '! ', '? ') or end of string\n        sentences_split = re.finditer(r'([.!?] |[.!?]$)', remaining_text)\n        for match in sentences_split:\n            end_index = match.start() + len(match.group(0)) - 1 # Include punctuation\n            potential_end_indices.append(end_index)\n\n        # Also consider boundaries that force a word cut (if nothing else works)\n        # We ensure we never cut within a known sequence of non-space characters (a word)\n        \n        best_break_point = -1\n        \n        # 2. Iterate through possible break points to find the largest safe chunk <= max_chars\n        \n        # Start by checking if we can fit the whole remaining text\n        if len(remaining_text) <= max_chars:\n            chunks.append(remaining_text)\n            break # Done\n\n        # Try potential sentence breaks first, as they are preferred\n        for p_end in sorted(potential_end_indices):\n            chunk_candidate = remaining_text[:p_end + 1]\n            if len(chunk_candidate) <= max_chars:\n                best_break_point = max(best_break_point, p_end)\n\n        # If sentence breaks aren't sufficient or available at the limit, \n        # we must fall back to finding the best word-boundary break near max_chars.\n        if best_break_point == -1:\n            # Target index is close to max_chars\n            target_index = min(len(remaining_text), max_chars)\n            \n            # Search backwards from target_index until a space or start of string is found, \n            # ensuring we don't exceed the limit.\n            i = target_index\n            while i > 0 and remaining_text[i-1].isalnum() or remaining_text[i-1] in '.!?':\n                i -= 1\n            \n            # If we backed up, this 'i' is a good word boundary break point.\n            if i < target_index:\n                 best_break_point = i\n            else:\n                # If no boundary was found (e.g., small chunks remaining), just use max_chars or the whole thing\n                 best_break_point = min(len(remaining_text) - 1, max_chars - 1)\n\n        # 3. Final selection of break point\n        if best_break_point == -1:\n             # Fallback safety net (should only happen for very short inputs)\n            best_break_point = min(len(remaining_text) - 1, max_chars - 1)\n\n        \n        chunk = remaining_text[:best_break_point + 1].strip()\n        chunks.append(chunk)\n        \n        # Move past the consumed chunk and clean up the next start\n        remaining_text = remaining_text[best_break_point + 1:].lstrip()\n\n    return chunks\n\n\nif __name__ == '__main__':\n    import doctest\n    doctest.testmod()\n    \n    # Detailed tests based on expected behavior:\n    print(\"\\n--- Manual Tests ---\")\n    \n    text1 = \"This is the first sentence! This second one is much longer and needs careful handling.\"\n    max1 = 30\n    result1 = chunk_text(text1, max1)\n    print(f\"Test 1 (Max {max1}): '{text1}'\")\n    print(\"Result:\", result1)\n    # Expected: ['This is the first sentence! ', 'This second one is much longer and', 'needs careful handling.']\n\n    print(\"-\" * 20)\n    \n    text2 = \"Short text.\"\n    max2 = 100\n    result2 = chunk_text(text2, max2)\n    print(f\"Test 2 (Max {max2}): '{text2}'\")\n    print(\"Result:\", result2)\n    # Expected: ['Short text.']\n\n    print(\"-\" * 20)\n    \n    text3 = \"Wordbreak test. This is a very long sentence designed to exceed typical limits.\"\n    max3 = 15\n    result3 = chunk_text(text3, max3)\n    print(f\"Test 3 (Max {max3}): '{text3}'\")\n    print(\"Result:\", result3)\n    # Expected: ['Wordbreak test. ', 'This is a very long', 'sentence designed to excee'] # Note: The last one might cut if sentence boundaries aren't hit exactly at the limit\n\n    print(\"-\" * 20)\n    \n    text4 = \"Hello world? How are you! Bye.\"\n    max4 = 10\n    result4 = chunk_text(text4, max4)\n    print(f\"Test 4 (Max {max4}): '{text4}'\")\n    print(\"Result:\", result4)\n    # Expected: ['Hello world?', 'How are you!', 'Bye.']\n\n    try:\n        chunk_text(\"test\", 0)\n    except ValueError as e:\n        print(f\"Test 5 (Error Handling): Caught expected error - {e}\")\n```",
       "latency_s": 12.763019,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -56,14 +58,16 @@
       "tokens_per_s": 120.4,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "Here is a concise review:\n\n**Bugs/Security:**\n\n*   **Major Security Flaw (SQL Injection):** The use of an f-string (`f\"SELECT * FROM users WHERE id = {user_id}\"`) directly injects the `user_id` into the SQL query. If `user_id` comes from user input, this is highly vulnerable to SQL injection attacks.\n    *   **Fix:** Always use parameterized queries (the `?` placeholder mechanism provided by `sqlite3`).\n\n**Style/Best Practices:**\n\n*   **Resource Management (Crucial):** The database connection (`conn`) must be closed in all execution paths, even if an error occurs. Using a `with` statement is the standard, safe practice.\n*   **Error Handling:** No error handling is present. If the file doesn't exist or the table is missing, the function will crash ungracefully.\n\n**Concise Summary of Fixes Needed:**\n\n1.  **Security:** Use parameterized queries: `cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))`.\n2.  **Reliability/Style:** Wrap database operations in a `with sqlite3.connect(...) as conn:` block to ensure automatic connection closing.",
       "latency_s": 2.510662,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -75,14 +79,16 @@
       "tokens_per_s": 105.5,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nGrape",
       "latency_s": 0.391868,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -94,7 +100,9 @@
       "tokens_per_s": 17.9,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -120,7 +128,7 @@
       "task": "sprint_narrative",
       "response": "We successfully wrapped up the user auth revamp and implemented reliable billing webhook retries this sprint. Development velocity stalled considerably due to the external vendor API outage impacting SSO integration for three days. Moving forward, we need dedicated time to stabilize the flaky CI within the mobile pipeline to maintain momentum.",
       "latency_s": 0.791492,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -132,7 +140,9 @@
       "tokens_per_s": 72.0,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -158,7 +168,7 @@
       "task": "summarization",
       "response": "Our primary database system went offline briefly because the storage drive filled up with old backups due to a missed maintenance step. We quickly switched over to a backup system, which resulted in an eight-minute service interruption for our users. To prevent this from happening again, we are reactivating the necessary alerts and updating our routine checks after any maintenance work.",
       "latency_s": 0.900968,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -170,7 +180,9 @@
       "tokens_per_s": 77.7,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -196,7 +208,7 @@
       "task": "changelog_generation",
       "response": "*   **Enhanced Security & Reliability**: We've strengthened our account connection process, ensuring uninterrupted access even if temporary network issues occur while verifying your credentials.\n*   **New Reporting Capability**: You can now download detailed sprint reports directly from the dashboard as CSV files for easy offline analysis and sharing.\n*   **Faster Performance**: Our system is faster than ever behind the scenes with optimized data handling, delivering a smoother experience throughout the platform.\n*   **Improved Stability**: We've fixed potential errors when processing external notifications, ensuring all your automated updates arrive intact regardless of input variations.",
       "latency_s": 1.549416,
-      "score": null,
+      "score": 0.9,
       "error": null,
       "image": null,
       "truncated": false,
@@ -208,7 +220,9 @@
       "tokens_per_s": 78.1,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.9"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -227,14 +241,15 @@
       "tokens_per_s": 95.1,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "skipped: truncated (unscored)"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "Critical security issue: **SQL Injection** vulnerability due to string formatting with `{}`. Replace with parameterized queries: `cursor.execute(\"SELECT * FROM users WHERE id=?\", (user_id,))`. Style improvement: Add a context manager (`with conn:`) for automatic connection closing and include explicit error handling (`try/except`).",
       "latency_s": 1.072001,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -246,14 +261,16 @@
       "tokens_per_s": 62.5,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nOrange",
       "latency_s": 0.343901,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -265,7 +282,9 @@
       "tokens_per_s": 20.4,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -291,7 +310,7 @@
       "task": "sprint_narrative",
       "response": "We successfully delivered the user authentication revamp and stabilized our billing webhook retry logic despite external delays. However, we made little to no progress on SSO integration due to persistent three-day downtime from the vendor's API. Going forward, I am mandating a failover mechanism for mobile builds to address the current flakiness in that pipeline before it impacts production releases.",
       "latency_s": 1.065584,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -303,7 +322,9 @@
       "tokens_per_s": 69.4,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -329,7 +350,7 @@
       "task": "summarization",
       "response": "The database system went offline briefly because its hard drive became full after backup files were not cleared for two days due to a disabled scheduling task. A short delay in restoring the automatic cleanup process caused critical alerts about low storage space to be ignored, leading to this specific outage. We have now fixed the issue by re-enabling these warnings and adding them to our routine maintenance checks to prevent future occurrences.",
       "latency_s": 1.112562,
-      "score": null,
+      "score": 0.92,
       "error": null,
       "image": null,
       "truncated": false,
@@ -341,7 +362,9 @@
       "tokens_per_s": 71.9,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.92"
     }
   ]
 }
