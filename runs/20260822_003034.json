@@ -25,7 +25,7 @@
       "task": "changelog_generation",
       "response": "Here are a few options, depending on the tone you want for your changelog (Friendly, Professional, or Direct).\n\n---\n\n### \u2728 Option 1: Friendly & Benefit-Focused (Recommended)\n\n**Improvements**\n\n*   Easily download complete sprint reports as CSV files directly from the dashboard.\n*   Improved connection reliability; the system now automatically handles token refreshes if they fail mid-process.\n*   Enhanced stability when receiving webhook data, ensuring the service doesn't crash even if certain user details are missing.\n\n---\n\n### \u2728 Option 2: Professional & Polished\n\n**Improvements**\n\n*   Added the capability to export full sprint reports in CSV format from the dashboard.\n*   Increased robustness for OAuth integrations by implementing more reliable token refreshing logic during live sessions.\n*   Resolved stability issues related to incomplete or missing user data within webhook payloads.\n\n---\n\n### \u2728 Option 3: Direct & Concise (For experienced users)\n\n**Improvements**\n\n*   Now you can export sprint reports as CSV from the dashboard.\n*   Improved resilience for OAuth token refreshing, ensuring better connection handling during long-running requests.\n*   Fixed crashes that could occur when webhook payloads were missing required `user_id` information.",
       "latency_s": 2.645556,
-      "score": null,
+      "score": 0.9,
       "error": null,
       "image": null,
       "truncated": false,
@@ -37,14 +37,16 @@
       "tokens_per_s": 97.5,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.9"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_generation",
       "response": "```python\nimport re\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits text into chunks of at most max_chars, preferring to break \n    on sentence boundaries ('.', '!', '?'), and never cutting a word.\n\n    The function processes the text chunk by chunk, aiming to keep each \n    chunk as close to max_chars as possible while respecting grammatical \n    boundaries when possible.\n\n    Args:\n        text: The input string to be chunked.\n        max_chars: The maximum desired length for each chunk.\n\n    Returns:\n        A list of strings, where each string is a text chunk.\n\n    Raises:\n        ValueError: If max_chars is less than 1.\n\n    Examples:\n        >>> chunk_text(\"Hello world. This is a test!\", 15)\n        ['Hello world.', 'This is a test!']\n        >>> chunk_text(\"Short.\", 3)\n        ['Short.']\n    \"\"\"\n    if max_chars < 1:\n        raise ValueError(\"max_chars must be at least 1.\")\n    if not text:\n        return []\n\n    chunks = []\n    current_index = 0\n    text_length = len(text)\n\n    while current_index < text_length:\n        remaining_text = text[current_index:]\n        start_of_chunk = current_index\n        potential_end = min(current_index + max_chars, text_length)\n\n        # 1. Try to find a natural break point near the desired length (max_chars)\n        best_break_index = -1\n        \n        # Look for sentence boundaries within a margin around potential_end\n        search_window_start = max(start_of_chunk + max_chars - 20, start_of_chunk) # Search up to 20 characters back from the ideal cut point\n        search_window_end = min(potential_end + 5, text_length)\n\n        # Prioritize finding a sentence end (. ! ?) near or just before max_chars limit\n        for i in range(max(start_of_chunk, potential_end - 10), min(potential_end + 1, text_length)):\n            char = text[i]\n            if char in ['.', '!', '?']:\n                # Check if breaking after this sentence boundary respects word boundaries\n                # If we break here, the next char must not be a word character (or it's okay)\n                next_char_is_word_start = (i + 1 < text_length and text[i+1].isalnum())\n                \n                if best_break_index == -1 or (potential_end - i > abs(potential_end - best_break_index)):\n                     # Simple heuristic: take the longest boundary break found so far near the target length\n                    best_break_index = i + 1\n\n        # If a good sentence break point was found, use it if it's not too short/long\n        if best_break_index != -1 and (best_break_index - start_of_chunk >= max_chars * 0.8) and (best_break_index - start_of_chunk <= max_chars + 5):\n            end_index = best_break_index\n        else:\n            # 2. Fallback: Try to find the latest possible safe break point (word boundary) \n            # before or at max_chars, ensuring we don't cut a word.\n            \n            # Candidate end index should be near potential_end\n            candidate_index = min(potential_end + 1, text_length)\n\n            for i in range(min(potential_end + 5, text_length), start_of_chunk - 1, -1):\n                char = text[i]\n                # Check if breaking before 'i' is safe (i.e., not inside a word)\n                is_word_boundary = (i == 0 or not text[i-1].isalnum()) and \\\n                                   (i == text_length or not text[i].isalnum())\n\n                if i >= start_of_chunk and is_word_boundary:\n                    # We found a potential word boundary. Check if this break point results in a chunk of sufficient size.\n                    proposed_end = i\n                    if proposed_end - start_of_chunk >= max_chars * 0.7 or proposed_end == text_length:\n                        end_index = proposed_end\n                        break # Use the first safe boundary found moving backwards\n            else:\n                # If no good word break is found near max_chars, just take the full (or near full) segment up to potential_end.\n                end_index = potential_end\n\n        # Final safety check on end_index\n        if end_index <= start_of_chunk and current_index < text_length:\n            # This happens if max_chars is very small or the logic failed; just take a word boundary break.\n             match = re.search(r\"(\\w+)(?=\\s|$)\", remaining_text)\n             if match:\n                 end_index = start_of_chunk + len(match.group(0))\n             else:\n                 # Should not happen if text is non-empty, but just take the limit\n                 end_index = min(start_of_chunk + max_chars, text_length)\n\n\n        chunk = text[start_of_chunk:end_index].strip()\n        chunks.append(chunk)\n\n        current_index = end_index\n        \n    return chunks\n\n# --- Assert Tests ---\n\n# Test 1: Basic sentence boundary splitting (Success case described in docstring)\nassert chunk_text(\"Hello world. This is a test!\", 15) == ['Hello world.', 'This is a test!']\n\n# Test 2: Chunk size smaller than word count (Should handle gracefully but respecting boundaries)\nassert chunk_text(\"Short.\", 3) == [\"Short.\"]\n\n# Test 3: Single, long text chunk (Should return the whole text if it's under max_chars)\nlong_text = \"This is a very long sentence that should fit entirely in one piece.\"\nassert chunk_text(long_text, 100) == [long_text]\n\n# Test 4: Max characters forcing multiple breaks while respecting boundaries\ntest_text_4 = \"Alpha beta gamma. Delta epsilon zeta! Kappa lambda mu?\"\n# Target around 15 chars. Expected breaks: after '.', after '!', etc.\nresult_4 = chunk_text(test_text_4, 18)\nassert len(result_4) > 1\n\n# Test 5: Empty string input\nassert chunk_text(\"\", 20) == []\n\n# Test 6: Edge case - Max chars is exactly the length of a word boundary (e.g., ending on punctuation)\ntest_text_6 = \"Word one. Word two!\"\nassert chunk_text(test_text_6, 11) == ['Word one.', 'Word two!']\n\n# Test 7: Edge case - Max chars too small but still functional (should return words/small segments)\ntest_text_7 = \"ABCDEFGHIJK\"\nassert chunk_text(test_text_7, 3) == [\"ABC\", \"DEF\", \"GHI\", \"JK\"]\n\nprint(\"All assertion tests passed!\")\n```",
       "latency_s": 14.470274,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -56,14 +58,16 @@
       "tokens_per_s": 115.1,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "code_review",
       "response": "Here is a concise review:\n\n### \ud83d\udc1e Bugs/Logic\n* **None apparent** for the simple logic presented, but resource management is poor. The connection (`conn`) is never closed in all execution paths (e.g., if an error occurs).\n\n### \ud83d\udee1\ufe0f Security Issues\n* **SQL Injection Vulnerability:** This is critical. Using an f-string to embed user input (`user_id`) directly into the SQL query allows an attacker to manipulate the query structure (e.g., passing `1 OR 1=1`).\n\n### \u2728 Style & Best Practices\n* **Resource Management:** Use a `with` statement for database connections and cursors to ensure they are always closed automatically, even if errors occur.\n* **Type Safety/Efficiency:** Pass parameters safely using the question mark (`?`) placeholder mechanism provided by the library.\n\n---\n\n### \u2705 Recommended Fix (The Secure & Pythonic Way)\n\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    try:\n        # Use 'with' for automatic connection/cursor management\n        with sqlite3.connect('users.db') as conn:\n            cursor = conn.cursor()\n            # CRITICAL FIX: Use parameter substitution (?)\n            query = \"SELECT * FROM users WHERE id = ?\"\n            cursor.execute(query, (user_id,)) # Pass input as a tuple\n            return cursor.fetchone()\n    except sqlite3.Error as e:\n        print(f\"Database error occurred: {e}\")\n        return None\n```",
       "latency_s": 3.145266,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -75,14 +79,16 @@
       "tokens_per_s": 104.3,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nGrape",
       "latency_s": 0.44114,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -94,7 +100,9 @@
       "tokens_per_s": 15.9,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -120,7 +128,7 @@
       "task": "sprint_narrative",
       "response": "We successfully delivered the user auth revamp and stabilized billing webhooks this sprint. Progress on SSO stalled due to unexpected three-day vendor API downtime, which was a key blocker. Moving forward, we need immediate focus on stabilizing the flaky CI build in the mobile pipeline to mitigate future delays.",
       "latency_s": 0.828832,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -132,7 +140,9 @@
       "tokens_per_s": 70.0,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/gemma4:e4b",
@@ -158,7 +168,7 @@
       "task": "summarization",
       "response": "The database experienced an outage this afternoon because the storage drive where the data is kept ran out of space. This happened because an automated system responsible for managing backups was turned off during maintenance and wasn't properly reactivated afterward. We restored service by switching to a backup copy, resulting in about eight minutes of downtime, and we have fixed the process to prevent this from happening again.",
       "latency_s": 0.995797,
-      "score": null,
+      "score": 0.92,
       "error": null,
       "image": null,
       "truncated": false,
@@ -170,7 +180,9 @@
       "tokens_per_s": 77.3,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.92"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -196,7 +208,7 @@
       "task": "changelog_generation",
       "response": "Here are user-facing improvements for your SaaS changelog:\n\n*   **Stable Authentication**: Improved login reliability so you can stay logged in even if a token refresh experiences temporary network issues.\n*   **New Export Feature**: Easily download detailed sprint reports directly from the dashboard as CSV files to share with your team.",
       "latency_s": 1.07178,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -208,14 +220,16 @@
       "tokens_per_s": 61.6,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_generation",
       "response": "```python\nimport re\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits the input text into chunks of at most `max_chars` characters.\n    \n    The function prioritizes breaking sentences (at '.', '!', '?') over \n    arbitrary cuts within words or in the middle of a sentence structure.\n    Empty strings are not yielded as chunks if they result from trailing whitespace after splitting,\n    but multiple consecutive separators might leave empty entries; this implementation filters them out\n    to ensure sensible output unless specifically needed (current logic handles standard punctuation).\n\n    Args:\n        text (str): The input string to be split.\n        max_chars (int): Maximum number of characters allowed per chunk.\n\n    Returns:\n        list[str]: A list of non-empty strings, each with length <= max_chars.\n\n    Raises:\n        ValueError: If max_chars is less than 1 or negative.\n\n    Example:\n        >>> chunk_text(\"Hello world! This is a test.\", 5)\n        ['Hello', 'world!', 'This', 'is', 'a'] \n        # Note: Last part might include '.' depending on how sentence boundary aligns with length\n    \n    \"\"\"\n    \n    if max_chars <= 0:\n        raise ValueError(\"max_chars must be greater than 0\")\n\n    chunks = []\n    current_chunk = \"\"\n\n    def finalize_chunk() -> None:\n        nonlocal current_chunk\n        stripped = current_chunk.strip()\n        # We only yield non-empty, trimmed content. \n        # If the user wants raw splits including empty strings from multiple dots without space,\n        # we would change this logic. Currently we prefer semantic chunks.\n        if stripped and len(current_chunk) <= max_chars:\n            chunks.append(stripped)\n        \n    def reset_current() -> None:\n        nonlocal current_chunk\n        current_chunk = \"\"\n\n    for char in text:\n        # If adding the character exceeds limit, try to finalize before adding.\n        if len(current_chunk + char) > max_chars and not re.match(r\"^[.\\!?]\\s*$\", char): \n            # Heuristic check: don't cut inside a word unless necessary and unavoidable after punctuation logic?\n            # But requirement says \"never cutting a word\". So we must avoid cutting mid-word.\n            \n            # Strategy: If current is incomplete (no end of sentence) and adding 'char' exceeds,\n            # flush what we have if it ends in .!? otherwise cut here carefully.\n            pass\n        \n        # Simpler approach with backtracking for \"never cut a word\":\n        \n    # Revised Logic for Safety against mid-word cuts:\n    \n    words = text.split()  # split by whitespace\n    \n    current_chunk_text = \"\"\n    final_chunks = []\n\n    def flush_chunk(cut_at_end=True):\n        nonlocal current_chunk_text\n        \n        candidate = (current_chunk_text + (\" \" if cut_at_end and len(current_chunk_text) > max_chars else \"\")).strip()\n        \n        # If adding the next word makes it too big, we might need to split before that.\n        return_candidate = None\n        \n        temp_len = 0\n        # Actually let's implement iterative filling with lookahead\n    \n    better_logic = True\n\ndef chunk_text_v2(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits the input text into chunks of at most `max_chars` characters.\n    \n    Prioritizes breaking sentences ('.', '!', '?') over arbitrary cuts within words. \n    Never cuts a word in half unless absolutely necessary (which we avoid by flushing earlier).\n\n    Args:\n        text (str): Input string to split.\n        max_chars (int): Max length of each chunk.\n\n    Returns:\n        list[str]: List of chunks, ensuring no internal words are cut and punctuation \n                    preferably triggers a break if within limit.\n    \n    Raises:\n        ValueError: If max_chars is not positive.\n    \"\"\"\n    if max_chars <= 0:\n        raise ValueError(\"max_chars must be greater than 0\")\n\n    # Split text into tokens preserving original spacing logic roughly by keeping full sentences? \n    # Actually, simpler to split by whitespace and join back with spaces carefully.\n    \n    raw_tokens = re.split(r'\\s+', text.strip()) if text else []\n    \n    chunks = []\n    current_len = 0\n    \n    for token in raw_tokens:\n        next_token_len = len(token)\n        \n        # Check punctuation boundary before deciding to add strictly? \n        # Requirement: Prefer breaking on sentence boundaries. This implies that IF we are forced \n        # and the only way to fit is after a '.', '!', '?', do it immediately (if possible).\n        # But primarily \"never cut a word\". So if current + token > max, we MUST flush now.\n        \n        can_add = True\n        \n        if current_len == 0:\n            chunk_start_token = len(text) < max_chars ? ... no logic here yet\n            \n    let's restructure cleanly without premature complexity\n    \ndef _chunk_text_clean(text: str, limit: int):\n    \"\"\"Helper to implement the specific constraints.\"\"\"\n    if not text or limit <= 0: return []\n    \n    # We want chunks that respect punctuation boundaries as much as possible.\n    full_sentences = [s.strip() for s in re.split(r'([.\\!?]+)', text) if s] \n    # Wait, splitting by regex might lose data; better to iterate char-by-char or sentence-segments?\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits `text` into chunks of at most `max_chars`. Breaks preferentially at '.', '!', '?' \n    and never cuts a word (unless the text ends mid-sentence which is fine).\n    \n    Logic:\n    1. Accumulate words until adding the next would exceed max_chars.\n    2. If accumulation exceeds, check if there was no recent punctuation to allow breaking earlier.\n       Actually simpler: Try to fit as much as possible. When overflow happens, \n       ensure we break at a valid point (preferably after '.!?'). \n       \n    To strictly \"never cut a word\": We treat words separated by whitespace as atomic units.\n    \n    \"\"\"\n    if not text or max_chars <= 0: return []\n\n    # Normalize spaces slightly for tokenization but preserve internal structure? \n    # Simple approach: Split into tokens, rebuild chunks greedily while respecting boundaries.\n    \n    raw = re.split(r'(\\s+)', text) # Keep delimiters to handle multiple spaces correctly if needed later? \n    \n    # Actually simpler: split by whitespace and join with single space is usually standard for this task.\n    words_with_spaces_split = [w.strip() for w in text.replace('\\n', ' ').split()] \n    # Wait, the prompt implies raw strings might contain newlines/spaces; let's stick to simple whitespace tokens\n    \ndef chunk_text_final(text: str, max_chars: int) -> list[str]:\n    if not isinstance(max_chars, (int)) or max_chars <= 0:\n        raise ValueError(\"max_chars must be a positive integer\")\n        \n    # Handle empty text\n    if not text.strip(): return []\n\n    tokens = re.split(r'\\s+', text) \n    chunks = []\n    \n    current_chunk_len = 0\n    \n    for token in tokens:\n        len_token = len(token)\n        \n        # If adding this token exceeds limit, we need to close the chunk.\n        if current_chunk_len + len_token > max_chars and not (current_chunk_len == 0): \n            # We are overflowing. Close current chunk with what it has currently? No, that cuts a word implicitly? \n            # Wait: If current is \"Hello\" (6) and limit is 5 -> impossible initially unless first token fits.\n            \n        pass \n\n    Let's write the definitive solution based on standard requirements for this type of problem:\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits `text` into chunks with a maximum length of `max_chars`.\n    \n    The function attempts to avoid cutting words in half. It prioritizes \n    breaking after sentence-ending punctuation ('.', '!', '?') when an exact \n    fit isn't possible or when moving past them helps maintain constraints.\n\n    Args:\n        text (str): The input string to process.\n        max_chars (int): Maximum allowed characters per chunk.\n\n    Returns:\n        list[str]: A list of non-empty strings, each having length <= max_chars.\n\n    Raises:\n        ValueError: If `max_chars` is less than or equal to 0.\n    \n    Example:\n        >>> chunk_text(\"This is a long sentence with many words.\", 20)\n        ['This', 'is', 'a', 'long', 'sentence'], [...] \n    \"\"\"\n\nif __name__ == \"__main__\":\n    assert isinstance(chunk_text(\"Hello World\", 15), list)\n```\n\n### Final Corrected Code Implementation\n\n```python\nimport re\n\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Splits the input text into chunks of at most `max_chars` characters.\n    \n    Strategy:\n    1. Tokenize the text by whitespace to avoid cutting individual words in half.\n    2. Greedily accumulate tokens into a chunk until adding the next token would \n       exceed `max_chars`.\n    3. If an overflow occurs, finalize the current chunk and start a new one.\n       - We prioritize ensuring no word is cut mid-stream (since we tokenize by space).\n       - The \"prefer sentence boundary\" requirement naturally handles itself because \n         tokens ending in '. ', '!', '?', are kept intact as atomic units; if they \n         fit at the very end, great. If not, we flush before them to keep integrity, \n         effectively breaking near a word which might be fine or implies the previous \n         sentence was too long and needs truncation (though strictly \"prefer\" means try hard).\n       \n    Note: This implementation ensures no single whitespace-separated token is split.\n\n    Args:\n        text (str): The string to split.\n        max_chars (int): Maximum number of characters per chunk.\n\n    Returns:\n        list[str]: A list of chunks, each <= `max_chars` and containing whole tokens.\n\n    Raises:\n        ValueError: If `max_chars` is less than or equal to 0.\n        \n    Example:\n        >>> chunk_text(\"Hello world! This is a test.\", 5) \n        ['world!', 'This', 'is'] ... (depending on exact lengths and punctuation logic applied strictly per token list)\n    \n    \"\"\"\n    \n    if max_chars <= 0:\n        raise ValueError(\"max_chars must be greater than 0\")\n        \n    # Clean up text slightly but keep logical tokens. \n    # We split by whitespace to get atomic units (tokens).\n    raw_tokens = re.split(r'\\s+', text)\n    \n    chunks = []\n    current_chunk: str = \"\"\n\n    for token in raw_tokens:\n        if not token: continue\n        \n        token_len = len(token)\n        \n        # If the chunk is empty, just add it (unless max_chars < 0 which is handled above)\n        if not current_chunk:\n            current_chunk += token\n            \n        elif current_chunk + \" \" + token <= text[:max_chars] and \\\n             len(current_chunk + \" \" + token) <= max_chars: \n             \n             # Check length constraint including the space separator for readability, \n             # though strictly we might join without extra spaces if not needed. \n             # Standard approach joins with single space between tokens found in split list? \n             # Usually yes to preserve structure unless original had multiple spaces which regex \\s+ removes (single out).\n             \n            candidate = current_chunk + \" \" + token\n            \n            # Optimization: If adding this exceeds limit, check if we can break BEFORE a sentence end.\n            # But the simplest guarantee against cutting words is flushing now.\n            \n        elif len(current_chunk) == 0 and current_chunk_len < max_chars : \n             pass\n\n    return chunks\n\ndef chunk_text_fixed(text: str, max_chars: int) -> list[str]:\n    \"\"\"Correct implementation\"\"\"\n    \n    if not text or isinstance(max_chars, (int)) <= False or max_chars <= 0:\n        raise ValueError(\"max_chars must be a positive integer\")\n        \n    tokens = re.split(r'\\s+', text.strip()) # Use strip() to remove leading/trailing whitespace noise\n    \n    chunks = []\n    current_buffer_len = 0\n    buffer_content = \"\"\n    \n    for token in tokens:\n        next_len = len(token) + (1 if not empty and buffer_content else 0) \n        \n        logic...\n\n```",
       "latency_s": 53.107455,
-      "score": null,
+      "score": 0.6,
       "error": null,
       "image": null,
       "truncated": false,
@@ -227,14 +241,16 @@
       "tokens_per_s": 90.3,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.6"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "code_review",
       "response": "- **Critical Security Issue**: The code is vulnerable to SQL injection. User input (`user_id`) is interpolated directly into the query string without sanitization or parameter binding. It must use a placeholder: `query = \"SELECT * FROM users WHERE id = ?\"` and pass `(user_id,)` as arguments to `.execute()`.\n- **Resource Management**: The database connection is never closed, leading to resource leaks. Wrap logic in a `with sqlite3.connect(...) as conn:` block or explicitly call `conn.close()` after use.",
       "latency_s": 1.547894,
-      "score": null,
+      "score": 0.85,
       "error": null,
       "image": null,
       "truncated": false,
@@ -246,14 +262,16 @@
       "tokens_per_s": 71.1,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
       "task": "instruction_following",
       "response": "Apple\nBanana\nOrange",
       "latency_s": 0.375856,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -265,7 +283,9 @@
       "tokens_per_s": 18.6,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -291,7 +311,7 @@
       "task": "sprint_narrative",
       "response": "We successfully delivered the user authentication overhaul and stabilized our billing webhook retry logic ahead of schedule. Progress was significantly delayed by SSO integration blockers caused by a three-day vendor API outage that we could not resolve internally. Going forward, we must immediately investigate and address the unstable CI pipelines on the mobile branch to prevent future deployment risks.",
       "latency_s": 1.007587,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -303,7 +323,9 @@
       "tokens_per_s": 65.5,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -329,7 +351,7 @@
       "task": "summarization",
       "response": "The main database went offline briefly because the server's hard drive ran out of storage due to archived logs that were not being cleared automatically. A backup copy was quickly switched in to minimize the service interruption to just eight minutes. We have now fixed this by restoring critical space-monitoring alerts and added a final check for disk usage before any future maintenance is completed.",
       "latency_s": 1.132653,
-      "score": null,
+      "score": 0.95,
       "error": null,
       "image": null,
       "truncated": false,
@@ -341,7 +363,9 @@
       "tokens_per_s": 63.6,
       "thinking_chars": 0,
       "think_disabled": true,
-      "ingestion_failed": false
+      "ingestion_failed": false,
+      "judge": "nvidia/meta/llama-3.3-70b-instruct",
+      "judge_raw": "0.95"
     }
   ]
 }
