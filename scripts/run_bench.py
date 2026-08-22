@@ -29,6 +29,59 @@ import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# Bump when the shape of a run record changes, so a reader can tell which records
+# are comparable. Runs written before this existed carry no provenance block at all.
+SCHEMA_VERSION = 1
+
+
+def _shell(args, default=""):
+    """Best-effort capture; provenance must never break a benchmark run."""
+    import subprocess
+    try:
+        p = subprocess.run(args, capture_output=True, text=True, timeout=15, cwd=REPO)
+        return p.stdout.strip() if p.returncode == 0 else default
+    except Exception:
+        return default
+
+
+def build_provenance():
+    """What a reader needs to know to decide whether two runs are comparable.
+
+    Deliberately records hardware CLASS (GPU model, VRAM) and never machine
+    identity -- no hostname, no username, no absolute paths. This repo is public.
+    """
+    import hashlib
+
+    tasks_dir = os.path.join(REPO, "tasks")
+    battery = ""
+    try:
+        h = hashlib.sha256()
+        for name in sorted(os.listdir(tasks_dir)):
+            if name.endswith(".yaml"):
+                with open(os.path.join(tasks_dir, name), "rb") as f:
+                    h.update(name.encode()); h.update(f.read())
+        battery = h.hexdigest()[:12]
+    except OSError:
+        pass
+
+    gpu = _shell(["nvidia-smi", "--query-gpu=name,memory.total",
+                  "--format=csv,noheader"]).splitlines()
+    ollama = _shell(["ollama", "--version"])
+
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "recorded_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+        "pipeline_sha": _shell(["git", "rev-parse", "--short", "HEAD"]),
+        "pipeline_dirty": bool(_shell(["git", "status", "--porcelain"])),
+        "task_battery_sha": battery,
+        "task_count": len([n for n in os.listdir(tasks_dir)
+                           if n.endswith(".yaml")]) if os.path.isdir(tasks_dir) else None,
+        # The judge is asserted here so a run can be checked rather than trusted.
+        "judge": {"provider": "nvidia_nim", "model": "meta/llama-3.3-70b-instruct"},
+        "hardware": {"gpu": gpu[0].strip() if gpu else None},
+        "ollama_version": ollama or None,
+    }
+
 
 def load_registry(path):
     with open(path) as f:
@@ -76,6 +129,16 @@ def call_model(model, prompt, max_tokens, image_path=None):
                 "messages": [message],
                 "stream": False,
                 "options": {"num_predict": max_tokens},
+                # Thinking OFF is this benchmark's standard condition, for two
+                # measured reasons (see DECISIONS.md 2026-08-15):
+                #   1. Ollama DROPS the image when thinking is on, so a vision
+                #      model reports "no image provided" and scores 0 for what is
+                #      a harness artefact, not a capability (gemma4:e4b).
+                #   2. Thinking does not always terminate: qwen3.5:9b spends 4730+
+                #      words on `arithmetic_reasoning` and is still truncated at an
+                #      8192 budget, while think-off answers it in 484 tokens.
+                # Ollama accepts this key for non-thinking models too (no-op).
+                "think": False,
             }
             # Vision tasks carry an `image:` path (relative to REPO). Ollama's
             # /api/chat expects `images` INSIDE the message that carries the
@@ -117,6 +180,11 @@ def call_model(model, prompt, max_tokens, image_path=None):
                 "done_reason": resp.get("done_reason"),
                 "prompt_tokens": resp.get("prompt_eval_count"),
                 "completion_tokens": resp.get("eval_count"),
+                # Non-zero despite `think: False` means the model ignored the flag;
+                # surfaced so a silent regression to thinking mode is visible in the
+                # run JSON rather than showing up as mystery truncation.
+                "thinking_chars": len(msg.get("thinking") or ""),
+                "think_disabled": True,
             }
             return text, latency, None, meta
         except Exception as e:
@@ -205,6 +273,25 @@ def _norm_time(s):
     "5:00" is a substring of "15:00")."""
     m = re.match(r"0*(\d{1,2}):(\d{2})$", s.strip())
     return f"{int(m.group(1))}:{m.group(2)}" if m else s.strip()
+
+
+# A vision model that answers "you have not provided an image" did not FAIL the
+# task, it never received it. Scoring that as a capability result is the inverse
+# of the honesty rule (CLAUDE.md 9): a harness/ingestion failure published as a
+# low OCR score. Flagged separately so reports can say which one happened.
+# gemma4:e4b emits this intermittently on tasks/images/ocr_card.png even with a
+# correctly attached image and `think: False`.
+_NO_IMAGE_RE = re.compile(
+    r"(not|n't|no)\s+(been\s+)?(provided|attached|given|uploaded|include)"
+    r"|need\s+an?\s+image|cannot\s+see\s+(an?\s+)?image|unable\s+to\s+see"
+    r"|please\s+(provide|upload|share)\s+(the|an?)\s+(image|picture|photo)",
+    re.I,
+)
+
+
+def looks_like_ingestion_failure(response):
+    """True when a response to an IMAGE task claims no image was supplied."""
+    return bool(response and _NO_IMAGE_RE.search(response))
 
 
 def _to_float(tok):
@@ -370,18 +457,27 @@ def main():
                 "prompt_tokens": meta.get("prompt_tokens"),
                 "completion_tokens": meta.get("completion_tokens"),
                 "tokens_per_s": tps,
+                "thinking_chars": meta.get("thinking_chars"),
+                "think_disabled": meta.get("think_disabled"),
+                "ingestion_failed": bool(
+                    task.get("image") and looks_like_ingestion_failure(text)),
             })
             if tracker is not None:
                 _record_telemetry(tracker, run_id, model, task, latency, meta, err)
             flag = ("ERR" if err else
                     ("TRUNC/unscored" if truncated else
-                     ("score=" + str(sc) if sc is not None else "unscored")))
+                     ("INGEST-FAIL/unscored" if results[-1]["ingestion_failed"] else
+                      ("score=" + str(sc) if sc is not None else "unscored"))))
             print(f"[{run_id}] {model['id']} x {task['id']}: {flag}"
                   + (f" (attempts={meta.get('attempts')})" if meta.get("attempts", 1) > 1 else ""))
 
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, f"{run_id}.json"), "w") as f:
-        json.dump({"run_id": run_id, "results": results}, f, indent=2)
+        json.dump({
+            "run_id": run_id,
+            "provenance": build_provenance(),
+            "results": results,
+        }, f, indent=2)
     # TODO: generate reports/<run_id>.md from results (leaderboard + cost split).
     print(f"Wrote {args.out}/{run_id}.json  ({len(results)} model/task pairs)")
 

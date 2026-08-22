@@ -49,21 +49,47 @@ def looks_truncated(resp):
     return len(tail) > 300 and not tail.endswith((".", "!", "?", "}", ")", "`", '"', ":", "]"))
 
 
-def load_rows():
+# Runs before this date were produced by a pipeline with known credibility defects
+# (truncation, answer extraction, multiple judges), fixed in d61170e on 2026-07-27.
+# They stay in the repo as history but must never be averaged together with runs
+# from the current pipeline -- the two eras are not comparable.
+ERA_CUTOFF = "20260727"
+
+# Only YYYYMMDD_HHMMSS files are benchmark runs. `vision_*.json` are development
+# smoke tests that predate the naming convention, and one file uses a dashed date.
+RUN_ID_RE = re.compile(r"^\d{8}_\d{6}$")
+
+
+def is_current_era(run_id):
+    """True if this run belongs in a published aggregate."""
+    if not RUN_ID_RE.match(str(run_id)):
+        return False
+    return str(run_id)[:8] >= ERA_CUTOFF
+
+
+def load_rows(include_all=False):
     rows = []
     run_ids = []
+    skipped = {"pre_era": 0, "not_a_run": 0}
     for path in sorted(glob.glob(os.path.join(RUNS_DIR, "*.json"))):
         try:
             data = json.load(open(path, encoding="utf-8"))
         except Exception:
             continue
         rid = data.get("run_id") or os.path.splitext(os.path.basename(path))[0]
+        if not include_all and not is_current_era(rid):
+            key = "not_a_run" if not RUN_ID_RE.match(str(rid)) else "pre_era"
+            skipped[key] += 1
+            continue
         run_ids.append(rid)
         for r in data.get("results", []):
             if isinstance(r, dict):
                 r = dict(r)
                 r["_run"] = rid
                 rows.append(r)
+    if skipped["pre_era"] or skipped["not_a_run"]:
+        print("aggregate: excluded %d pre-%s run(s) and %d non-run file(s)"
+              % (skipped["pre_era"], ERA_CUTOFF, skipped["not_a_run"]))
     return rows, run_ids
 
 
@@ -194,9 +220,7 @@ def render(a):
               "(estimated from response endings). Reasoning models (`qwen3.5:9b`) "
               "are hit hardest: `arithmetic_reasoning` and `structured_output` "
               "scores are partly a harness limit, not a capability signal. "
-              "*(Fixed going forward: a `done_reason` truncation guard now retries "
-              "at 2× budget and marks still-truncated responses unscored, not 0.0; "
-              "the runs aggregated above predate it.)*")
+              "*(A `done_reason` truncation guard retries at 2× budget and marks still-truncated responses unscored rather than 0.0. Every run in this aggregate already has it — pre-2026-07-27 runs are excluded.)*")
     md.append(f"- **Errors:** {er} results errored (mostly Ollama `HTTP 404`, a "
               "model tag that failed to pull). Errored rows are excluded from means.")
     md.append("- **Uneven coverage:** tag-gating means `qwen3.5:9b` attempts 5 tasks "
