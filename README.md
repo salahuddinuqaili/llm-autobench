@@ -1,157 +1,113 @@
 # llm-autobench
 
-**An autonomous, local-first LLM benchmarking pipeline, and a public portfolio piece.**
+**A zero-cost harness for benchmarking open models on hardware you already own — and deleting them afterwards.**
 
-`llm-autobench` watches for new open-source model releases, **pulls** them onto a
-local GPU, **benchmarks** them against a fixed task battery, **reports** the results,
-then **deletes** the model to keep the machine free. The whole cycle runs unattended.
+The interesting part of this repo is not the scores. It is that a **12 GB consumer GPU** can benchmark a stream of open models continuously, at **no API cost**, without ever hosting a judge and a model at the same time, and without filling the disk.
 
-> **Public repo. No secrets, no private data.** Only public models are benchmarked.
-> The judge runs on a **free NVIDIA NIM model** (Llama 3.3 70B, 40 RPM) in the cloud,
-> which keeps the local **12 GB GPU** free for the model-under-test, so no single box
-> ever has to host a judge *and* a model at once. There is **no paid API spend**
-> anywhere in the pipeline.
+> **Public repo. No secrets, no private data.** Only public models are benchmarked. The judge runs on a **free NVIDIA NIM model** (Llama 3.3 70B, 40 RPM) in the cloud, keeping the local **12 GB GPU** free for the model-under-test, so no single box ever hosts a judge *and* a model at once. **There is no paid API spend anywhere in this pipeline.**
 
-## 📊 Results so far
+---
 
-The pipeline has run unattended for days. This section is **auto-generated from every
-committed `runs/*.json`** by [`scripts/aggregate_results.py`](scripts/aggregate_results.py).
-Per-run detail lives in [`reports/`](reports/), the roadmap in [`IMPROVEMENTS.md`](IMPROVEMENTS.md).
+## ⚠️ Read this before reading the numbers
+
+**This is a harness with a smoke-test battery attached. It is not a leaderboard, and the scores below should not be used to rank models.**
+
+- **Every task is a single prompt.** Eleven task files, eleven prompts — so a model's score in a category is whether it answered **one** question correctly, graded binary. That cannot separate models, and one ambiguous prompt flips a category score between 1.0 and 0.0.
+- **N=1 per (model, task)**, one judge pass, no repeats, no confidence intervals, no inter-rater agreement.
+- **Coverage is uneven** — tag-gating means some models attempt 5 tasks and others 11, so comparison is only meaningful within shared tasks.
+- **A category label is not a guarantee about content.** `logical_reasoning` is, on inspection, an arithmetic word problem.
+
+Public benchmarks answer the ranking question with hundreds or thousands of items and far more rigour. **This repo answers a different question: what can a 12 GB box actually run, how fast, and at what cost.**
+
+---
+
+## What it is actually good for
+
+| Question | Answered here |
+|---|---|
+| Does this model fit and run on 12 GB VRAM? | ✅ measured, not estimated |
+| How slow is it on consumer hardware? | ✅ per-task latency, real hardware |
+| What does continuous benchmarking cost? | ✅ **nothing** — free judge, local compute |
+| Can it run unattended without filling the disk? | ✅ that is what the lifecycle is for |
+| Which model is *better*? | ❌ **not answerable from this data** |
+
+---
+
+## The architecture — why the judge lives elsewhere
+
+```
+   ┌─ Cycle · orchestrator + judge = FREE NVIDIA NIM (Llama 3.3 70B) ────────────────
+   │
+   │   1. discover   find a model tag not yet benchmarked ── fits 12 GB VRAM? (≤ ~14B)
+   │   2. pull       ollama pull <model>
+   │   3. bench      run_bench.py → local Ollama runs the model-under-test  (heavy)
+   │   4. judge      free NVIDIA NIM 70B scores each output against the task rubric
+   │   5. report     write reports/<run_id>.md
+   │   6. delete     ollama rm <model>          (free disk + VRAM for the next cycle)
+   │   7. commit     git commit runs/ + reports/
+   │
+   └─ Local Ollama does step 3 only; everything else runs FREE in the cloud ─────────
+```
+
+**The separation is the whole design.** A 12 GB box cannot host a judge *and* a subject, so the judge is cloud-side on a free tier — the local GPU is never contended, and the marginal cost of another run is zero.
+
+**Step 6 is the one nobody else does.** Without deleting the model, a machine that is also your workstation fills its disk within days. The lifecycle is what makes this sustainable rather than a weekend experiment.
+
+## Constraints, by design
+
+- **12 GB VRAM ceiling** — the watcher only pulls models ≤ `max_params_billions` (default 14).
+- **Public only** — no private-repo or personal data ever enters this repo.
+- **Free judge** — NVIDIA NIM (Llama 3.3 70B, 40 RPM). No paid spend, ever.
+
+---
+
+## Results — smoke-test output, not a ranking
+
+Auto-generated from committed `runs/*.json` by [`scripts/aggregate_results.py`](scripts/aggregate_results.py). Per-run detail in [`reports/`](reports/); roadmap in [`IMPROVEMENTS.md`](IMPROVEMENTS.md).
+
+⚠️ **Runs before 2026-07-27 predate the credibility fixes** landed in `d61170e` — truncation guard, answer extraction, single judge. **Treat the two eras as separate datasets; they are not comparable.**
 
 <!-- RESULTS:START (auto-generated by scripts/aggregate_results.py; do not edit by hand) -->
-_All-time aggregate across **103 runs** (2026-07-16 → 2026-07-22), **13 models**, **11 tasks**, 1039 model×task results. Judge: free NVIDIA NIM Llama-3.3-70B. Regenerate: `python scripts/aggregate_results.py --inject README.md`._
-
-### 🏆 Leaderboard (all-time mean score)
-
-| Rank | Model | Avg | Results (n) | Runs | Tasks | Avg latency | Err |
-|---:|---|---:|---:|---:|---:|---:|---:|
-| 🥇 | `qwen2.5-coder:14b` | **0.92** | 9 | 1 | 9 | 3.7s | - |
-| 🥈 | `llama3.2:3b` | **0.82** | 9 | 1 | 9 | 2.0s | - |
-| 🥉 | `minicpm-v:latest` ·👁 | **0.82** | 17 | 9 | 2 | 1.8s | - |
-| 4 | `gemma4:e4b` | **0.77** | 608 | 75 | 11 | 5.2s | 3 |
-| 5 | `codellama:13b` | **0.73** | 7 | 1 | 7 | 12.2s | - |
-| 6 | `qwen3.5:9b` | **0.72** | 270 | 77 | 5 | 10.7s | - |
-| 7 | `claude-sonnet-4-5` | **0.71** | 7 | 2 | 9 | 11.3s | - |
-| 8 | `codeup:13b` | **0.69** | 9 | 1 | 9 | 4.9s | - |
-| 9 | `qwen2.5:7b-instruct` | **0.67** | 3 | 1 | 9 | 2.1s | - |
-| 10 | `cogito:14b` | **0.50** | 4 | 1 | 9 | 3.0s | - |
-| 11 | `deepcoder:14b` | **0.38** | 13 | 2 | 9 | 10.5s | - |
-| 12 | `everythinglm:13b` | **0.33** | 3 | 1 | 9 | 14.4s | - |
-| 13 | `gemma3n:e4b` | **0.00** | 9 | 1 | 9 | 0.0s | 9 |
-
-> ⚠️ **Read with the sample size.** Baselines (`gemma4:e4b`, `qwen3.5:9b`) have tens of runs; most discovered models have a single run (n≈7–9). A one-run average is a first impression, not a ranking. `👁` = vision-only coverage (different judging regime).
-
-### 🎯 Task difficulty (mean score across all models)
-
-| Task | Avg | Results (n) | Models | |
-|---|---:|---:|---:|---|
-| `sprint_narrative` | 0.96 | 72 | 7 | `██████████` |
-| `code_review` | 0.93 | 138 | 8 | `█████████░` |
-| `instruction_following` | 0.92 | 75 | 9 | `█████████░` |
-| `logical_reasoning` | 0.89 | 145 | 11 | `█████████░` |
-| `changelog_generation` | 0.81 | 72 | 7 | `████████░░` |
-| `summarization` | 0.73 | 72 | 7 | `███████░░░` |
-| `code_generation` | 0.71 | 138 | 8 | `███████░░░` |
-| `structured_output` | 0.63 | 75 | 10 | `██████░░░░` |
-| `vision_progressive` 👁 | 0.43 | 16 | 2 | `████░░░░░░` |
-| `vision_ocr` 👁 | 0.42 | 18 | 2 | `████░░░░░░` |
-| `arithmetic_reasoning` | 0.35 | 147 | 12 | `████░░░░░░` |
-
-### 🧮 Model × task score matrix
-
-| Task | `minicpm-v:latest` | `gemma4:e4b` | `qwen3.5:9b` | `claude-sonnet-4-5` | `deepcoder:14b` |
-|---|---:|---:|---:|---:|---:|
-| `sprint_narrative` | · | 0.97 | · | · | 1.00 |
-| `code_review` | · | 0.89 | 0.99 | · | 1.00 |
-| `instruction_following` | · | 0.98 | · | 0.00 | 0.00 |
-| `logical_reasoning` | · | 1.00 | 0.78 | 1.00 | 0.75 |
-| `changelog_generation` | · | 0.84 | · | · | 0.00 |
-| `summarization` | · | 0.75 | · | · | 0.00 |
-| `code_generation` | · | 0.82 | 0.61 | · | 0.00 |
-| `structured_output` | · | 0.69 | · | 0.50 | 0.00 |
-| `vision_progressive` | 0.86 | 0.00 | · | · | · |
-| `vision_ocr` | 0.78 | 0.06 | · | · | · |
-| `arithmetic_reasoning` | · | 0.15 | 0.49 | 1.00 | 0.75 |
-
-_Showing the 5 repeat-tested models (≥2 runs); each cell is a mean of ≥2 samples. Single-run models are in the leaderboard above. `·` = task not attempted (model/task tag mismatch)._
-
-### 🔍 Data quality (honest caveats)
-
-- **Truncation inflates the hard tasks.** ~118 of 192 zero-scores are responses cut off at the token budget *before stating an answer* (estimated from response endings). Reasoning models (`qwen3.5:9b`) are hit hardest: `arithmetic_reasoning` and `structured_output` scores are partly a harness limit, not a capability signal. *(Fixed going forward: a `done_reason` truncation guard now retries at 2× budget and marks still-truncated responses unscored, not 0.0; the runs aggregated above predate it.)*
-- **Errors:** 34 results errored (mostly Ollama `HTTP 404`, a model tag that failed to pull). Errored rows are excluded from means.
-- **Uneven coverage:** tag-gating means `qwen3.5:9b` attempts 5 tasks while `gemma4:e4b` attempts 11; cross-model comparison is only fair within shared tasks (see the matrix).
-- **Single judge, single sample:** one NVIDIA-70B judge pass, N=1 per (model, task). No confidence intervals or inter-rater agreement yet.
-
 <!-- RESULTS:END -->
 
-## The autonomous lifecycle
+---
 
-```
-   ┌─ Autonomous cron cycle · orchestrator + judge = FREE NVIDIA NIM (Llama 3.3 70B) ─────────────
-   │
-   │   1. discover   find a new model tag (watcher) ── fits 12 GB VRAM? (≤ ~14B)
-   │   2. pull       ollama pull <model>
-   │   3. bench      run_bench.py → local Ollama runs the model-under-test  (heavy compute)
-   │   4. judge      free NVIDIA NIM 70B model scores each output against the task rubric
-   │   5. report     write reports/<run_id>.md  (leaderboard grouped by model)
-   │   6. delete     ollama rm <model>          (free disk + VRAM for the next cycle)
-   │   7. commit     git commit runs/ + reports/ → push to public GitHub
-   │
-   └─ Local Ollama (127.0.0.1:11434) does step 3 only; every other step runs FREE on cloud ──────
-```
+## Quick start
 
-The **free NVIDIA NIM model is the judge** (steps 1, 4, 5, 7). The **local GPU does
-only step 3** (running the model-under-test). That separation is the point: a 12GB box
-can't host a judge *and* a model-under-test, so the judge lives on free cloud (NVIDIA
-Llama 3.3 70B, 40 RPM, no credit cap). The orchestrating cron agent itself runs on the
-same free NVIDIA model.
-
-## Quick start (manual)
 ```bash
 # benchmark the baseline local models (no pull/delete)
-python scripts/run_bench.py --tier local
+python scripts/autobench_cycle.py --baselines-only
 
 # run one model through the full lifecycle (pull → bench → delete → commit)
 python scripts/autobench_cycle.py --model qwen3.5:9b
+
+# keep the model afterwards, for inspection
+python scripts/autobench_cycle.py --model qwen3.5:9b --no-delete
 ```
 
 ## Layout
-- `models/registry.yaml`: `baseline:` known models (comparison refs) + `watcher:` discovery config (size cap, judge model, delete-after-bench).
-- `tasks/*.yaml`: eval tasks (prompt + scoring method + tags).
-- `runs/`: raw per-run JSON (one per `run_id`), committed for diffable history.
-- `reports/`: markdown summaries (leaderboard + cost split), one per `run_id`.
-- `scripts/run_bench.py`: the benchmark runner (calls Ollama directly).
-- `scripts/autobench_cycle.py`: the lifecycle orchestrator (pull/bench/delete/commit).
-- `scripts/aggregate_results.py`: all-time results view; regenerates the README leaderboard + `reports/LEADERBOARD.md`.
-- `IMPROVEMENTS.md`: prioritized roadmap (P0 credibility → P1 legibility → P2 scale).
 
-## Vision section
+| Path | What |
+|---|---|
+| `scripts/` | The pipeline — cycle, bench, judge, score, aggregate, telemetry |
+| `tasks/` | The task battery, one YAML per task ⚠️ **one prompt each** |
+| `models/registry.yaml` | Model tags, VRAM gating, baselines |
+| `runs/` | Raw results, one JSON per run |
+| `reports/` | Per-run markdown |
+| `telemetry/` | Timing and resource data |
 
-Autobench can benchmark **vision models**, not just text. A task with an
-`image:` field (path relative to repo root, committed CC0 asset under
-`tasks/images/`) is sent to vision-capable models with the image attached; the
-text response is then judged by the rubric-llm judge like any other task.
+## Vision tasks
 
-- Vision tasks are tagged `vision`; only models tagged `vision` in the registry
-  run them (tag-based matching in `run_bench.py`).
-- `run_bench.py` attaches the base64 image **inside the Ollama chat message**
-  (Ollama's `/api/chat` expects `images` per-message, not at the payload root).
-- Baselines registered: `gemma4:e4b` and `minicpm-v` (both local Ollama).
-- Example: `tasks/vision_ocr.yaml` asks the model to read printed text + name
-  the color of a square. Verified result (RTX 5070): `minicpm-v` scores 1.00,
-  `gemma4:e4b` cannot ingest the image via Ollama and scores 0.00.
-
-```bash
-# run only vision models x vision tasks (fast smoke)
-python scripts/run_bench.py --tier local   # vision tasks auto-matched by tag
-python scripts/nvidia_judge.py runs/<vision_run>.json   # scores the text output
-```
-
-## Constraints (by design)
-- **12GB VRAM ceiling**: the watcher only pulls models ≤ `max_params_billions` (default 14).
-- **Public only**: no per-x / private-repo data ever enters this repo.
-- **Free judge**: scoring uses a free NVIDIA NIM model (Llama 3.3 70B, 40 RPM); no paid spend on this public pipeline.
+`vision_ocr` and `vision_progressive` run only against vision-capable tags. ⚠️ `runs/vision_*.json` are **development smoke tests, not benchmark runs** — they predate the naming convention and are excluded from aggregates.
 
 ## Conventions
-See `CLAUDE.md` (Claude Code) and `AGENTS.md` (generic agents) for operating rules.
-Commits are prefixed `bench:` (result runs) or `autobench:` (lifecycle runs).
+
+Operating rules are in [`AGENTS.md`](AGENTS.md); `CLAUDE.md` imports it. Commits are prefixed `bench:` (result runs) or `autobench:` (lifecycle runs).
+
+## Roadmap
+
+The honest next step is **a real task battery** — many items per category with mechanical ground truth, so the harness measures something a score can be built on. See [`IMPROVEMENTS.md`](IMPROVEMENTS.md).
+
+## Licence
+
+MIT. Results are generated from public models; nothing here contains third-party proprietary content.
