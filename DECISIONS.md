@@ -3,6 +3,43 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-08-23 · Eras are a table, not a constant; era 3 opens on the multi-sample harness
+`aggregate_results.py` now carries an `ERAS` list (dates + label + why-separated) and derives
+`ERA_CUTOFF` from its last entry, which the README renders as an era-history table. Why: bumping a
+bare cutoff constant silently erased the existence of the runs it excluded — a reader could not tell
+whether 80 runs were deleted or quarantined. Rejected: keeping the single constant with a hand-written
+README note (drifts); back-filling old runs through the new harness (they were produced by a different
+measurement — re-scoring them would invent history).
+
+## 2026-08-23 · N=3 draws per (model, task) is the default for unattended runs
+`run_bench.py --samples N` (nightly passes 3). Why: N=1 was structural, not a setting — there was no
+sample loop at all, so every published cell was a single draw presented as a measurement, with no way
+to distinguish a capable model from a lucky one. 3 is the smallest N that yields a reportable spread
+on a 12GB box. Rejected: N=5 (run time roughly doubles for a marginally tighter interval on a battery
+whose real limit is 11 items); seeding for determinism (Ollama exposes no reliable per-call seed, and
+a fixed seed would hide exactly the variance being measured).
+
+## 2026-08-23 · Shared-task column ADDED alongside the overall average, not instead of it
+The leaderboard now shows both a whole-coverage `Avg` and a `Shared-task avg` over the tasks every
+general model attempted. Why: the 2026-08-15 entry rejected a shared-task-only column because it
+hid data while the underlying tag gate was still unfair. The gate is fixed; a second column is now
+additive disclosure rather than a substitute for the fix. Rejected: replacing `Avg` (hides coverage
+differences); dropping vision-only models from the board (they are real results, just not comparable
+— they are marked and excluded from the shared column instead).
+
+## 2026-08-23 · Truncation is counted from `done_reason`, never estimated from response text
+The aggregate reads recorded `truncated` / `attempts` fields. Why: it had been guessing truncation
+from trailing punctuation and publishing "~2 of 143 zero-scores are truncated" — a figure that could
+not be right in principle, since a truncated row is scored `null` and is therefore never in the
+zero-score pool. Real figures for the same data: 77 retried at 2x budget, 46 still truncated (unscored).
+Rejected: keeping the heuristic as a cross-check (a wrong number next to a right one is not a check).
+
+## 2026-08-23 · The cycle publishes; nightly stays the logged wrapper
+`autobench_cycle.py` now runs judge -> aggregate -> commit itself (P1.2/F1.2), and `nightly.py` passes
+`--no-report` so the same run is not judged twice. Why: judging lived in an agent session, which is
+why 80 runs of data never reached the README. Rejected: moving judging wholly into nightly (leaves the
+interactive path publishing nothing); letting both run it (double judge calls on a free-tier quota).
+
 ## 2026-08-15 · Thinking OFF (`think: false`) is the benchmark's standard condition
 All Ollama calls send `think: false`, disclosed in every report. Why: measured, thinking broke
 the harness two ways — Ollama DROPS the attached image when thinking is on (gemma4:e4b answered

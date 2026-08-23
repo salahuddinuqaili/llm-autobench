@@ -24,6 +24,7 @@ import subprocess
 import sys
 import time
 import base64
+import urllib.request
 from pathlib import Path
 
 JUDGE_MODEL = "meta/llama-3.3-70b-instruct"
@@ -153,8 +154,12 @@ def describe_image(img_path: str, max_retries: int = 2) -> str:
         if desc:
             cache[img_path] = desc
             return desc
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 - describer is best-effort
+        # This used to be `except Exception: pass`, which swallowed a NameError:
+        # urllib was never imported, so the local-describer fallback could not
+        # work at all and failed silently into the text-only judge path.
+        print(f"  [warn] local vision describer failed: "
+              f"{exc.__class__.__name__}: {exc}", file=sys.stderr)
     return ""
 
 
@@ -221,10 +226,22 @@ def load_rubric(task_id):
     return re.sub(r"^[ \t]+", "", m.group(1), flags=re.MULTILINE)
 
 
-def _writeback(results, scored, run_path):
-    """Incremental write-back so partial progress survives timeouts."""
-    pending = [x for x in results if x.get("score") is None]
-    data = {"results": scored + pending}
+def _writeback(envelope, results, scored, run_path):
+    """Incremental write-back so partial progress survives timeouts.
+
+    Writes the WHOLE envelope, not just results. It used to rebuild the file as
+    {"results": ...}, which meant a judge that died midway left the run stripped
+    of run_id, provenance and the recorded `skipped` coverage block - crash
+    safety for scores bought by silently destroying the run metadata.
+    """
+    # The tail of `results` not yet processed. It used to be "every row whose
+    # score is None", which quietly dropped rows the RUNNER had already scored
+    # (exact / json-exact) but the judge loop had not yet walked past - so a
+    # mid-judge crash lost them entirely. `scored` grows in iteration order and
+    # every row is appended exactly once, so the remainder is the tail.
+    pending = results[len(scored):]
+    data = dict(envelope)
+    data["results"] = scored + pending
     run_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
@@ -263,29 +280,35 @@ def build_report(run_stem, scored):
     # ---- Leaderboard: one row PER MODEL ----
     lines.append("## Leaderboard")
     lines.append("")
-    lines.append("| Model | Avg score | Scored | Tasks | Avg latency | Errors |")
-    lines.append("|---|---:|---:|---:|---:|---:|")
+    # Tasks and draws are different numbers once a run samples N times per pair.
+    # This column used to print len(rows) under a "Tasks" header, which read as
+    # "qwen attempted 27 tasks" for a 9-task battery drawn 3 times.
+    lines.append("| Model | Avg score | Tasks | Draws | Scored | Unscored | Avg latency |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|")
     lb = []
     for m, rows in by_model.items():
         avg = avg_of(rows)
         scored_n = sum(1 for r in rows if _is_num(r.get("score")))
         lats = [r.get("latency_s", 0) or 0 for r in rows]
         latm = sum(lats) / len(lats) if lats else 0.0
-        errs = sum(1 for r in rows
-                   if r.get("error") or r.get("truncated") or r.get("ingestion_failed"))
-        lb.append((m, avg, scored_n, len(rows), latm, errs))
+        # Truncated / ingestion-failed rows are UNSCORED, not errors. Filing them
+        # under "Errors" implied the harness broke; it means the row was withheld.
+        unscored = sum(1 for r in rows if not _is_num(r.get("score")))
+        ntasks = len({r.get("task") for r in rows})
+        lb.append((m, avg, ntasks, len(rows), scored_n, unscored, latm))
     lb.sort(key=lambda x: (x[1] is None, -(x[1] or 0)))  # best avg first, None last
-    for m, avg, scored_n, ntasks, latm, errs in lb:
+    for m, avg, ntasks, ndraws, scored_n, unscored, latm in lb:
         avg_s = f"{avg:.2f}" if avg is not None else "—"
-        lines.append(f"| `{m}` | {avg_s} | {scored_n} | {ntasks} | {latm:.1f}s | {errs or '—'} |")
+        lines.append(f"| `{m}` | {avg_s} | {ntasks} | {ndraws} | {scored_n} | "
+                     f"{unscored or '—'} | {latm:.1f}s |")
     lines.append("")
 
     # ---- Per-model detail ----
     for m, rows in by_model.items():
         lines.append(f"## {m}")
         lines.append("")
-        lines.append("| Task | Score | Latency | Judge reason |")
-        lines.append("|---|---|---|---|")
+        lines.append("| Task | Draw | Score | Latency | Judge reason |")
+        lines.append("|---|---:|---|---|---|")
         for r in rows:
             sc = r.get("score")
             sc_s = (f"{sc:.2f}" if _is_num(sc)
@@ -293,7 +316,9 @@ def build_report(run_stem, scored):
                           else ("no-image" if r.get("ingestion_failed") else "—")))
             lat = r.get("latency_s", 0) or 0
             reason = (r.get("judge_raw", "") or "")[:120].replace("\n", " ")
-            lines.append(f"| {r['task']} | {sc_s} | {lat:.1f}s | {reason} |")
+            draw = (f"{r['sample'] + 1}/{r['samples']}"
+                    if r.get("samples") else "1/1")
+            lines.append(f"| {r['task']} | {draw} | {sc_s} | {lat:.1f}s | {reason} |")
         lines.append("")
 
     # ---- Failures: errored, truncated, or unscored (honest, per SPEC §12) ----
@@ -318,8 +343,15 @@ def build_report(run_stem, scored):
     # ---- Lifecycle ----
     lines.append("## Lifecycle")
     lines.append("")
-    lines.append("- Model pulled, benchmarked on Ollama, then deleted.")
-    lines.append("- Judge: nvidia/meta/llama-3.3-70b-instruct (NVIDIA NIM, free tier, direct API).")
+    # This used to read "Model pulled, benchmarked on Ollama, then deleted." on
+    # every report, including --baselines-only runs where nothing was pulled or
+    # deleted. The judge cannot observe the lifecycle, so it no longer asserts one.
+    lines.append("- Model-under-test ran locally on Ollama; the judge ran in the cloud, "
+                 "so the GPU never hosted both.")
+    lines.append("- Judge: nvidia/meta/llama-3.3-70b-instruct (NVIDIA NIM, free tier, "
+                 "direct API). No paid API spend.")
+    lines.append("- Pull/delete is handled by `autobench_cycle.py` and recorded in its "
+                 "commit, not observable from this run file.")
     lines.append("")
     return "\n".join(lines)
 
@@ -392,7 +424,7 @@ def main():
                 r["judge_raw"] = out[:300]
                 print(score, file=sys.stderr, flush=True)
                 scored.append(r)
-                _writeback(results, scored, run_path)
+                _writeback(data, results, scored, run_path)
                 continue
             except Exception as e:  # noqa: BLE001
                 print(f"  [warn] vision describe failed ({e}); text judge",
@@ -406,7 +438,7 @@ def main():
         r["judge_raw"] = out[:300]
         print(score, file=sys.stderr, flush=True)
         scored.append(r)
-        _writeback(results, scored, run_path)
+        _writeback(data, results, scored, run_path)
 
     data["results"] = scored
     run_path.write_text(json.dumps(data, indent=2), encoding="utf-8")

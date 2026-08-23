@@ -98,26 +98,45 @@ NVIDIA; the legacy file contradicts both.
 matrix, and honest caveats, and injects them into the README (`RESULTS:START/END` markers) +
 `reports/LEADERBOARD.md`. Before this, 98 runs of data had **no** aggregate view anywhere.
 
-### P1.2 · Regenerate results every cycle `[S]`
-**Actions.** In `autobench_cycle.commit()`, run `score_run.py` then
-`aggregate_results.py --inject README.md` before `git add`, so the README leaderboard is always
-current. Closes **F1.2** (cycle → judge → report). **Files.** `autobench_cycle.py:274-319`.
-**Accept.** One `autobench_cycle.py --model X` yields run + report + refreshed README, no manual step.
+### P1.2 · Regenerate results every cycle · ✅ **shipped 2026-08-23** `[S]`
+**Actions.** `autobench_cycle.report()` runs `score_run.py` (free NVIDIA judge) then
+`aggregate_results.py --inject README.md`, and `commit()` stages `README.md` alongside
+`runs/`+`reports/`. Judge failure is fatal: an unscored run is never aggregated as if it were
+scored. `nightly.py` passes the new `--no-report` so the same run is not judged twice.
+Closes **F1.2** (cycle → judge → report). **Files.** `autobench_cycle.py` (`report`, `commit`,
+`main`), `nightly.py`.
+**Accept.** One `autobench_cycle.py --baselines-only --samples 3` yielded run + report +
+refreshed README + commit with no manual step — see the run cited under P2.1 below.
+Also added `--baselines-only`, a flag the README had documented for weeks without it existing.
 
-### P1.3 · Even out task coverage + disclose skips `[M]`
-**Problem.** Tag-gating means `qwen3.5:9b` attempts **5** tasks and `gemma4:e4b` **11**; the
-leaderboard's cross-model averages aren't apples-to-apples. **Actions.** Broaden baseline tags to
-the shared battery (or compute a "shared-task" leaderboard column), and have reports list the
-`(model, task)` pairs they skipped and why (**F1.6/D5**). **Files.** `registry.yaml`,
-`run_bench.py` (matching), `nvidia_judge.py` (report). **Accept.** Reports disclose skipped pairs;
-the README matrix already exposes the gaps.
+### P1.3 · Even out task coverage + disclose skips · ✅ **shipped 2026-08-23** `[M]`
+**Problem (as diagnosed).** Tag-gating meant `qwen3.5:9b` attempted **5** tasks and `gemma4:e4b`
+**11**; the leaderboard cross-model averages were not apples-to-apples.
+**What actually shipped.** Three parts, because the diagnosis was only half the problem:
+1. `registry.yaml` gained `battery_tags` as the single source of truth for the text battery, and
+   both baselines and the discovered-model entry read it (2026-08-15). qwen went 5 → **9** tasks.
+2. The tag gate no longer skips in silence: `run_bench.py` records **every** refused
+   `(model, task)` pair with its reason, model tags and task tags into `runs/<id>.json`
+   (`skipped: [...]`), and the aggregate renders a Coverage table from it (**F1.6/D5**).
+3. The leaderboard gained a **shared-task avg** column over the tasks every general model
+   attempted — the like-for-like number — next to the whole-coverage average.
+**Residual, by design.** Coverage is *disclosed*, not *equal*: `minicpm-v` is a vision-only VLM
+and attempts no text battery at all. Forcing it to would publish nonsense; it is marked 👁 and
+excluded from the shared column instead.
+**Files.** `models/registry.yaml`, `run_bench.py` (gate + run record), `aggregate_results.py`.
 
 ---
 
 ## P2 — Scale (only after P0 is green — SPEC §4–§8 roadmap)
 
-- **P2.1 Multi-run + confidence `[M]`.** N=3–5 seeded runs per (model, task); report mean ± 95% CI.
-  Turns the current n=1..9 "first impressions" into defensible rankings (SPEC §6).
+- **P2.1 Multi-run + confidence `[M]` · ✅ shipped 2026-08-23.** `run_bench.py --samples N` draws N
+  responses per (model, task) — N=1 had been *structural*, not a setting: there was no sample loop
+  in the runner at all. `nightly.py` runs N=3. The aggregate reports mean ± 95% CI (Student t, not
+  a flat 1.96, because these sample sizes are small) on the leaderboard, per task, and in every
+  matrix cell, plus a **sampling-spread** table listing each (model, task) that disagreed with
+  itself across identical draws — the direct evidence that a single draw was never a measurement.
+  Not seeded: Ollama exposes no reliable per-call seed, and a fixed seed would suppress the very
+  variance being reported (see `DECISIONS.md` 2026-08-23).
 - **P2.2 Established suites `[L]`.** Port a GSM8K + HumanEval slice with **execution-based** code
   scoring (run the code, check tests) — removes judge subjectivity on code and counters
   "my tasks are easy for my models" bias (SPEC §4/§5.3).
@@ -135,11 +154,25 @@ the README matrix already exposes the gaps.
 
 ---
 
+## What the caveats block still cannot retire (2026-08-23)
+
+The README "Data quality" caveats were rewritten to be **measured rather than asserted**, and three
+of the four causes were fixed. These two are structural, and saying so is the point:
+
+| Caveat | Why it survives | What would actually close it |
+|---|---|---|
+| **Single judge, no inter-rater agreement** | A second opinion needs either a second cloud judge (another provider, another key — the constraint is *one free judge*) or a local judge, which would have to share the 12 GB card with the model-under-test. That contention is the exact thing the architecture exists to avoid. | A second **free** cloud judge and Cohen κ between them (**P2.3**). Judge self-consistency (same judge 3× at temp 0) is cheap but is *not* inter-rater agreement and must not be reported as if it were. |
+| **Each task is one prompt, graded binary** | Multi-sampling (**P2.1**, shipped) measures *sampling* noise. It cannot fix *construct* validity: 11 prompts is 11 prompts, and one ambiguous item still swings a category between 1.00 and 0.00. | Suites with mechanical ground truth — a GSM8K + HumanEval slice with execution-based scoring (**P2.2**, sized `[L]`). This is the honest next step and it is a project, not an afternoon. |
+
+Until both land, the numbers in the README are **smoke-test output on a 12 GB box**, which is what
+the README says above the leaderboard. That framing is not modesty; it is the accurate scope.
+
+---
+
 ## Suggested order
 
-1. **P0.1–P0.5** in one credibility sprint (all `[S]`), each with its acceptance test run against
-   the real failing case, then **regenerate the affected runs** so the committed leaderboard has no
-   truncation-driven or mis-attributed numbers.
-2. **P1.2–P1.3** to make the now-trustworthy results self-updating and fair.
-3. **P2** as capacity allows, starting with **P2.4** (telemetry, quick) and **P2.1** (multi-run,
-   highest credibility payoff).
+1. ~~**P0.1–P0.5** credibility sprint~~ — ✅ shipped 2026-07-22.
+2. ~~**P1.2–P1.3**~~ — ✅ shipped 2026-08-23 (self-updating README + disclosed coverage).
+3. **P2.2** (established suites, execution-based code scoring) is now the highest-value item left:
+   it is the only thing that lifts this from a smoke test to a benchmark. **P2.3** (judge panel + κ)
+   second, **P2.5–P2.7** as capacity allows.

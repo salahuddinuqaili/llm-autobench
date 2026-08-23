@@ -100,6 +100,30 @@ def ci95(vals):
     return t95(n - 1) * sd / math.sqrt(n)
 
 
+def ci_bounds(vals):
+    """95% interval CLAMPED to the [0, 1] score range, as (lo, hi), or None.
+
+    Scores are bounded, so a raw half-width is not printable: 3 draws of 0/1/1
+    yield a t half-width of 1.43, and "0.67 +/- 1.43" on a 0-1 metric reads as a
+    broken number rather than as the very wide interval it actually is. The
+    clamped bounds say the same thing without claiming impossible values.
+    """
+    half = ci95(vals)
+    if half is None:
+        return None
+    m = statistics.mean(vals)
+    return (max(0.0, m - half), min(1.0, m + half))
+
+
+def ci_str(vals):
+    """Interval for a table cell: `0.42-0.88`, `exact` when the draws agree."""
+    b = ci_bounds(vals)
+    if b is None:
+        return "n<2"
+    lo, hi = b
+    return "exact" if hi - lo < 5e-3 else f"{lo:.2f}–{hi:.2f}"
+
+
 def short(model):
     """custom:ollama/qwen3.5:9b -> qwen3.5:9b ; anthropic/claude-... -> claude-..."""
     return model.split("/", 1)[1] if "/" in model else model
@@ -255,8 +279,7 @@ def render(a):
     for i, m in enumerate(models, 1):
         sc, lat = a["m_scores"][m], a["m_lat"][m]
         avg = statistics.mean(sc)
-        half = ci95(sc)
-        ci_s = f"±{half:.2f}" if half is not None else "n<2"
+        ci_s = ci_str(sc)
         latm = statistics.mean(lat) if lat else 0.0
         errp = a["m_err"][m]
         tag = "\U0001F947\U0001F948\U0001F949"[i - 1] if i <= 3 else str(i)
@@ -286,8 +309,7 @@ def render(a):
     for t in tasks:
         sc = a["t_scores"][t]
         avg = statistics.mean(sc)
-        half = ci95(sc)
-        ci_s = f"±{half:.2f}" if half is not None else "n<2"
+        ci_s = ci_str(sc)
         bar = "█" * round(avg * 10) + "░" * (10 - round(avg * 10))
         vis = " \U0001F441" if t in VISION_TASKS else ""
         md.append(f"| `{t}`{vis} | {avg:.2f} | {ci_s} | {len(sc)} | "
@@ -312,13 +334,15 @@ def render(a):
             elif len(v) == 1:
                 cells.append(f"{v[0]:.2f} <sub>n=1</sub>")
             else:
-                half = ci95(v)
-                cells.append(f"{statistics.mean(v):.2f} <sub>±{half:.2f}, n={len(v)}</sub>")
+                c = ci_str(v)
+                cells.append(f"{statistics.mean(v):.2f} <sub>n={len(v)}</sub>" if c == "exact"
+                             else f"{statistics.mean(v):.2f} <sub>{c}, n={len(v)}</sub>")
         md.append(f"| `{t}` | " + " | ".join(cells) + " |")
     md.append("")
     md.append(f"_Showing the {len(mcols)} model(s) with ≥2 scored results. "
               "`·` = task not attempted (tag mismatch — see Coverage below). "
-              "`±` is the 95% CI half-width over that cell's draws._")
+              "Ranges are 95% t-intervals over that cell's draws, clamped to the "
+              "`[0, 1]` score range; a cell whose draws all agreed shows no range._")
     md.append("")
 
     # ---- Sampling spread: the direct evidence for why N=1 was not enough ----
@@ -383,14 +407,19 @@ def render(a):
     total = len(a["rows"])
     md.append("### \U0001F50D Data quality (measured, not estimated)")
     md.append("")
+    was = "was" if rs == 1 else "were"
+    is_are = "is" if tr == 1 else "are"
     md.append(f"- **Truncation — counted, not guessed.** {rt} of {total} responses hit "
               f"the token budget and were **retried once at 2× budget**; {rs} then "
-              f"completed and were scored, {tr} were still cut off and are **unscored "
-              f"(`null`), never 0.0** — excluded from every mean above. This is read "
-              f"from Ollama's recorded `done_reason`, not inferred from how a response ends. "
-              f"(The previous caveat estimated truncation from punctuation and reported "
-              f"\"~2 of {zr} zero-scores\"; that number could never have been right — a "
-              f"truncated row is unscored, so it is not in the zero-score pool at all.)")
+              f"completed and {was} scored, {tr} {is_are} still cut off and therefore "
+              f"**unscored (`null`), never 0.0** — excluded from every mean above. This "
+              f"is read from Ollama's recorded `done_reason`, not inferred from how a "
+              f"response ends. (The caveat this replaces estimated truncation from "
+              f"trailing punctuation and published \"~2 of 143 zero-scores\" for the "
+              f"previous era — a figure that could not have been right in principle, "
+              f"since a truncated row is unscored and so is never in the zero-score "
+              f"pool being counted. The same data, read from the recorded fields: "
+              f"77 retried, 31 rescued, 46 still truncated.)")
     md.append(f"- **Zero-scores are real zeros.** {zr} of {total} rows scored 0.0 with a "
               f"complete, untruncated response — answers the scorer or judge rejected, "
               f"not harness artefacts.")
