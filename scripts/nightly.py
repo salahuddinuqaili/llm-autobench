@@ -16,10 +16,11 @@ or continue past one -- a partial run that looks complete is worse than a missin
 
 from __future__ import annotations
 
+import argparse
+import ctypes
 import datetime as dt
 import glob
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -35,6 +36,17 @@ MIN_FREE_GB = 30                              # a model pull needs headroom
 # 3 is the smallest N that yields a spread the aggregate can report.
 SAMPLES = 3
 
+# --- power management, for the wake-at-21:00-then-sleep-again pattern ----------
+# A machine woken by a WAKE TIMER is in an "unattended" state and Windows will
+# put it straight back to sleep once the triggering task returns -- and can do so
+# mid-run if nothing holds a power request. ES_SYSTEM_REQUIRED is that request.
+ES_CONTINUOUS = 0x80000000
+ES_SYSTEM_REQUIRED = 0x00000001
+# Do not suspend a machine somebody is sitting at. LogonUI presence is NOT a
+# reliable lock signal on this box (it lingers while unlocked), so the guard is
+# real user input: keyboard/mouse within this many minutes means stay awake.
+IDLE_BEFORE_SLEEP_MIN = 10
+
 
 def log(msg: str) -> None:
     line = f"{dt.datetime.now().isoformat(timespec='seconds')}  {msg}"
@@ -42,6 +54,61 @@ def log(msg: str) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     with open(LOG_DIR / f"{dt.date.today():%Y%m%d}.log", "a", encoding="utf-8") as f:
         f.write(line + "\n")
+
+
+def keep_awake(on: bool) -> None:
+    """Hold (or release) a system power request for the duration of the run."""
+    try:
+        flags = (ES_CONTINUOUS | ES_SYSTEM_REQUIRED) if on else ES_CONTINUOUS
+        ctypes.windll.kernel32.SetThreadExecutionState(flags)
+    except Exception as exc:  # noqa: BLE001 - never let power management kill a run
+        log(f"keep-awake: could not set execution state ({exc})")
+
+
+def idle_minutes() -> float:
+    """Minutes since the last real keyboard/mouse input. -1.0 if unreadable."""
+    class LASTINPUTINFO(ctypes.Structure):
+        _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
+
+    try:
+        lii = LASTINPUTINFO()
+        lii.cbSize = ctypes.sizeof(LASTINPUTINFO)
+        if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(lii)):
+            return -1.0
+        delta = ctypes.windll.kernel32.GetTickCount() - lii.dwTime
+        # GetTickCount wraps at ~49.7 days; a negative delta means it wrapped, and
+        # guessing would be worse than admitting we do not know.
+        return -1.0 if delta < 0 else delta / 60000.0
+    except Exception:  # noqa: BLE001
+        return -1.0
+
+
+def maybe_sleep(enabled: bool) -> None:
+    """Suspend the machine after the run, but ONLY if nobody is using it.
+
+    Pairs with the task setting "wake the computer to run this task": the PC wakes
+    at 21:00, benchmarks, and goes back to sleep, without ever being signed out.
+    Refuses to suspend when it cannot prove the machine is unattended.
+    """
+    if not enabled:
+        return
+    idle = idle_minutes()
+    if idle < 0:
+        log("sleep-when-done: idle time unreadable -- staying awake rather than "
+            "suspending a machine that may be in use")
+        return
+    if idle < IDLE_BEFORE_SLEEP_MIN:
+        log(f"sleep-when-done: last input {idle:.1f} min ago "
+            f"(< {IDLE_BEFORE_SLEEP_MIN}) -- someone is at this PC, staying awake")
+        return
+    log(f"sleep-when-done: idle {idle:.0f} min -- suspending to S3")
+    keep_awake(False)
+    try:
+        # SetSuspendState(Hibernate=0, ForceCritical=0, DisableWakeEvent=0).
+        # DisableWakeEvent MUST stay 0 or the next wake timer would not fire.
+        ctypes.windll.powrprof.SetSuspendState(0, 0, 0)
+    except Exception as exc:  # noqa: BLE001
+        log(f"sleep-when-done: suspend failed ({exc}); machine left awake")
 
 
 def run(args: list[str], stage: str, timeout: int = 5400) -> bool:
@@ -108,6 +175,25 @@ def newest_run(before: set[str]) -> Path | None:
 
 
 def main() -> int:
+    ap = argparse.ArgumentParser(description="unattended llm-autobench run")
+    ap.add_argument("--sleep-when-done", action="store_true",
+                    help="suspend the machine afterwards if nobody is using it "
+                         "(pairs with the task setting that wakes it at 21:00)")
+    args = ap.parse_args()
+
+    # Hold the machine awake for the WHOLE run. Without this a wake-timer wake can
+    # return to sleep mid-benchmark, which would look like a mysteriously truncated
+    # nightly rather than a power event.
+    keep_awake(True)
+    try:
+        rc = _run_pipeline()
+    finally:
+        keep_awake(False)
+        maybe_sleep(args.sleep_when_done)
+    return rc
+
+
+def _run_pipeline() -> int:
     log("=" * 62)
     log("nightly start")
 
