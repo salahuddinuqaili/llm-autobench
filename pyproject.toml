@@ -1,4 +1,4 @@
 [tool.llm_autobench]
-generated_by = "Hermes Agent (autonomous)"
+generated_by = "Built by directing coding agents"
 human_reviewed = false
 build_date = "2026-07-16"
