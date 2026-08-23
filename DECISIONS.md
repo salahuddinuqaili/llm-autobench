@@ -3,6 +3,40 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-08-15 · Thinking OFF (`think: false`) is the benchmark's standard condition
+All Ollama calls send `think: false`, disclosed in every report. Why: measured, thinking broke
+the harness two ways — Ollama DROPS the attached image when thinking is on (gemma4:e4b answered
+"no image provided" and scored 0.00 for a harness artefact), and thinking does not always
+terminate (qwen3.5:9b spent 4730+ words on `arithmetic_reasoning` and was still truncated at an
+8192 budget, vs 484 tokens / 16s with thinking off). Rejected: keeping thinking on and publishing
+permanent nulls; raising budgets (8192 still failed); running both modes (doubles run time —
+revisit as a separate reported axis).
+
+## 2026-08-15 · Ingestion failure is reported separately from a wrong answer
+A response to an image task that claims no image was supplied is flagged `ingestion_failed` and
+left unscored, not graded as a capability result. Why: the inverse of the honesty rule (CLAUDE.md 9)
+was live — gemma4:e4b's intermittent "you have not provided an image" was published as
+`vision_ocr 0.06`, i.e. a harness/ingestion failure presented as poor OCR. Rejected: scoring the
+non-answer 0.0, which conflates "cannot ingest" with "read it wrong" — very different signals for
+a reader choosing a model.
+
+## 2026-08-15 · Two benchmark tasks were mis-specified and have been corrected
+`vision_ocr` asked for "the square in the top-left corner" while the red square is in the
+TOP-RIGHT, and its rubric awarded marks for answering "red" — rewarding agreement with a false
+premise over accurate perception. `arithmetic_reasoning` was ambiguous between a 12- and 24-hour
+clock (qwen3.5:9b reasoned correctly to 5:00, answered "17:00", and was marked wrong). Both now
+ask non-leading, unambiguous questions. Why: a task that rewards sycophancy measures the wrong
+thing. Rejected: keeping them for historical comparability — the pre-fix aggregate is quarantined
+anyway.
+
+## 2026-08-15 · Tag gate biases the leaderboard; baselines get the full text battery
+`build_temp_registry` gives DISCOVERED models 11 broad tags (all 9 text tasks) while BASELINE
+models carry narrow hand-written tags — `qwen3.5:9b` attempted only 4, and they are the hardest
+in the battery (no easy writing tasks). The public leaderboard therefore compared a 9-task average
+against a 4-task average as though they were the same quantity. Baseline tags now match the
+battery. Why: this reorders the rankings; it is a correctness bug, not a fairness nicety.
+Rejected: a "shared-task only" column (hides data); leaving discovered/baseline asymmetric.
+
 ## 2026-07-22 · P0 credibility sprint: the 2026-07-18 audit fixes actually landed
 Implemented P0.1-P0.5 (truncation guard, answer-extraction scorer, per-model report
 grouping, VRAM fail-closed, single judge path), which were logged "decided" on 2026-07-18

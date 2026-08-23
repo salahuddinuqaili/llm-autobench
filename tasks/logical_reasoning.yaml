@@ -11,7 +11,9 @@ expected:
 scoring:
   method: exact
   rubric: |
-    Award full marks if the final answer is 720 and the working is correct.
-    Partial for correct method with arithmetic error. Zero for wrong approach.
+    Binary (method: exact — the scorer returns 1.0 or 0.0, never partial). Scored by
+    extracting the LAST "Final answer:" line and comparing by VALUE, so 720, 720.0 and
+    "720 items" all pass while 1720 / 7200 do not. Correct working with a wrong final
+    answer scores 0 — the stated answer is what is graded.
 max_tokens: 2048
 tags: [reasoning]

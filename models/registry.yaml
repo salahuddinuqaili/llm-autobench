@@ -1,9 +1,23 @@
 # llm-autobench model registry
 # PUBLIC repo — no secrets, no private data. Only public models are benchmarked.
 #
-# Two sections:
-#   baseline: known models used as a comparison reference (run on every cycle)
-#   watcher:  config for autonomous discovery of NEW models to test
+# Three sections:
+#   battery_tags: the shared text battery every general model is measured on
+#   baseline:     known models used as a comparison reference (run on every cycle)
+#   watcher:      config for autonomous discovery of NEW models to test
+
+# SINGLE SOURCE OF TRUTH for "the full text battery". Both the baselines below and
+# the discovered model injected by autobench_cycle.build_temp_registry() use this
+# list, so the two can never drift apart again. They did: discovered models were
+# given 11 broad tags (all 9 text tasks) while baselines carried narrow hand-written
+# tags — qwen3.5:9b attempted only 4, and they were the HARDEST in the battery. The
+# leaderboard was comparing a 9-task average against a 4-task average as if they were
+# the same number. See DECISIONS.md 2026-08-15.
+battery_tags: [
+  general, reasoning, coding, writing, summarization,
+  instruction_following, structured_output, communication,
+  security, python, json,
+]
 
 baseline:
   - id: custom:ollama/qwen3.5:9b
@@ -12,7 +26,12 @@ baseline:
     base_url: http://127.0.0.1:11434/v1
     tier: local
     context_window: 32000
-    tags: [reasoning, general, coding]
+    # Full text battery (see battery_tags). A general 9B model can write a
+    # changelog; gating it to [reasoning, general, coding] only ever asked it the
+    # hard half and then published the result as a cross-model average.
+    tags: [general, reasoning, coding, writing, summarization,
+           instruction_following, structured_output, communication,
+           security, python, json]
     enabled: true
 
   - id: custom:ollama/gemma4:e4b
@@ -21,7 +40,10 @@ baseline:
     base_url: http://127.0.0.1:11434/v1
     tier: local
     context_window: 128000
-    tags: [vision, general]
+    # Multimodal AND general: full text battery + vision.
+    tags: [general, reasoning, coding, writing, summarization,
+           instruction_following, structured_output, communication,
+           security, python, json, vision, ocr, progressive]
     enabled: true
 
   - id: custom:ollama/minicpm-v:latest
@@ -30,7 +52,10 @@ baseline:
     base_url: http://127.0.0.1:11434/v1
     tier: local
     context_window: 128000
-    tags: [vision, ocr]
+    # Vision-only by design (a small dedicated VLM, not a general text model).
+    # Its leaderboard average is therefore NOT comparable to a text-battery
+    # average — reports mark vision-only coverage explicitly.
+    tags: [vision, ocr, progressive]
     enabled: true
 
 watcher:

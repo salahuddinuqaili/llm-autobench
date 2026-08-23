@@ -16,5 +16,8 @@ scoring:
     docstring and one assert test. Deduct for missing any requirement.
     Partial if the logic is correct but edge cases (empty string, single long
     word) are not handled.
-max_tokens: 1024
+# 1024 was not enough: qwen3.5:9b was still truncated at the 2048 retry ceiling
+# writing the function + docstring + assert, so it scored null instead of being
+# graded. 2048 (retrying to 4096) leaves room for a complete implementation.
+max_tokens: 2048
 tags: [coding, python]

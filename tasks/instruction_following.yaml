@@ -7,7 +7,7 @@ prompt: |
 expected:
   answer: ""
 scoring:
-  method: exact
+  method: rubric-llm
   rubric: |
     Award full marks ONLY if the response contains exactly three lines, each
     a fruit name with no punctuation, no numbers, no extra text. Any deviation

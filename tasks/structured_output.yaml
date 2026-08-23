@@ -8,7 +8,7 @@ prompt: |
   a team of 4 engineers."
   Output ONLY the JSON object, no markdown, no extra text.
 expected:
-  answer: '{"project_name": "Phoenix", "deadline": "2026-09-15", "budget_eur": 120000, "team_size": 4}'
+  answer: '{"project_name": "The Phoenix project", "deadline": "2026-09-15", "budget_eur": 120000, "team_size": 4}'
 scoring:
   method: json-exact
   rubric: |

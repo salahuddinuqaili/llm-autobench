@@ -2,17 +2,19 @@ id: arithmetic_reasoning
 category: reasoning
 requires_frontier: false
 prompt: |
-  A train leaves at 2:00 traveling 60 km/h. Another leaves the same station
-  at 3:00 traveling 90 km/h on the same route. At what time does the second
+  A train leaves at 02:00 traveling 60 km/h. Another leaves the same station
+  at 03:00 traveling 90 km/h on the same route. At what time does the second
   train catch the first? Show your work, then state your final answer on the
-  last line as "Final answer: HH:MM".
+  last line as "Final answer: HH:MM" using a 24-hour clock.
 expected:
-  answer: "5:00"
+  answer: "05:00"
 scoring:
   method: exact
   rubric: |
-    Award full marks if the final answer is 5:00 (or 05:00) and the working is
-    correct. Award partial marks for the correct method but a small arithmetic
-    slip. Award zero if the approach is wrong.
+    Binary (method: exact — the scorer returns 1.0 or 0.0, never partial). Scored by
+    extracting the LAST "Final answer:" line and comparing it as a normalised HH:MM
+    token: 05:00 and 5:00 both pass; 17:00 does not (the prompt specifies a 24-hour
+    clock precisely so this is unambiguous). Correct working with a wrong final answer
+    scores 0 — the stated answer is what is graded.
 max_tokens: 2048
 tags: [reasoning]

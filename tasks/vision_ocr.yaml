@@ -7,17 +7,21 @@ requires_frontier: false
 # rubric below. Tags drive matching: only models tagged `vision` run this task.
 image: tasks/images/ocr_card.png
 prompt: |
-  Look at this image and answer: what text is printed on it, and what color is
-  the square in the top-left corner? Be concise.
+  Look at this image and answer: what text is printed on it, and what colour is
+  the square and which corner is it in? Be concise.
 expected:
   answer: ""
 scoring:
   method: rubric-llm
   rubric: |
-    Award full marks if the response identifies BOTH: (1) the printed text
-    contains "HELLO" and "123" (case-insensitive; "READ-THE-TEXT" is a bonus),
-    and (2) the top-left square is red. Partial credit (0.5) if it gets the text
-    but wrong/missing color, or color but wrong/missing text. Zero if it says
-    there is no text or cannot read the image.
+    Ground truth: the image shows "HELLO" and "123" in black on white, with a RED
+    square in the TOP-RIGHT corner.
+    Award full marks if the response identifies BOTH: (1) the printed text contains
+    "HELLO" and "123" (case-insensitive), and (2) the square is red AND in the
+    top-right corner. Partial credit (0.5) if it gets the text but the wrong/missing
+    colour or corner, or the square but the wrong/missing text. Zero if it says there
+    is no text, cannot read the image, or reports no image was provided.
+    Do NOT award marks for placing the square in the top-left: the question is
+    deliberately non-leading and the square is on the right.
 max_tokens: 256
 tags: [vision, ocr]

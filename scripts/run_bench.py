@@ -404,7 +404,13 @@ def main():
     ap.add_argument("--tasks", default=os.path.join(REPO, "tasks"))
     ap.add_argument("--out", default=os.path.join(REPO, "runs"))
     ap.add_argument("--tier", default=None, help="comma list to filter, e.g. local,free")
+    # N=1 was structural, not a setting: there was no sample loop at all, so every
+    # published number was a single draw with no way to tell signal from noise.
+    ap.add_argument("--samples", type=int, default=1,
+                    help="draws per (model, task); >1 makes variance measurable")
     args = ap.parse_args()
+    if args.samples < 1:
+        raise SystemExit("--samples must be >= 1")
 
     models = load_registry(args.registry)
     tasks = load_tasks(args.tasks)
@@ -425,61 +431,89 @@ def main():
         print(f"[{run_id}] telemetry disabled: {e}", file=sys.stderr)
 
     results = []
+    # Every (model, task) pair the tag gate refuses, with its reason. The gate used
+    # to `continue` in silence, so a 9-task average and an 11-task average were
+    # published side by side as if they measured the same thing (F1.6/D5).
+    skipped = []
     for model in models:
+        mtags = set(model.get("tags", []))
         for task in tasks:
-            mtags = set(model.get("tags", []))
             ttags = set(task.get("tags", []))
             if not (mtags & ttags) and not task.get("requires_frontier"):
+                skipped.append({
+                    "model": model["id"],
+                    "task": task["id"],
+                    "reason": "tag mismatch: model tags do not intersect task tags",
+                    "model_tags": sorted(mtags),
+                    "task_tags": sorted(ttags),
+                })
+                print(f"[{run_id}] {model['id']} x {task['id']}: SKIP (tag mismatch)")
                 continue
-            text, latency, err, meta = call_model_guarded(
-                model, task["prompt"], task.get("max_tokens", 512),
-                image_path=task.get("image"))
-            # A response cut off at the token budget is a non-answer: score it
-            # `null` (unscored/±), NEVER 0.0 — a truncated CoT is not a wrong answer.
-            truncated = bool(meta.get("truncated"))
-            if truncated:
-                sc = None
-            else:
-                sc = score(task, text) if text else None
-            tps = None
-            gen_latency = meta.get("gen_latency_s") or latency
-            if meta.get("completion_tokens") and gen_latency > 0:
-                tps = round(meta["completion_tokens"] / gen_latency, 1)
-            results.append({
-                "model": model["id"], "task": task["id"],
-                "response": text, "latency_s": latency,
-                "score": sc, "error": err,
-                "image": task.get("image"),
-                "truncated": truncated,
-                "done_reason": meta.get("done_reason"),
-                "attempts": meta.get("attempts", 1),
-                "max_tokens_used": meta.get("max_tokens_used", task.get("max_tokens", 512)),
-                "prompt_tokens": meta.get("prompt_tokens"),
-                "completion_tokens": meta.get("completion_tokens"),
-                "tokens_per_s": tps,
-                "thinking_chars": meta.get("thinking_chars"),
-                "think_disabled": meta.get("think_disabled"),
-                "ingestion_failed": bool(
-                    task.get("image") and looks_like_ingestion_failure(text)),
-            })
-            if tracker is not None:
-                _record_telemetry(tracker, run_id, model, task, latency, meta, err)
-            flag = ("ERR" if err else
-                    ("TRUNC/unscored" if truncated else
-                     ("INGEST-FAIL/unscored" if results[-1]["ingestion_failed"] else
-                      ("score=" + str(sc) if sc is not None else "unscored"))))
-            print(f"[{run_id}] {model['id']} x {task['id']}: {flag}"
-                  + (f" (attempts={meta.get('attempts')})" if meta.get("attempts", 1) > 1 else ""))
+            for sample_i in range(args.samples):
+                text, latency, err, meta = call_model_guarded(
+                    model, task["prompt"], task.get("max_tokens", 512),
+                    image_path=task.get("image"))
+                # A response cut off at the token budget is a non-answer: score it
+                # `null` (unscored), NEVER 0.0 - a truncated CoT is not a wrong answer.
+                truncated = bool(meta.get("truncated"))
+                if truncated:
+                    sc = None
+                else:
+                    sc = score(task, text) if text else None
+                tps = None
+                gen_latency = meta.get("gen_latency_s") or latency
+                if meta.get("completion_tokens") and gen_latency > 0:
+                    tps = round(meta["completion_tokens"] / gen_latency, 1)
+                results.append({
+                    "model": model["id"], "task": task["id"],
+                    # Which draw this is. Rows are only comparable within a
+                    # (model, task, run); the aggregate uses these to compute
+                    # spread instead of asserting a single draw is the truth.
+                    "sample": sample_i,
+                    "samples": args.samples,
+                    "response": text, "latency_s": latency,
+                    "score": sc, "error": err,
+                    "image": task.get("image"),
+                    "truncated": truncated,
+                    "done_reason": meta.get("done_reason"),
+                    "attempts": meta.get("attempts", 1),
+                    "max_tokens_used": meta.get("max_tokens_used", task.get("max_tokens", 512)),
+                    "prompt_tokens": meta.get("prompt_tokens"),
+                    "completion_tokens": meta.get("completion_tokens"),
+                    "tokens_per_s": tps,
+                    "thinking_chars": meta.get("thinking_chars"),
+                    "think_disabled": meta.get("think_disabled"),
+                    "ingestion_failed": bool(
+                        task.get("image") and looks_like_ingestion_failure(text)),
+                })
+                if tracker is not None:
+                    _record_telemetry(tracker, run_id, model, task, latency, meta, err)
+                flag = ("ERR" if err else
+                        ("TRUNC/unscored" if truncated else
+                         ("INGEST-FAIL/unscored" if results[-1]["ingestion_failed"] else
+                          ("score=" + str(sc) if sc is not None else "unscored"))))
+                tag = (f" [sample {sample_i + 1}/{args.samples}]"
+                       if args.samples > 1 else "")
+                print(f"[{run_id}] {model['id']} x {task['id']}{tag}: {flag}"
+                      + (f" (attempts={meta.get('attempts')})" if meta.get("attempts", 1) > 1 else ""))
 
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, f"{run_id}.json"), "w") as f:
+        prov = build_provenance()
+        prov["samples_per_pair"] = args.samples
         json.dump({
             "run_id": run_id,
-            "provenance": build_provenance(),
+            "provenance": prov,
             "results": results,
+            # What this run did NOT measure, and why. A reader can now tell a
+            # coverage gap from a capability gap without reading the registry.
+            "skipped": skipped,
         }, f, indent=2)
     # TODO: generate reports/<run_id>.md from results (leaderboard + cost split).
-    print(f"Wrote {args.out}/{run_id}.json  ({len(results)} model/task pairs)")
+    pairs = len({(r["model"], r["task"]) for r in results})
+    print(f"Wrote {args.out}/{run_id}.json  ({pairs} model/task pairs x "
+          f"{args.samples} sample(s) = {len(results)} rows; "
+          f"{len(skipped)} pair(s) skipped)")
 
 
 if __name__ == "__main__":

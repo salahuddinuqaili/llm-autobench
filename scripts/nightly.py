@@ -31,6 +31,9 @@ SCRIPTS = REPO / "scripts"
 LOG_DIR = REPO / "telemetry" / "nightly"     # gitignored, stays local
 OLLAMA = "http://127.0.0.1:11434/api/tags"
 MIN_FREE_GB = 30                              # a model pull needs headroom
+# Draws per (model, task). N=1 published single draws as if they were measurements;
+# 3 is the smallest N that yields a spread the aggregate can report.
+SAMPLES = 3
 
 
 def log(msg: str) -> None:
@@ -114,7 +117,11 @@ def main() -> int:
 
     before = {p for p in glob.glob(str(REPO / "runs" / "*.json"))}
 
-    if not run([sys.executable, str(SCRIPTS / "autobench_cycle.py")], "cycle"):
+    # --no-report: the cycle can now judge + aggregate + commit itself (P1.2),
+    # but nightly runs those as separate logged stages so a failure names which
+    # one broke. Letting both do it would judge the same run twice.
+    if not run([sys.executable, str(SCRIPTS / "autobench_cycle.py"),
+                "--no-report", "--samples", str(SAMPLES)], "cycle"):
         log("nightly ABORTED: cycle failed")
         return 1
 

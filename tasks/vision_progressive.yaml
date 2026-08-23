@@ -1,16 +1,16 @@
 id: vision_progressive
 category: vision
 requires_frontier: false
-# This is the USER'S progressive-JPEG photo (tasks/images/private_fixtures/
-# progressive_photo_user.jpg) -- a real-world image, committed per user
-# direction. It is a progressive JPEG, the exact format that broke ariadne's
-# screenshot ingestion. A stored ground-truth description sits beside it
-# (progressive_photo_user.desc.txt), baked in once by a strong vision model, so
-# the benchmark scores against it with NO per-run vision calls.
+# A real-world progressive JPEG (tasks/images/fixtures/progressive_photo.jpg),
+# committed deliberately by the repo owner as a public test fixture. Progressive
+# JPEG is the exact format that broke ariadne's screenshot ingestion. A stored
+# ground-truth description sits beside it (progressive_photo.desc.txt), baked in
+# once by a strong vision model, so the benchmark scores against it with NO
+# per-run vision calls.
 # A model that correctly ingests the progressive JPEG will describe the scene
 # (blue sky, treeline, grassy meadow, wildflowers, a person); one that fails to
 # decode it returns "no image provided".
-image: tasks/images/private_fixtures/progressive_photo_user.jpg
+image: tasks/images/fixtures/progressive_photo.jpg
 prompt: |
   Describe this image in one or two sentences: what is in the scene (sky, trees,
   ground, wildflowers, any person)?

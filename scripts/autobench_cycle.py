@@ -8,13 +8,17 @@ judging, and reporting. This script does the mechanical LOCAL work:
   1. discover()  -> find a new model tag not yet benchmarked (VRAM-aware)
   2. pull()      -> `ollama pull <model>` if it fits VRAM
   3. bench()     -> calls run_bench.py for the discovered model (+ baselines)
-  4. judge/report-> done by the agent reading runs/<id>.json (see CLAUDE.md)
+  4. report()    -> score_run.py (free NVIDIA judge) then aggregate_results.py
+                    --inject README.md. Wired in-process as of P1.2/F1.2: this
+                    used to be an agent session job, which is why 80 runs of data
+                    never reached the published README.
   5. delete()    -> `ollama rm <model>` to free disk/VRAM
-  6. commit()    -> git add runs/ reports/ && commit
+  6. commit()    -> git add runs/ reports/ README.md && commit
 
 Run manually:
     python autobench_cycle.py --model qwen3.5:9b
     python autobench_cycle.py --model qwen3.5:9b --no-delete   # keep for inspection
+    python autobench_cycle.py --baselines-only --samples 3     # no pull, N=3 draws
 """
 import argparse
 import concurrent.futures
@@ -205,8 +209,9 @@ def build_temp_registry(model, watcher):
     """
     cfg = yaml.safe_load(open(os.path.join(REPO, "models", "registry.yaml")))
     baselines = [b for b in cfg.get("baseline", []) if b.get("enabled", True)]
-    # The vision baseline (gemma4) is large and irrelevant to the text battery;
-    # drop it from discovered-model runs to save VRAM.
+    # Drop the gemma4 baseline from discovered-model runs purely to save VRAM —
+    # it now carries the full text battery too, so this is a memory trade-off, not
+    # a relevance one. Its own numbers come from the scheduled baseline runs.
     baselines = [b for b in baselines if "gemma4" not in b.get("id", "")]
 
     disc = {
@@ -216,14 +221,16 @@ def build_temp_registry(model, watcher):
         "base_url": "http://127.0.0.1:11434/v1",
         "tier": "local",
         "context_window": 8000,
-        # Broad tags so the discovered model is attempted on the full task battery.
-        "tags": [
-            "general", "reasoning", "coding", "writing", "summarization",
-            "instruction_following", "structured_output", "communication",
-            "security", "python", "json",
-        ],
+        # Full task battery, read from registry.yaml `battery_tags` — the SAME list
+        # the baselines carry. Hardcoding it here is what let discovered models be
+        # measured on 9 tasks while baselines got 4 (see DECISIONS.md 2026-08-15).
+        "tags": list(cfg.get("battery_tags") or []),
         "enabled": True,
     }
+    if not disc["tags"]:
+        raise SystemExit(
+            "registry.yaml is missing `battery_tags`; refusing to run rather than "
+            "silently benchmark the discovered model on zero tasks.")
 
     def est_of(entry):
         m = re.search(r":(\d+(?:\.\d+)?)b?$", entry["id"], re.IGNORECASE)
@@ -249,8 +256,22 @@ def pull(model):
     subprocess.run(["ollama", "pull", model], check=True)
 
 
-def bench(model, tier="local"):
+def _runs_snapshot():
+    import glob
+    return {os.path.basename(p) for p in glob.glob(os.path.join(REPO, "runs", "*.json"))}
+
+
+def _new_run_since(before):
+    """The run file this cycle produced, identified by diff rather than mtime."""
+    new = sorted(_runs_snapshot() - before)
+    return os.path.join(REPO, "runs", new[-1]) if new else None
+
+
+def bench(model, tier="local", samples=1):
+    """Benchmark the discovered model (+ affordable baselines). Returns the path
+    of the run file produced, so the caller can judge exactly that file."""
     tmp, kept = build_temp_registry(model, load_watcher()[0])
+    before = _runs_snapshot()
     try:
         print(f"[autobench] bench {model} (registry includes {kept})")
         subprocess.run(
@@ -263,6 +284,8 @@ def bench(model, tier="local"):
                 tmp,
                 "--out",
                 os.path.join(REPO, "runs"),
+                "--samples",
+                str(samples),
             ],
             check=True,
         )
@@ -271,6 +294,54 @@ def bench(model, tier="local"):
             os.remove(tmp)
         except OSError:
             pass
+    return _new_run_since(before)
+
+
+def bench_baselines(tier="local", samples=1):
+    """Run the committed registry baselines with no pull and no delete. This is
+    the entry point the README documents as --baselines-only, which until now did
+    not exist as a flag."""
+    before = _runs_snapshot()
+    print(f"[autobench] bench baselines from models/registry.yaml (samples={samples})")
+    subprocess.run(
+        [
+            sys.executable,
+            os.path.join(REPO, "scripts", "run_bench.py"),
+            "--tier", tier,
+            "--registry", os.path.join(REPO, "models", "registry.yaml"),
+            "--out", os.path.join(REPO, "runs"),
+            "--samples", str(samples),
+        ],
+        check=True,
+    )
+    return _new_run_since(before)
+
+
+def report(run_path):
+    """Judge the run, then refresh the published aggregate (P1.2 / F1.2).
+
+    This is the step that used to live in an agent session, which is why 80 runs
+    of data never reached the README. A cycle that benches but does not score and
+    publish is a cycle whose output nobody can read.
+
+    Judging failure is FATAL: an unscored run must never be aggregated as if it
+    had been scored.
+    """
+    if not run_path or not os.path.exists(run_path):
+        print("[autobench] no run file produced; nothing to judge", file=sys.stderr)
+        return False
+    print(f"[autobench] judge {os.path.basename(run_path)}")
+    j = subprocess.run(
+        [sys.executable, os.path.join(REPO, "scripts", "score_run.py"), run_path])
+    if j.returncode != 0:
+        print("[autobench] JUDGE FAILED - run is on disk but UNSCORED; refusing to "
+              "aggregate it as if it were scored", file=sys.stderr)
+        return False
+    print("[autobench] aggregate -> README.md")
+    a = subprocess.run(
+        [sys.executable, os.path.join(REPO, "scripts", "aggregate_results.py"),
+         "--inject", "README.md"], cwd=REPO)
+    return a.returncode == 0
 
 
 def delete(model):
@@ -279,7 +350,15 @@ def delete(model):
 
 
 def commit(msg):
-    subprocess.run(["git", "-C", REPO, "add", "runs/", "reports/"], check=True)
+    # README carries the injected aggregate, so it is part of the run product,
+    # not an unrelated edit that happens to be dirty.
+    subprocess.run(["git", "-C", REPO, "add", "runs/", "reports/", "README.md"],
+                   check=True)
+    staged = subprocess.run(["git", "-C", REPO, "diff", "--cached", "--name-only"],
+                            capture_output=True, text=True).stdout.strip()
+    if not staged:
+        print("[autobench] nothing staged; skipping commit")
+        return
     subprocess.run(["git", "-C", REPO, "commit", "-m", msg], check=True)
 
 
@@ -287,9 +366,29 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", help="test a specific model (skip discover())")
     ap.add_argument("--no-delete", action="store_true")
+    ap.add_argument("--baselines-only", action="store_true",
+                    help="bench the registry baselines only: no discover, no pull, "
+                         "no delete")
+    ap.add_argument("--samples", type=int, default=1,
+                    help="draws per (model, task); >1 makes variance measurable")
+    ap.add_argument("--no-report", action="store_true",
+                    help="skip judge+aggregate+commit (nightly.py runs those "
+                         "itself, with per-stage logging)")
     args = ap.parse_args()
 
     watcher, _baseline = load_watcher()
+
+    # Baselines-only: a full local cycle with no model lifecycle at all.
+    if args.baselines_only:
+        run_path = bench_baselines(samples=args.samples)
+        if args.no_report:
+            return
+        if not report(run_path):
+            raise SystemExit(1)
+        commit(f"autobench: baselines @ {dt.datetime.now():%Y%m%d_%H%M%S} "
+               f"(N={args.samples})")
+        return
+
     model = args.model or discover(watcher)
     if not model:
         print("[autobench] nothing new to benchmark")
@@ -316,13 +415,17 @@ def main():
         print(f"[autobench] model {model} already available locally, skipping pull")
 
     print(f"[autobench] bench {model}")
-    bench(model)
+    run_path = bench(model, samples=args.samples)
     # Only delete models we pulled — never delete pre-existing local models
     if pulled and not args.no_delete and watcher.get("delete_after_bench", True):
         print(f"[autobench] delete {model}")
         delete(model)
     elif not pulled:
         print(f"[autobench] skipping delete — model was pre-existing locally")
+    if args.no_report:
+        return
+    if not report(run_path):
+        raise SystemExit(1)
     commit(f"autobench: {model} @ {dt.datetime.now():%Y%m%d_%H%M%S}")
 
 
