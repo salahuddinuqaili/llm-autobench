@@ -132,6 +132,31 @@ def run(args: list[str], stage: str, timeout: int = 5400) -> bool:
     return True
 
 
+def wait_for_network(timeout_s: int = 90) -> bool:
+    """Wait for outbound connectivity, bounded. Returns False if it never arrives.
+
+    A run started by a WAKE TIMER begins seconds after resume, while the NIC is
+    often still reassociating. Discovery scrapes ollama.com almost immediately, so
+    without this the first network call of a wake-from-sleep run is the one most
+    likely to fail -- and it would look like "no candidates" rather than "no
+    network". Cheap insurance for a case that only happens unattended.
+    """
+    import time
+    deadline = time.monotonic() + timeout_s
+    attempt = 0
+    while time.monotonic() < deadline:
+        attempt += 1
+        try:
+            urllib.request.urlopen("https://ollama.com/library", timeout=10).read(64)
+            if attempt > 1:
+                log(f"preflight: network up after {attempt} attempt(s)")
+            return True
+        except Exception:  # noqa: BLE001 - any failure means "not yet"
+            time.sleep(5)
+    log(f"preflight: no outbound network after {timeout_s}s")
+    return False
+
+
 def preflight() -> bool:
     """Refuse to start rather than fail halfway. Each check is a real failure seen before."""
     try:
@@ -158,6 +183,11 @@ def preflight() -> bool:
         log(f"preflight: cannot import judge ({exc}) -- aborting")
         return False
     log("preflight: NVIDIA key resolves")
+
+    if not wait_for_network():
+        log("preflight: network unreachable -- aborting (discovery and the judge "
+            "both need it; better to skip a night than half-run one)")
+        return False
 
     dirty = subprocess.run(["git", "status", "--porcelain"], cwd=REPO,
                            capture_output=True, text=True).stdout.strip()
