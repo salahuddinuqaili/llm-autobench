@@ -274,8 +274,16 @@ def render(a):
     # ---- Leaderboard ----
     md.append("### \U0001F3C6 Leaderboard (all-time mean score)")
     md.append("")
-    md.append("| Rank | Model | Avg | 95% CI | Shared-task avg | Results (n) | Runs | Tasks | Avg latency | Err |")
-    md.append("|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|")
+    # Kept to 8 columns: GitHub renders a wider table with a horizontal scrollbar
+    # and squeezes the numbers, which is where the reader actually looks.
+    any_err = any(a["m_err"].values())
+    hdr = "| Rank | Model | Avg | 95% CI | Shared-task | n | Runs / Tasks | Latency |"
+    sep = "|---:|---|---:|---:|---:|---:|---:|---:|"
+    if any_err:
+        hdr += " Err |"
+        sep += "---:|"
+    md.append(hdr)
+    md.append(sep)
     for i, m in enumerate(models, 1):
         sc, lat = a["m_scores"][m], a["m_lat"][m]
         avg = statistics.mean(sc)
@@ -288,9 +296,12 @@ def render(a):
         sh_vals = [s for (mm, t), v in a["mt_scores"].items()
                    if mm == m and t in shared for s in v]
         sh_s = f"{statistics.mean(sh_vals):.2f}" if sh_vals else "—"
-        md.append(f"| {tag} | `{short(m)}`{vis} | **{avg:.2f}** | {ci_s} | {sh_s} | "
-                  f"{len(sc)} | {len(a['m_runs'][m])} | {len(a['m_tasks'][m])} | "
-                  f"{latm:.1f}s | {errp or '-'} |")
+        row = (f"| {tag} | `{short(m)}`{vis} | **{avg:.2f}** | {ci_s} | {sh_s} | "
+               f"{len(sc)} | {len(a['m_runs'][m])} / {len(a['m_tasks'][m])} | "
+               f"{latm:.1f}s |")
+        if any_err:
+            row += f" {errp or '-'} |"
+        md.append(row)
     md.append("")
     md.append(f"> **Avg** is over every task a model attempted, so two models with "
               f"different coverage are not comparable there. **Shared-task avg** is over "
@@ -369,16 +380,26 @@ def render(a):
     # ---- Coverage: what was NOT run, and why (F1.6/D5) ----
     md.append("### \U0001F4CB Coverage (what was skipped, and why)")
     md.append("")
-    md.append("| Model | Tasks attempted | Skipped | Why |")
+    md.append("| Model | Tasks attempted | Skipped | Reason |")
     md.append("|---|---:|---:|---|")
     by_model_skip = defaultdict(list)
     for s in a["skips"]:
         by_model_skip[s.get("model", "?")].append(s.get("task", "?"))
-    for m in sorted(set(list(a["m_tasks"]) + list(by_model_skip))):
+    order = sorted(set(list(a["m_tasks"]) + list(by_model_skip)))
+    for m in order:
         sk = sorted(set(by_model_skip.get(m, [])))
-        why = ("`" + "`, `".join(sk) + "` — tag mismatch") if sk else "nothing skipped"
-        md.append(f"| `{short(m)}` | {len(a['m_tasks'].get(m, ()))} | {len(sk)} | {why} |")
+        md.append(f"| `{short(m)}` | {len(a['m_tasks'].get(m, ()))} | {len(sk)} | "
+                  f"{'tag mismatch' if sk else '—'} |")
     md.append("")
+    # The task lists live below the table, not inside a cell: a 9-item list in one
+    # cell made the rendered table several screens wide on GitHub.
+    for m in order:
+        sk = sorted(set(by_model_skip.get(m, [])))
+        if sk:
+            md.append(f"- `{short(m)}` did not attempt: "
+                      + ", ".join(f"`{t}`" for t in sk) + ".")
+    if any(by_model_skip.values()):
+        md.append("")
     if not a["skips"]:
         md.append("_No run in this aggregate recorded a skipped pair. Runs from earlier "
                   "eras skipped pairs silently and cannot be audited this way._")
@@ -387,14 +408,17 @@ def render(a):
     # ---- Era history: previous datasets, preserved and excluded ----
     md.append("### \U0001F5C2 Era history (previous datasets, kept but not averaged in)")
     md.append("")
-    md.append("| Era | Dates | Runs on disk | In this aggregate | Why separated |")
-    md.append("|---|---|---:|---|---|")
+    md.append("| Era | Dates | Runs on disk | In this aggregate |")
+    md.append("|---|---|---:|---|")
     for e in ERAS:
         n = a["era_counts"].get(e["label"], 0)
         cur = "**yes**" if e["from"] == ERA_CUTOFF else "no"
         frm = "…" if e["from"] == "00000000" else fmt_date(e["from"])
         to = "now" if e["to"] == "99999999" else fmt_date(e["to"])
-        md.append(f"| {e['label']} | {frm} → {to} | {n} | {cur} | {e['why']} |")
+        md.append(f"| {e['label']} | {frm} → {to} | {n} | {cur} |")
+    md.append("")
+    for e in ERAS:
+        md.append(f"- **{e['label']}** — {e['why']}")
     md.append("")
     md.append("_Every run above is still committed in `runs/`. A harness change that alters "
               "what is measured makes old runs a different dataset, not a longer time series, "

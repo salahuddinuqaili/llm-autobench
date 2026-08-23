@@ -2,11 +2,11 @@ _All-time aggregate across **1 runs** (2026-08-23 → 2026-08-23), **3 models**,
 
 ### 🏆 Leaderboard (all-time mean score)
 
-| Rank | Model | Avg | 95% CI | Shared-task avg | Results (n) | Runs | Tasks | Avg latency | Err |
-|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 🥇 | `qwen3.5:9b` | **0.90** | 0.81–0.99 | 0.90 | 25 | 1 | 9 | 8.2s | - |
-| 🥈 | `gemma4:e4b` | **0.75** | 0.60–0.90 | 0.86 | 31 | 1 | 11 | 3.6s | - |
-| 🥉 | `minicpm-v:latest` ·👁 | **0.40** | 0.18–0.62 | — | 6 | 1 | 2 | 1.6s | - |
+| Rank | Model | Avg | 95% CI | Shared-task | n | Runs / Tasks | Latency |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 🥇 | `qwen3.5:9b` | **0.90** | 0.81–0.99 | 0.90 | 25 | 1 / 9 | 8.2s |
+| 🥈 | `gemma4:e4b` | **0.75** | 0.60–0.90 | 0.86 | 31 | 1 / 11 | 3.6s |
+| 🥉 | `minicpm-v:latest` ·👁 | **0.40** | 0.18–0.62 | — | 6 | 1 / 2 | 1.6s |
 
 > **Avg** is over every task a model attempted, so two models with different coverage are not comparable there. **Shared-task avg** is over the 9 task(s) every general model attempted (`arithmetic_reasoning`, `changelog_generation`, `code_generation`, `code_review`, `instruction_following`, `logical_reasoning`, `sprint_narrative`, `structured_output`, `summarization`) — that column is the like-for-like one. `—` = vision-only model, which attempts none of the shared text battery. `👁` = vision-only coverage (different judging regime).
 
@@ -62,19 +62,26 @@ _9 cell(s) returned different scores for the **same prompt at the same settings*
 
 ### 📋 Coverage (what was skipped, and why)
 
-| Model | Tasks attempted | Skipped | Why |
+| Model | Tasks attempted | Skipped | Reason |
 |---|---:|---:|---|
-| `gemma4:e4b` | 11 | 0 | nothing skipped |
-| `minicpm-v:latest` | 2 | 9 | `arithmetic_reasoning`, `changelog_generation`, `code_generation`, `code_review`, `instruction_following`, `logical_reasoning`, `sprint_narrative`, `structured_output`, `summarization` — tag mismatch |
-| `qwen3.5:9b` | 9 | 2 | `vision_ocr`, `vision_progressive` — tag mismatch |
+| `gemma4:e4b` | 11 | 0 | — |
+| `minicpm-v:latest` | 2 | 9 | tag mismatch |
+| `qwen3.5:9b` | 9 | 2 | tag mismatch |
+
+- `minicpm-v:latest` did not attempt: `arithmetic_reasoning`, `changelog_generation`, `code_generation`, `code_review`, `instruction_following`, `logical_reasoning`, `sprint_narrative`, `structured_output`, `summarization`.
+- `qwen3.5:9b` did not attempt: `vision_ocr`, `vision_progressive`.
 
 ### 🗂 Era history (previous datasets, kept but not averaged in)
 
-| Era | Dates | Runs on disk | In this aggregate | Why separated |
-|---|---|---:|---|---|
-| pre-credibility-fix | … → 2026-07-26 | 93 | no | substring scorer (false-positive 1.00), no truncation guard, two disagreeing judge paths |
-| credibility fixes (`d61170e`) | 2026-07-27 → 2026-08-22 | 80 | no | answer extraction + truncation guard + single judge landed, but N=1 per (model, task) with no variance, and the tag gate skipped pairs silently so coverage gaps were invisible |
-| multi-sample + disclosed coverage | 2026-08-23 → now | 1 | **yes** | N>1 draws per (model, task) with spread reported, every skipped pair recorded with its reason, truncation counted from recorded `done_reason` instead of estimated from response endings |
+| Era | Dates | Runs on disk | In this aggregate |
+|---|---|---:|---|
+| pre-credibility-fix | … → 2026-07-26 | 93 | no |
+| credibility fixes (`d61170e`) | 2026-07-27 → 2026-08-22 | 80 | no |
+| multi-sample + disclosed coverage | 2026-08-23 → now | 1 | **yes** |
+
+- **pre-credibility-fix** — substring scorer (false-positive 1.00), no truncation guard, two disagreeing judge paths
+- **credibility fixes (`d61170e`)** — answer extraction + truncation guard + single judge landed, but N=1 per (model, task) with no variance, and the tag gate skipped pairs silently so coverage gaps were invisible
+- **multi-sample + disclosed coverage** — N>1 draws per (model, task) with spread reported, every skipped pair recorded with its reason, truncation counted from recorded `done_reason` instead of estimated from response endings
 
 _Every run above is still committed in `runs/`. A harness change that alters what is measured makes old runs a different dataset, not a longer time series, so they are cited as history and never averaged with current ones._
 

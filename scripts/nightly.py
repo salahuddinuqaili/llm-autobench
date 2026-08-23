@@ -155,8 +155,16 @@ def main() -> int:
         log("commit failed (a hook may have blocked it) -- run left staged, not pushed")
         return 1
 
-    if not run(["git", "push", "-q", "origin", "HEAD"], "push", timeout=300):
-        log("push failed -- commit is local, will go up next run")
+    # Publish to master explicitly rather than to the current branch. The repo is
+    # worked on in feature branches, so pushing HEAD would park the refreshed
+    # README on whatever branch happened to be checked out and leave the public
+    # default branch stale -- which is how the README froze in July.
+    # Git refuses a non-fast-forward push, so this self-guards: if the checked-out
+    # branch does not contain origin/master, the push fails loudly instead of
+    # publishing unrelated work.
+    if not run(["git", "push", "-q", "origin", "HEAD:master"], "push", timeout=300):
+        log("push to master failed (not a fast-forward, or no network) -- the "
+            "commit is local and will go up once the branch contains origin/master")
         return 1
 
     log("nightly OK")
