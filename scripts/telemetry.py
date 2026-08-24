@@ -14,6 +14,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+import procutil
+
 REPO = Path(__file__).parent.parent
 TELEMETRY_DIR = REPO / "telemetry"
 TELEMETRY_DIR.mkdir(exist_ok=True)
@@ -92,7 +94,7 @@ def get_vram_used_mib() -> Optional[int]:
     """Return used VRAM in MiB via nvidia-smi."""
     try:
         import subprocess
-        out = subprocess.check_output(
+        out = procutil.check_output(
             ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
             text=True, stderr=subprocess.DEVNULL,
         )
@@ -104,7 +106,7 @@ def get_vram_used_mib() -> Optional[int]:
 def get_vram_free_mib() -> Optional[int]:
     try:
         import subprocess
-        out = subprocess.check_output(
+        out = procutil.check_output(
             ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
             text=True, stderr=subprocess.DEVNULL,
         )

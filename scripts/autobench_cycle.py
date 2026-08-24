@@ -32,6 +32,8 @@ import urllib.request
 
 import yaml
 
+import procutil
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Curated fallback models (untested, VRAM-friendly) used only if the live
@@ -53,7 +55,7 @@ def load_watcher():
 def get_vram_free_mib():
     """Return free VRAM in MiB via nvidia-smi. Returns None on failure."""
     try:
-        out = subprocess.check_output(
+        out = procutil.check_output(
             ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
             text=True,
             stderr=subprocess.DEVNULL,
@@ -91,7 +93,7 @@ def model_is_available_locally(model_tag):
     Returns the actual local tag name if found, or False.
     """
     try:
-        out = subprocess.check_output(["ollama", "list"], text=True, stderr=subprocess.DEVNULL)
+        out = procutil.check_output(["ollama", "list"], text=True, stderr=subprocess.DEVNULL)
         # Check against actual first-column tags (not substring match)
         local_tags = [line.split()[0] for line in out.splitlines() if line.split()]
         # Exact match first
@@ -253,7 +255,7 @@ def build_temp_registry(model, watcher):
 
 def pull(model):
     print(f"[autobench] ollama pull {model}")
-    subprocess.run(["ollama", "pull", model], check=True)
+    procutil.run(["ollama", "pull", model], check=True)
 
 
 def _runs_snapshot():
@@ -274,7 +276,7 @@ def bench(model, tier="local", samples=1):
     before = _runs_snapshot()
     try:
         print(f"[autobench] bench {model} (registry includes {kept})")
-        subprocess.run(
+        procutil.run(
             [
                 sys.executable,
                 os.path.join(REPO, "scripts", "run_bench.py"),
@@ -303,7 +305,7 @@ def bench_baselines(tier="local", samples=1):
     not exist as a flag."""
     before = _runs_snapshot()
     print(f"[autobench] bench baselines from models/registry.yaml (samples={samples})")
-    subprocess.run(
+    procutil.run(
         [
             sys.executable,
             os.path.join(REPO, "scripts", "run_bench.py"),
@@ -331,14 +333,14 @@ def report(run_path):
         print("[autobench] no run file produced; nothing to judge", file=sys.stderr)
         return False
     print(f"[autobench] judge {os.path.basename(run_path)}")
-    j = subprocess.run(
+    j = procutil.run(
         [sys.executable, os.path.join(REPO, "scripts", "score_run.py"), run_path])
     if j.returncode != 0:
         print("[autobench] JUDGE FAILED - run is on disk but UNSCORED; refusing to "
               "aggregate it as if it were scored", file=sys.stderr)
         return False
     print("[autobench] aggregate -> README.md")
-    a = subprocess.run(
+    a = procutil.run(
         [sys.executable, os.path.join(REPO, "scripts", "aggregate_results.py"),
          "--inject", "README.md"], cwd=REPO)
     return a.returncode == 0
@@ -346,20 +348,20 @@ def report(run_path):
 
 def delete(model):
     print(f"[autobench] ollama rm {model}")
-    subprocess.run(["ollama", "rm", model], check=True)
+    procutil.run(["ollama", "rm", model], check=True)
 
 
 def commit(msg):
     # README carries the injected aggregate, so it is part of the run product,
     # not an unrelated edit that happens to be dirty.
-    subprocess.run(["git", "-C", REPO, "add", "runs/", "reports/", "README.md"],
+    procutil.run(["git", "-C", REPO, "add", "runs/", "reports/", "README.md"],
                    check=True)
-    staged = subprocess.run(["git", "-C", REPO, "diff", "--cached", "--name-only"],
+    staged = procutil.run(["git", "-C", REPO, "diff", "--cached", "--name-only"],
                             capture_output=True, text=True).stdout.strip()
     if not staged:
         print("[autobench] nothing staged; skipping commit")
         return
-    subprocess.run(["git", "-C", REPO, "commit", "-m", msg], check=True)
+    procutil.run(["git", "-C", REPO, "commit", "-m", msg], check=True)
 
 
 def main():

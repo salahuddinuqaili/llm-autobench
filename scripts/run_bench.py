@@ -27,6 +27,8 @@ import urllib.request
 
 import yaml
 
+import procutil
+
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Bump when the shape of a run record changes, so a reader can tell which records
@@ -36,9 +38,8 @@ SCHEMA_VERSION = 1
 
 def _shell(args, default=""):
     """Best-effort capture; provenance must never break a benchmark run."""
-    import subprocess
     try:
-        p = subprocess.run(args, capture_output=True, text=True, timeout=15, cwd=REPO)
+        p = procutil.run(args, capture_output=True, text=True, timeout=15, cwd=REPO)
         return p.stdout.strip() if p.returncode == 0 else default
     except Exception:
         return default
@@ -193,7 +194,6 @@ def call_model(model, prompt, max_tokens, image_path=None):
     # quota — no ANTHROPIC_API_KEY env var needed or wanted.
     if model.get("provider") == "anthropic":
         try:
-            import subprocess as _sp
             model_name = model.get("model_name", "claude-sonnet-4-5")
             cmd = [
                 "claude", "-p", prompt,
@@ -202,7 +202,7 @@ def call_model(model, prompt, max_tokens, image_path=None):
                 "--output-format", "json",
             ]
             t0 = dt.datetime.now()
-            result = _sp.run(cmd, capture_output=True, text=True, timeout=120)
+            result = procutil.run(cmd, capture_output=True, text=True, timeout=120)
             latency = (dt.datetime.now() - t0).total_seconds()
             if result.returncode != 0:
                 return None, latency, f"claude cli error: {result.stderr.strip()}", {}

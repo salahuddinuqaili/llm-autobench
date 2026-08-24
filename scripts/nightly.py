@@ -27,6 +27,8 @@ import sys
 import urllib.request
 from pathlib import Path
 
+import procutil
+
 REPO = Path(__file__).resolve().parent.parent
 SCRIPTS = REPO / "scripts"
 LOG_DIR = REPO / "telemetry" / "nightly"     # gitignored, stays local
@@ -114,7 +116,7 @@ def maybe_sleep(enabled: bool) -> None:
 def run(args: list[str], stage: str, timeout: int = 5400) -> bool:
     log(f"[{stage}] $ {' '.join(args[1:])}")
     try:
-        p = subprocess.run(args, cwd=REPO, capture_output=True, text=True, timeout=timeout)
+        p = procutil.run(args, cwd=REPO, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         log(f"[{stage}] TIMEOUT after {timeout}s")
         return False
@@ -189,7 +191,7 @@ def preflight() -> bool:
             "both need it; better to skip a night than half-run one)")
         return False
 
-    dirty = subprocess.run(["git", "status", "--porcelain"], cwd=REPO,
+    dirty = procutil.run(["git", "status", "--porcelain"], cwd=REPO,
                            capture_output=True, text=True).stdout.strip()
     if dirty:
         log(f"preflight: {len(dirty.splitlines())} uncommitted file(s) present -- "
@@ -258,9 +260,9 @@ def _run_pipeline() -> int:
         log("nightly STOPPED: aggregation failed")
         return 1
 
-    subprocess.run(["git", "add", "runs", "reports", "README.md"], cwd=REPO,
+    procutil.run(["git", "add", "runs", "reports", "README.md"], cwd=REPO,
                    capture_output=True)
-    staged = subprocess.run(["git", "diff", "--cached", "--name-only"], cwd=REPO,
+    staged = procutil.run(["git", "diff", "--cached", "--name-only"], cwd=REPO,
                             capture_output=True, text=True).stdout.strip()
     if not staged:
         log("nothing to commit")

@@ -13,6 +13,8 @@ import os
 import sys
 from pathlib import Path
 
+import procutil
+
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "scripts"))
 
@@ -39,10 +41,9 @@ def main() -> int:
     nvidia_judge.main.__globals__  # no-op to ensure import side effects
     # Re-run main() with the chosen run file by re-invoking via subprocess so
     # the judge's own arg parsing is authoritative.
-    import subprocess
 
     cmd = [sys.executable, str(REPO / "scripts" / "nvidia_judge.py"), run_file]
-    res = subprocess.run(cmd)
+    res = procutil.run(cmd)
     return res.returncode
 
 

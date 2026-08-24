@@ -20,12 +20,13 @@ Usage:
 import json
 import os
 import re
-import subprocess
 import sys
 import time
 import base64
 import urllib.request
 from pathlib import Path
+
+import procutil
 
 JUDGE_MODEL = "meta/llama-3.3-70b-instruct"
 # Two-stage vision judging (per user direction):
@@ -81,7 +82,7 @@ def call_judge(prompt: str, api_key: str, max_retries: int = 4,
                 "-H", "Content-Type: application/json",
                 "-d", payload,
             ]
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=200)
+            res = procutil.run(cmd, capture_output=True, text=True, timeout=200)
             out = res.stdout.strip()
             if not out:
                 last_err = f"empty response (HTTP {res.returncode})"
@@ -119,7 +120,6 @@ def describe_image(img_path: str, max_retries: int = 2) -> str:
         if desc:
             cache[img_path] = desc
             return desc
-    import subprocess as _sp
     prompt = ("Describe this image in thorough, factual detail: every object, "
               "its color and position, any text/labels, the scene type, and "
               "overall lighting. Be specific and literal; do not speculate.")
@@ -128,7 +128,7 @@ def describe_image(img_path: str, max_retries: int = 2) -> str:
         cmd = ["claude", "-p", prompt, "--model", "claude-sonnet-4-5",
                "--max-turns", "1", "--output-format", "text"]
         # pass the image as a file argument Claude can read
-        res = _sp.run(cmd + [img_path], capture_output=True, text=True,
+        res = procutil.run(cmd + [img_path], capture_output=True, text=True,
                       timeout=180)
         if res.returncode == 0 and res.stdout.strip():
             desc = res.stdout.strip()
