@@ -1,7 +1,9 @@
 # llm-autobench — Specification
 
-**Version:** 0.3 (draft) · **Status:** Tier A shipped **but flagship run misreports scores** — see §11–§12
-**Owner:** Salahuddin Uqaili · **Visibility:** PUBLIC (portfolio piece)
+**Version:** 0.4 (draft) · **Status:** credibility fixes shipped (§12 closed 2026-07-22); the
+pipeline now runs unattended nightly and publishes itself. **Next action: §13** — refocus discovery
+on 6–10B models and measure agentic capability.
+**Owner:** Salahuddin Uqaili · **Visibility:** PUBLIC
 
 ---
 
@@ -218,7 +220,10 @@ demonstrably-fake headline number is still enough to violate the "Honesty in rep
 
 ---
 
-## 12. Remediation plan (credibility-first) — supersedes §10 Phase B as the next action
+## 12. Remediation plan (credibility-first) — ✅ closed 2026-07-22, superseded by §13
+
+> Kept as history. Phase 0–1 shipped; the claimed-vs-actual audit trail is in
+> `IMPROVEMENTS.md`. The next action is **§13**, not this section.
 
 **Principle:** a benchmark that reports wrong scores must be made *trustworthy* before it is made
 *bigger*. Fix scoring / loop / reporting (Phase 0–1) before porting suites (Phase 2).
@@ -269,3 +274,136 @@ reconcile SPEC/README with code state (telemetry = skeleton, judge panel + κ = 
 **Next action (revised):** start **Phase 0** in a fresh session. Locked-in choices are in
 `DECISIONS.md`; each fix must run its acceptance test against the real failing case before it's
 called done.
+
+---
+
+## 13. Small-model agentic focus (2026-08-24) — supersedes §12 as the next action
+
+**Status:** specified, not implemented. Decisions locked below; implement in a fresh session.
+
+### 13.1 Why this changes the question the repo asks
+
+Until now the harness asked *"what can a 12 GB box run?"* and answered it by pulling the **largest**
+model that fits. That is the wrong target. A 12 GB box is not interesting as a home for the biggest
+model it can barely hold — it is interesting as a home for a model small enough to be **useful
+repeatedly**: fast, leaves headroom, and able to drive tools.
+
+So the question becomes: **within 6–10B, which open models are actually effective, including at
+agentic work?** Agentic capability is the part no current task measures at all, and it is the part
+that decides whether a local model can do anything beyond answer a prompt.
+
+**Feasibility is established, not assumed.** Ollama `/api/chat` accepts a `tools` array, and
+`qwen3.5:9b` returned a well-formed call — `get_weather(city="Berlin")` — on the first attempt
+(measured 2026-08-24). No new dependency, no paid API. The gap is entirely in `run_bench.py`, which
+sends one-shot requests with no `tools` parameter, no tool executor and no multi-turn loop.
+
+### 13.2 Discovery: a size band, and an exact tag match
+
+| Setting | Now | Becomes |
+|---|---|---|
+| Selection rule | largest model that fits VRAM | prefer **untested within band** |
+| Band | none (ceiling only) | `size_band: {min: 6, max: 10}` |
+| Hard VRAM cap | `max_params_billions: 14` | unchanged — still the absolute guard |
+| Local-tag match | family name before the colon | **exact tag only** |
+
+**Exact tag match closes the livelock (D10, below).** `model_is_available_locally()` currently
+returns any local tag sharing the family name, so `gemma4:12b` resolved to the already-local
+`gemma4:e4b`: no pull, no delete, and the baseline re-benchmarked in its place — observed on two
+consecutive nights (2026-08-23, 2026-08-24). In a 6–10B band this gets worse, not better:
+`qwen3.5:8b` would silently resolve to the local `qwen3.5:9b`.
+
+*Accepted trade-off:* exact matching may pull `qwen2.5:7b` when `qwen2.5:7b-instruct` is already
+local. Correctness over disk — and disk is what `delete_after_bench` exists to reclaim.
+
+*Selection within the band* prefers models never benchmarked, tie-broken deterministically (not by
+size). "Prefer larger" is removed: it is what kept re-selecting the same 12B candidate.
+
+**Accept:** a unit test over `gemma4:12b`, `gemma4:e4b`, `qwen2.5:7b-instruct`, `mixtral:8x7b`,
+`qwen:latest`; and one cycle that pulls a genuinely new 6–10B model, benchmarks it, and deletes it.
+
+### 13.3 Agentic Phase 1 — single-turn tool-call correctness
+
+The floor. Many 7–9B models fail this outright, which is itself a result worth publishing.
+
+- Task schema gains `tools:` (JSON schemas) and `expect_tool_call:` (name + required arguments).
+- `call_model()` passes `tools` through to `/api/chat` when the task defines them.
+- New scoring method **`tool-call`**, scored mechanically: was a call emitted, is it the right tool,
+  are the required arguments present and correct.
+- **A model with no tool support must not score 0.** Absence of `tool_calls` is flagged
+  `tools_unsupported` and left **unscored**, exactly as `ingestion_failed` and `truncated` already
+  are. "Cannot" and "got it wrong" are different findings; conflating them is the inverse of the
+  honesty rule (CLAUDE.md 9).
+
+**Accept:** `qwen3.5:9b` scores 1.0 on a weather-style task; a model without tool support is
+flagged `tools_unsupported`, not scored 0.0.
+
+### 13.4 Agentic Phase 2 — multi-turn loop with sandboxed tools
+
+The real measurement. A deterministic executor, no network and no writes outside a temp directory:
+
+| Tool | Purpose |
+|---|---|
+| `calc(expression)` | arithmetic the model should delegate rather than guess |
+| `kv_get(key)` / `kv_set(key, value)` | state the model must carry across turns |
+| `list_files(dir)` / `read_file(path)` | read-only fixture directory |
+| `finish(answer)` | explicit termination — the model must decide it is done |
+
+Loop: execute each requested call, append the result as `role: "tool"`, continue until `finish` or a
+turn cap (proposed 8). The **full trajectory is recorded in the run JSON**, so a score can be audited
+rather than trusted.
+
+### 13.5 Mechanical trajectory scoring — no judge
+
+Agentic rows are scored **in code**, which removes judge subjectivity from the one category where it
+would be least defensible, and adds zero load to the free tier. Sub-scores are recorded
+**separately** rather than collapsed into one opaque number:
+
+| Sub-score | Question |
+|---|---|
+| `completed` | did it call `finish` with the correct answer? |
+| `tool_choice` | right tools, right arguments? |
+| `efficiency` | turns used vs the optimal path |
+| `error_recovery` | one task injects a tool error — did it adapt or give up? |
+| `no_hallucinated_tools` | did it only ever call tools that exist? |
+| `terminated` | did it stop on its own rather than hit the cap? |
+
+**Accept:** a hand-written perfect trajectory scores 1.0 on every sub-score; a transcript that loops
+to the cap scores `terminated: 0` while keeping its other sub-scores.
+
+### 13.6 Reporting
+
+Agentic tasks are a **separate regime**, like vision: their own marker, their own section, and
+excluded from the text shared-task column. Mixing a tool-use score into a prose average would repeat
+the coverage error the shared-task column exists to prevent.
+
+### 13.7 Era policy — no bump
+
+Adding **new** tasks does not invalidate existing measurements: the existing tasks are unchanged, and
+per-task means plus the shared-task column already handle models with differing coverage.
+`ERA_CUTOFF` stays at `20260823`. An era bump is for changes to *how existing things are measured*,
+not for additions.
+
+### 13.8 Non-goals
+
+Real-world tool use (network, shell, filesystem writes), SWE-bench-style environments, multi-agent
+orchestration. None fit a 12 GB box, and each would need a sandbox story this repo does not have.
+
+### 13.9 Risks
+
+- **Many 6–10B models will have no tool support.** Expect a large `tools_unsupported` count. That is
+  a finding, and the report must make it legible rather than let it read as failure.
+- **Runtime.** Multi-turn multiplies generations per row by up to the turn cap. Current run: 54 rows
+  in ~4 min. Adding 4 agentic tasks × 3 draws × 2 models at up to 8 turns is up to ~192 extra
+  generations. Needs a per-task timeout and a measured budget before it goes in the nightly.
+- **Exact matching may re-pull near-duplicates**, costing disk and pull time. Accepted in 13.2.
+
+### 13.10 Defect log addition
+
+**D10 — discovery livelock.** `model_is_available_locally()` matches on the family name before the
+colon, so a discovered tag resolves to a different local model of the same family. Effect: no pull,
+no delete, the local baseline benchmarked in its place, and — because the discovered tag never
+appears in `runs/` — it is never added to the tested set, so the same substitution repeats nightly.
+Observed 2026-08-23 and 2026-08-24. Fixed by 13.2.
+
+**Next action:** implement §13 in a fresh session, in order — 13.2 (discovery, smallest and unblocks
+the rest), then 13.3, then 13.4/13.5. Each with its acceptance test run against the real case.

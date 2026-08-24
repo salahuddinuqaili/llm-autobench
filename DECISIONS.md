@@ -3,6 +3,48 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-08-24 · Discovery targets a 6–10B band, not the largest model that fits
+`watcher.size_band: {min: 6, max: 10}`; `max_params_billions: 14` stays as the absolute VRAM guard;
+selection prefers models never benchmarked within the band, tie-broken deterministically. Why: a
+12GB box is not interesting as a home for the biggest model it can barely hold — it is interesting
+as a home for one small enough to be useful repeatedly, and 6–10B is where local agentic work is
+plausible. Rejected: strict 7–9B (candidate pool runs dry and nights are skipped); keeping the 14B
+ceiling with a mere preference (dilutes the focus and keeps re-selecting the same 12B tag).
+
+## 2026-08-24 · Local-tag matching is EXACT; family matching is removed
+`model_is_available_locally()` returns a tag only on exact match. Why: family matching resolved the
+discovered `gemma4:12b` to the already-local `gemma4:e4b`, so no pull and no delete happened and the
+baseline was re-benchmarked in its place — and since the discovered tag never reached `runs/`, it was
+never marked tested, so the substitution repeated every night (observed 2026-08-23 and 2026-08-24,
+logged as D10). In a 6–10B band it would get worse: `qwen3.5:8b` → local `qwen3.5:9b`. Rejected:
+family match plus a size check (still guesses at equivalence); leaving it (livelocks the core
+promise of the repo). Accepted cost: may re-pull `qwen2.5:7b` when `qwen2.5:7b-instruct` is local —
+correctness over disk, and `delete_after_bench` reclaims it.
+
+## 2026-08-24 · Agentic tasks are scored mechanically, never by the judge
+Trajectory sub-scores (`completed`, `tool_choice`, `efficiency`, `error_recovery`,
+`no_hallucinated_tools`, `terminated`) are computed in code and recorded separately rather than
+collapsed into one number. Why: tool use has ground truth — the right call with the right arguments
+either happened or it did not — so a judge would add subjectivity to the one category that does not
+need it, plus free-tier load. Rejected: judging the whole transcript (makes agentic scores as soft as
+the rubric ones); mechanical trajectory plus a judged final answer (reintroduces variance into half
+the score for little gain).
+
+## 2026-08-24 · A model with no tool support is unscored, not zero
+Absence of `tool_calls` is flagged `tools_unsupported` and left unscored, mirroring `truncated` and
+`ingestion_failed`. Why: "cannot use tools" and "used tools wrongly" are different findings, and
+publishing the first as a 0.0 is the inverse of the honesty rule (CLAUDE.md 9) — the same defeat
+pattern already fixed twice in this repo. Rejected: scoring 0.0 (conflates capability with absence);
+excluding such models from agentic tasks entirely (hides a real and useful finding about 6–10B
+models).
+
+## 2026-08-24 · Adding tasks does not open a new era
+`ERA_CUTOFF` stays `20260823` when agentic tasks land. Why: an era exists to separate runs where the
+*same thing was measured differently*. New tasks leave existing task measurements untouched, and
+per-task means plus the shared-task column already handle models with differing coverage. Rejected:
+bumping on any battery change (would reset the published aggregate to zero runs for no methodological
+gain, having just refilled it).
+
 ## 2026-08-23 · Eras are a table, not a constant; era 3 opens on the multi-sample harness
 `aggregate_results.py` now carries an `ERAS` list (dates + label + why-separated) and derives
 `ERA_CUTOFF` from its last entry, which the README renders as an era-history table. Why: bumping a
