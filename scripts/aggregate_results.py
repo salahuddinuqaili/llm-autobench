@@ -277,7 +277,7 @@ def render(a):
     # Kept to 8 columns: GitHub renders a wider table with a horizontal scrollbar
     # and squeezes the numbers, which is where the reader actually looks.
     any_err = any(a["m_err"].values())
-    hdr = "| Rank | Model | Avg | 95% CI | Shared-task | n | Runs / Tasks | Latency |"
+    hdr = "| # | Model | Avg | 95% CI | Shared-task | n | Runs / Tasks | Latency |"
     sep = "|---:|---|---:|---:|---:|---:|---:|---:|"
     if any_err:
         hdr += " Err |"
