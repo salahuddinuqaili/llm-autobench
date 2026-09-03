@@ -85,14 +85,69 @@ def idle_minutes() -> float:
         return -1.0
 
 
-def maybe_sleep(enabled: bool) -> None:
-    """Suspend the machine after the run, but ONLY if nobody is using it.
+# A wake-timer resume followed by this task starting is usually < 2 minutes.
+# Anything older means the box was already in S0 when the scheduled run began.
+WAKE_GRACE_S = 180.0
 
-    Pairs with the task setting "wake the computer to run this task": the PC wakes
-    at 21:00, benchmarks, and goes back to sleep, without ever being signed out.
-    Refuses to suspend when it cannot prove the machine is unattended.
+
+def last_resume_age_seconds() -> float | None:
+    """Seconds since Windows last resumed from sleep. None if unreadable.
+
+    Kernel-Power 107 is "the system has resumed from sleep." No such event
+    (cold boot, or log trimmed) is treated as unreadable by the caller.
+    """
+    cmd = (
+        "Get-WinEvent -FilterHashtable @{LogName='System'; "
+        "ProviderName='Microsoft-Windows-Kernel-Power'; Id=107} "
+        "-MaxEvents 1 -ErrorAction Stop | "
+        "ForEach-Object { $_.TimeCreated.ToUniversalTime().ToString('o') }"
+    )
+    try:
+        out = subprocess.check_output(
+            ["powershell", "-NoProfile", "-Command", cmd],
+            text=True, timeout=20, stderr=subprocess.DEVNULL,
+        ).strip()
+    except Exception:  # noqa: BLE001
+        return None
+    if not out:
+        return None
+    try:
+        last = dt.datetime.fromisoformat(out.replace("Z", "+00:00"))
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=dt.timezone.utc)
+        return (dt.datetime.now(dt.timezone.utc) - last).total_seconds()
+    except ValueError:
+        return None
+
+
+def machine_was_already_awake() -> bool:
+    """True if this scheduled run did NOT just wake the PC from sleep.
+
+    Fail closed: if last-resume is unreadable, assume already awake so we
+    never SetSuspendState a workstation that was left on.
+    """
+    age = last_resume_age_seconds()
+    if age is None:
+        log("power: last resume unreadable -- treating machine as already awake")
+        return True
+    awake = age > WAKE_GRACE_S
+    log(f"power: last resume {age:.0f}s ago -- "
+        f"{'already awake' if awake else 'likely woken by this task'}")
+    return awake
+
+
+def maybe_sleep(enabled: bool, already_awake: bool) -> None:
+    """Suspend after the run only if this task woke an sleeping PC.
+
+    If the machine was already in S0 at start, never suspend — a long bench
+    makes GetLastInputInfo look idle even when the box was left on (agents,
+    video, just awake). Idle-at-end is kept as a second guard for the
+    wake-from-sleep path, so a user who sat down mid-run is not put to sleep.
     """
     if not enabled:
+        return
+    if already_awake:
+        log("sleep-when-done: machine was already awake at start -- staying awake")
         return
     idle = idle_minutes()
     if idle < 0:
@@ -103,7 +158,7 @@ def maybe_sleep(enabled: bool) -> None:
         log(f"sleep-when-done: last input {idle:.1f} min ago "
             f"(< {IDLE_BEFORE_SLEEP_MIN}) -- someone is at this PC, staying awake")
         return
-    log(f"sleep-when-done: idle {idle:.0f} min -- suspending to S3")
+    log(f"sleep-when-done: woken by this run, idle {idle:.0f} min -- suspending to S3")
     keep_awake(False)
     try:
         # SetSuspendState(Hibernate=0, ForceCritical=0, DisableWakeEvent=0).
@@ -209,9 +264,13 @@ def newest_run(before: set[str]) -> Path | None:
 def main() -> int:
     ap = argparse.ArgumentParser(description="unattended llm-autobench run")
     ap.add_argument("--sleep-when-done", action="store_true",
-                    help="suspend the machine afterwards if nobody is using it "
-                         "(pairs with the task setting that wakes it at 21:00)")
+                    help="suspend afterwards only if this task woke the PC from sleep "
+                         "(never if it was already awake at start)")
     args = ap.parse_args()
+
+    # Snapshot BEFORE keep_awake: last-resume age vs process start. A long
+    # bench would otherwise make idle-at-end look like "nobody home".
+    already_awake = machine_was_already_awake()
 
     # Hold the machine awake for the WHOLE run. Without this a wake-timer wake can
     # return to sleep mid-benchmark, which would look like a mysteriously truncated
@@ -221,7 +280,7 @@ def main() -> int:
         rc = _run_pipeline()
     finally:
         keep_awake(False)
-        maybe_sleep(args.sleep_when_done)
+        maybe_sleep(args.sleep_when_done, already_awake=already_awake)
     return rc
 
 
