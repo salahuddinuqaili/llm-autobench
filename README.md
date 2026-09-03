@@ -1,6 +1,6 @@
 # llm-autobench
 
-**A zero-cost harness that pull → bench → judge-off-box → delete on a 12 GB card you already own.**
+**A zero-cost harness that pulls, benches, judges off-box, then deletes — on a 12 GB card you already own.**
 
 > **Public models only · no secrets / private data · free NVIDIA NIM judge · no paid API.** The local GPU never holds a judge and a subject at the same time.
 
@@ -53,7 +53,7 @@ _All-time aggregate across **13 runs** (2026-08-23 → 2026-09-03), **12 models*
 
 ### Smoke results (current-era mean score)
 
-| Rank | Model | Avg | 95% CI | Shared-task | n | Runs / Tasks | Latency |
+| # | Model | Avg | 95% CI | Shared-task | n | Runs / Tasks | Latency |
 |---:|---|---:|---:|---:|---:|---:|---:|
 | 🥇 | `qwen3.5:9b` | **0.88** | 0.83–0.93 | 0.88 | 105 | 4 / 9 | 5.2s |
 | 🥈 | `gemma4:e4b` | **0.84** | 0.78–0.90 | 0.87 | 112 | 4 / 11 | 4.0s |
