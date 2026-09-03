@@ -272,12 +272,12 @@ def render(a):
     md.append("")
 
     # ---- Leaderboard ----
-    md.append("### \U0001F3C6 Leaderboard (all-time mean score)")
+    md.append("### Smoke results (current-era mean score)")
     md.append("")
     # Kept to 8 columns: GitHub renders a wider table with a horizontal scrollbar
     # and squeezes the numbers, which is where the reader actually looks.
     any_err = any(a["m_err"].values())
-    hdr = "| Rank | Model | Avg | 95% CI | Shared-task | n | Runs / Tasks | Latency |"
+    hdr = "| # | Model | Avg | 95% CI | Shared-task | n | Runs / Tasks | Latency |"
     sep = "|---:|---|---:|---:|---:|---:|---:|---:|"
     if any_err:
         hdr += " Err |"
@@ -438,12 +438,7 @@ def render(a):
               f"completed and {was} scored, {tr} {is_are} still cut off and therefore "
               f"**unscored (`null`), never 0.0** — excluded from every mean above. This "
               f"is read from Ollama's recorded `done_reason`, not inferred from how a "
-              f"response ends. (The caveat this replaces estimated truncation from "
-              f"trailing punctuation and published \"~2 of 143 zero-scores\" for the "
-              f"previous era — a figure that could not have been right in principle, "
-              f"since a truncated row is unscored and so is never in the zero-score "
-              f"pool being counted. The same data, read from the recorded fields: "
-              f"77 retried, 31 rescued, 46 still truncated.)")
+              f"response ends.")
     md.append(f"- **Zero-scores are real zeros.** {zr} of {total} rows scored 0.0 with a "
               f"complete, untruncated response — answers the scorer or judge rejected, "
               f"not harness artefacts.")
@@ -456,7 +451,7 @@ def render(a):
                   f"score.")
     cov = ", ".join(f"`{short(m)}` {len(a['m_tasks'][m])}" for m in models)
     md.append(f"- **Coverage is disclosed, not even.** Tasks attempted: {cov}. Every skipped "
-              f"pair is recorded with its reason (see Coverage) and the leaderboard carries a "
+              f"pair is recorded with its reason (see Coverage) and the table carries a "
               f"**shared-task column** so cross-model comparison is like-for-like. Vision-only "
               f"models attempt no text tasks by design — their overall average is not "
               f"comparable to a text model's and is marked `\U0001F441`.")
