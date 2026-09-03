@@ -85,87 +85,115 @@ def idle_minutes() -> float:
         return -1.0
 
 
-# A wake-timer resume followed by this task starting is usually < 2 minutes.
-# Anything older means the box was already in S0 when the scheduled run began.
-WAKE_GRACE_S = 180.0
+WAKE_GRACE_SEC = 180
 
+def _last_wake_event():
+    """Return {time: datetime (UTC), source: str} or None. Fail closed.
 
-def last_resume_age_seconds() -> float | None:
-    """Seconds since Windows last resumed from sleep. None if unreadable.
-
-    Kernel-Power 107 is "the system has resumed from sleep." No such event
-    (cold boot, or log trimmed) is treated as unreadable by the caller.
+    Microsoft-Windows-Power-Troubleshooter Event 1 lives in the System log
+    on this box (verified on Sapne), not a separate Operational channel.
     """
-    cmd = (
-        "Get-WinEvent -FilterHashtable @{LogName='System'; "
-        "ProviderName='Microsoft-Windows-Kernel-Power'; Id=107} "
-        "-MaxEvents 1 -ErrorAction Stop | "
-        "ForEach-Object { $_.TimeCreated.ToUniversalTime().ToString('o') }"
-    )
     try:
-        out = subprocess.check_output(
-            ["powershell", "-NoProfile", "-Command", cmd],
-            text=True, timeout=20, stderr=subprocess.DEVNULL,
-        ).strip()
-    except Exception:  # noqa: BLE001
+        p = procutil.run(
+            ["wevtutil", "qe", "System",
+             "/q:*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1)]]",
+             "/c:1", "/rd:true", "/f:text"],
+            capture_output=True, text=True, timeout=15,
+        )
+        out = (p.stdout or "").strip()
+        if p.returncode != 0 or not out:
+            return None
+        t = None
+        src = ""
+        for line in out.splitlines():
+            s = line.strip()
+            if s.lower().startswith("date:"):
+                raw = s.split(":", 1)[1].strip().replace("?", "")
+                # wevtutil: 2026-09-03T09:43:23.0230000Z
+                raw = raw.replace("0000Z", "Z") if raw.endswith("0000Z") else raw
+                try:
+                    t = dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                except ValueError:
+                    t = None
+            if s.lower().startswith("wake source:"):
+                src = s.split(":", 1)[1].strip()
+        if t is None:
+            return None
+        if t.tzinfo is None:
+            t = t.replace(tzinfo=dt.timezone.utc)
+        if not src:
+            src = _powercfg_lastwake_source() or ""
+        return {"time": t, "source": src}
+    except Exception:
         return None
-    if not out:
-        return None
+
+
+def _powercfg_lastwake_source() -> str:
+    """Source-only fallback. No timestamp — caller still needs Event 1 time."""
     try:
-        last = dt.datetime.fromisoformat(out.replace("Z", "+00:00"))
-        if last.tzinfo is None:
-            last = last.replace(tzinfo=dt.timezone.utc)
-        return (dt.datetime.now(dt.timezone.utc) - last).total_seconds()
-    except ValueError:
-        return None
+        p = procutil.run(
+            ["powercfg", "/lastwake"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if p.returncode != 0:
+            return ""
+        return (p.stdout or "").strip()[:800]
+    except Exception:
+        return ""
 
 
-def machine_was_already_awake() -> bool:
-    """True if this scheduled run did NOT just wake the PC from sleep.
+def this_run_woke_machine(started: dt.datetime) -> bool:
+    """True only if a wake-timer / scheduled-task resume happened just before start.
 
-    Fail closed: if last-resume is unreadable, assume already awake so we
-    never SetSuspendState a workstation that was left on.
+    Fail closed (False): unreadable event, unknown time, unknown source, too old,
+    or source is a device/keyboard/mouse/power button.
     """
-    age = last_resume_age_seconds()
-    if age is None:
-        log("power: last resume unreadable -- treating machine as already awake")
-        return True
-    awake = age > WAKE_GRACE_S
-    log(f"power: last resume {age:.0f}s ago -- "
-        f"{'already awake' if awake else 'likely woken by this task'}")
-    return awake
+    info = _last_wake_event()
+    if not info or not info.get("time"):
+        log("power: last wake unreadable -- treating as already awake")
+        return False
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=dt.timezone.utc)
+    age = (started - info["time"]).total_seconds()
+    src = info.get("source") or ""
+    log(f"power: last wake {age:.0f}s ago source={src!r}")
+    if age < -30 or age > WAKE_GRACE_SEC:
+        return False
+    if not src:
+        return False
+    low = src.lower()
+    if not any(k in low for k in ("wake timer", "timer", "scheduled", "task scheduler")):
+        return False
+    if "device" in low and "timer" not in low:
+        return False
+    return True
 
 
-def maybe_sleep(enabled: bool, already_awake: bool) -> None:
-    """Suspend after the run only if this task woke an sleeping PC.
+def maybe_sleep(enabled: bool, woke: bool) -> None:
+    """Suspend after the run only if this task woke the PC from sleep.
 
-    If the machine was already in S0 at start, never suspend — a long bench
-    makes GetLastInputInfo look idle even when the box was left on (agents,
-    video, just awake). Idle-at-end is kept as a second guard for the
-    wake-from-sleep path, so a user who sat down mid-run is not put to sleep.
+    Already-S0 at start: never suspend, ignore idle (a long bench always looks
+    idle). Wake-from-sleep path keeps the idle guard so a user who sat down
+    mid-run is not put to sleep.
     """
     if not enabled:
         return
-    if already_awake:
+    if not woke:
         log("sleep-when-done: machine was already awake at start -- staying awake")
         return
     idle = idle_minutes()
     if idle < 0:
-        log("sleep-when-done: idle time unreadable -- staying awake rather than "
-            "suspending a machine that may be in use")
+        log("sleep-when-done: idle unreadable -- staying awake")
         return
     if idle < IDLE_BEFORE_SLEEP_MIN:
-        log(f"sleep-when-done: last input {idle:.1f} min ago "
-            f"(< {IDLE_BEFORE_SLEEP_MIN}) -- someone is at this PC, staying awake")
+        log(f"sleep-when-done: last input {idle:.1f} min ago -- staying awake")
         return
-    log(f"sleep-when-done: woken by this run, idle {idle:.0f} min -- suspending to S3")
+    log(f"sleep-when-done: this run woke the machine and idle {idle:.0f} min -- suspending to S3")
     keep_awake(False)
     try:
-        # SetSuspendState(Hibernate=0, ForceCritical=0, DisableWakeEvent=0).
-        # DisableWakeEvent MUST stay 0 or the next wake timer would not fire.
         ctypes.windll.powrprof.SetSuspendState(0, 0, 0)
     except Exception as exc:  # noqa: BLE001
-        log(f"sleep-when-done: suspend failed ({exc}); machine left awake")
+        log(f"sleep-when-done: suspend failed ({exc}); left awake")
 
 
 def run(args: list[str], stage: str, timeout: int = 5400) -> bool:
@@ -268,9 +296,9 @@ def main() -> int:
                          "(never if it was already awake at start)")
     args = ap.parse_args()
 
-    # Snapshot BEFORE keep_awake: last-resume age vs process start. A long
-    # bench would otherwise make idle-at-end look like "nobody home".
-    already_awake = machine_was_already_awake()
+    started = dt.datetime.now(dt.timezone.utc)
+    woke = this_run_woke_machine(started)
+    log(f"power: this_run_woke_machine={woke}")
 
     # Hold the machine awake for the WHOLE run. Without this a wake-timer wake can
     # return to sleep mid-benchmark, which would look like a mysteriously truncated
@@ -280,7 +308,7 @@ def main() -> int:
         rc = _run_pipeline()
     finally:
         keep_awake(False)
-        maybe_sleep(args.sleep_when_done, already_awake=already_awake)
+        maybe_sleep(args.sleep_when_done, woke)
     return rc
 
 
