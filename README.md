@@ -25,7 +25,7 @@ Use it to decide whether an Ollama model is worth keeping on a 12 GB workstation
    │
    │   1. discover   find a model id not yet benchmarked ── fits 12 GB VRAM? (≤ ~14B)
    │   2. pull       ollama pull <model>
-   │   3. bench      run_bench.py → local Ollama runs the model-under-test  (heavy)
+   │   3. bench      run_bench.py → local Ollama runs ONE subject per discovery night  (heavy)
    │   4. judge      free NVIDIA NIM 70B scores each output against the task rubric
    │   5. report     write reports/<run_id>.md
    │   6. delete     ollama rm <model>          (free disk + VRAM for the next cycle)
@@ -202,7 +202,7 @@ _Every run above is still committed in `runs/`. A harness change that alters wha
 
 ## Quick start
 
-**One cycle** = pull (optional) → local Ollama bench → free NVIDIA NIM judge → report → delete → refresh this README.
+**One discovery cycle** = one subject: pull (optional) → local Ollama bench → free NVIDIA NIM judge → report → delete → refresh this README. Baselines are refreshed separately with `--baselines-only`.
 
 Prerequisites (nothing else):
 
@@ -211,15 +211,14 @@ Prerequisites (nothing else):
 3. **Python 3** + `PyYAML` (`pip install pyyaml`). The aggregator is stdlib-only; the cycle script needs YAML to read `models/registry.yaml`.
 
 ```bash
-# benchmark the baseline local models (no pull/delete), 3 draws per task,
-# then judge + refresh this README + commit — one command, no manual step
-python scripts/autobench_cycle.py --baselines-only --samples 3
-
-# run one model through the full lifecycle (pull → bench → delete → commit)
+# discovery night: ONE subject through the full lifecycle (pull → bench → delete)
 python scripts/autobench_cycle.py --model qwen3.5:9b
 
-# keep the model afterwards, for inspection
+# keep the subject afterwards, for inspection
 python scripts/autobench_cycle.py --model qwen3.5:9b --no-delete
+
+# refresh baselines / vision (no pull, never ollama rm baselines), N=3 draws
+python scripts/autobench_cycle.py --baselines-only --samples 3
 ```
 
 ## Layout

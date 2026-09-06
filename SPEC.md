@@ -66,7 +66,7 @@ enough for free cloud or local. This is the core trick that makes 12GB viable.
 |---|---|---|
 | Task battery | `tasks/*.yaml` | 8 tasks, 4 categories (reasoning, coding, writing, structured) |
 | Runner | `scripts/run_bench.py` | Loads `baseline:` models × tasks; writes `runs/<run_id>.json` |
-| Lifecycle | `scripts/autobench_cycle.py` | discover → VRAM guard → pull → bench → delete → commit |
+| Lifecycle | `scripts/autobench_cycle.py` | discover → VRAM guard → pull → bench **one subject** → delete → commit; `--baselines-only` for baseline/vision refresh |
 | Judge/report | `scripts/score_run.py` → `scripts/nvidia_judge.py` | rubric scoring (free NVIDIA NIM 70B judge) + report grouped by model |
 | Telemetry | `scripts/telemetry.py` | `TelemetryTracker` + `TrackedCall` context manager (tokens, latency, VRAM, cost) |
 | Registry | `models/registry.yaml` | `baseline:` + `watcher:` (max 14B, judge, delete_after_bench) |

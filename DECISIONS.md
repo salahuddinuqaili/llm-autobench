@@ -3,6 +3,15 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-09-06 · One subject LLM per discovery nightly cycle
+`build_temp_registry` for discover / `--model` keeps **only** the subject — no baseline
+co-append. Why: co-running baselines on every discovery night burned VRAM/time on already-
+measured models, blurred the pull→bench→delete subject lifecycle, and made each night's
+run a multi-model stew instead of one new measurement. Baselines (and vision refresh) stay
+on the explicit `--baselines-only` path, which never `ollama rm`s baseline tags. Rejected:
+keeping VRAM-trimmed co-append (still couples discovery to baseline freshness); deleting
+baselines after a mixed night (breaks the "baselines stay local" contract).
+
 ## 2026-08-24 · Discovery targets a 6–10B band, not the largest model that fits
 `watcher.size_band: {min: 6, max: 10}`; `max_params_billions: 14` stays as the absolute VRAM guard;
 selection prefers models never benchmarked within the band, tie-broken deterministically. Why: a

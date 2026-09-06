@@ -7,7 +7,8 @@ judging, and reporting. This script does the mechanical LOCAL work:
 
   1. discover()  -> find a new model tag not yet benchmarked (VRAM-aware)
   2. pull()      -> `ollama pull <model>` if it fits VRAM
-  3. bench()     -> calls run_bench.py for the discovered model (+ baselines)
+  3. bench()     -> calls run_bench.py for the discovered subject only
+                    (baselines refresh via --baselines-only, not co-appended)
   4. report()    -> score_run.py (free NVIDIA judge) then aggregate_results.py
                     --inject README.md. Wired in-process as of P1.2/F1.2: this
                     used to be an agent session job, which is why 80 runs of data
@@ -257,15 +258,14 @@ def discover(watcher):
 
 
 def build_temp_registry(model, watcher):
-    """Build a temporary registry containing the discovered model + baselines,
-    VRAM-trimmed so the run stays within available memory. Returns (path, kept_ids).
+    """Build a temporary registry containing ONLY the subject model.
+
+    Discovery / `--model` cycles measure one subject per night. Baselines are
+    not co-appended here — refresh them with `--baselines-only` (multi-baseline
+    path; no pull/delete of baselines). `watcher` is accepted for call-site
+    compatibility and unused. Returns (path, kept_ids).
     """
     cfg = yaml.safe_load(open(os.path.join(REPO, "models", "registry.yaml")))
-    baselines = [b for b in cfg.get("baseline", []) if b.get("enabled", True)]
-    # Drop the gemma4 baseline from discovered-model runs purely to save VRAM —
-    # it now carries the full text battery too, so this is a memory trade-off, not
-    # a relevance one. Its own numbers come from the scheduled baseline runs.
-    baselines = [b for b in baselines if "gemma4" not in b.get("id", "")]
 
     disc = {
         "id": "custom:ollama/" + model,
@@ -285,19 +285,7 @@ def build_temp_registry(model, watcher):
             "registry.yaml is missing `battery_tags`; refusing to run rather than "
             "silently benchmark the discovered model on zero tasks.")
 
-    def est_of(entry):
-        m = re.search(r":(\d+(?:\.\d+)?)b?$", entry["id"], re.IGNORECASE)
-        return estimate_model_vram_mib(float(m.group(1))) if m else 2048
-
     keep = [disc]
-    free = get_vram_free_mib() or 0
-    budget = free - est_of(disc) - 1024  # keep discovered model always
-    # Include baselines (largest first) only if they fit alongside the discovered model.
-    for b in sorted(baselines, key=est_of, reverse=True):
-        if est_of(b) <= budget:
-            keep.append(b)
-            budget -= est_of(b)
-
     tmp = os.path.join(REPO, ".autobench_tmp_registry.yaml")
     with open(tmp, "w") as f:
         yaml.safe_dump({"baseline": keep}, f)
@@ -321,8 +309,8 @@ def _new_run_since(before):
 
 
 def bench(model, tier="local", samples=1):
-    """Benchmark the discovered model (+ affordable baselines). Returns the path
-    of the run file produced, so the caller can judge exactly that file."""
+    """Benchmark the discovered subject only (no baseline co-append). Returns the
+    path of the run file produced, so the caller can judge exactly that file."""
     tmp, kept = build_temp_registry(model, load_watcher()[0])
     before = _runs_snapshot()
     try:
