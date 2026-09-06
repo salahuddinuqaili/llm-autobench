@@ -3,7 +3,7 @@
 
 The per-run reports in reports/ answer "how did one cycle go?" - nothing in the
 repo answered "what has this pipeline measured, in total?". This script does:
-it scans every committed run of the CURRENT era, computes smoke results (with
+it scans every committed run of the current methodology version, computes smoke results (with
 confidence intervals and a shared-task column), per-task difficulty, a model x
 task matrix, sampling spread, disclosed coverage gaps, and data-quality caveats
 derived from recorded fields rather than guessed from response text.
@@ -37,10 +37,11 @@ END = "<!-- RESULTS:END -->"
 VISION_TASKS = {"vision_ocr", "vision_progressive"}
 
 # ---------------------------------------------------------------------------
-# Eras. A harness change that alters WHAT is measured makes old runs and new runs
-# different datasets, not a longer time series. Every era stays in runs/ as
-# history; only the last one is averaged into the published aggregate. Adding an
-# era is deliberately an append - previous rows are never edited or deleted.
+# Methodology versions ("eras"): a harness change that alters WHAT is measured
+# makes old runs and new runs different datasets, not a longer time series.
+# Every version stays in runs/ as history; only the last one is averaged into
+# the published aggregate. Adding a version is deliberately an append - previous
+# rows are never edited or deleted.
 # ---------------------------------------------------------------------------
 ERAS = [
     {
@@ -66,7 +67,8 @@ ERAS = [
 ]
 
 # Runs on or after this date belong to the published aggregate. Bumping this is
-# how an era is closed: older runs stay on disk, cited above, never averaged in.
+# how a methodology version is closed: older runs stay on disk, cited above,
+# never averaged in.
 ERA_CUTOFF = ERAS[-1]["from"]
 
 # Only YYYYMMDD_HHMMSS files are benchmark runs. `vision_*.json` are development
@@ -272,7 +274,7 @@ def render(a):
     md.append("")
 
     # ---- Smoke results ----
-    md.append("### Smoke results (current-era mean score)")
+    md.append("### Smoke results (current-methodology mean score)")
     md.append("")
     # Kept to 8 columns: GitHub renders a wider table with a horizontal scrollbar
     # and squeezes the numbers, which is where the reader actually looks.
@@ -402,13 +404,15 @@ def render(a):
         md.append("")
     if not a["skips"]:
         md.append("_No run in this aggregate recorded a skipped pair. Runs from earlier "
-                  "eras skipped pairs silently and cannot be audited this way._")
+                  "methodology versions skipped pairs silently and cannot be "
+                  "audited this way._")
         md.append("")
 
     # ---- Era history: previous datasets, preserved and excluded ----
-    md.append("### \U0001F5C2 Era history (previous datasets, kept but not averaged in)")
+    md.append("### \U0001F5C2 Era history — era = dataset/methodology version "
+              "(previous versions kept but not averaged in)")
     md.append("")
-    md.append("| Era | Dates | Runs on disk | In this aggregate |")
+    md.append("| Methodology version | Dates | Runs on disk | In this aggregate |")
     md.append("|---|---|---:|---|")
     for e in ERAS:
         n = a["era_counts"].get(e["label"], 0)
