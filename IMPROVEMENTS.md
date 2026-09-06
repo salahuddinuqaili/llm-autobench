@@ -96,7 +96,7 @@ NVIDIA; the legacy file contradicts both.
 ### P1.1 · All-time aggregate results — ✅ **shipped 2026-07-22** `[S]`
 `scripts/aggregate_results.py` computes the all-time leaderboard, task-difficulty, model×task
 matrix, and honest caveats, and injects them into the README (`RESULTS:START/END` markers) +
-`reports/LEADERBOARD.md`. Before this, 98 runs of data had **no** aggregate view anywhere.
+the README results block (via `--inject`; an early snapshot lived at `reports/LEADERBOARD.md` and was removed once the inject path became canonical). Before this, 98 runs of data had **no** aggregate view anywhere.
 
 ### P1.2 · Regenerate results every cycle · ✅ **shipped 2026-08-23** `[S]`
 **Actions.** `autobench_cycle.report()` runs `score_run.py` (free NVIDIA judge) then

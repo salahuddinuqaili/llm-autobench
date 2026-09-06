@@ -8,11 +8,12 @@ a fixed task battery, reports results, and deletes the model to keep the machine
 1. **No secrets. No private data.** This repo is public. Never commit credentials, and
    never benchmark or ingest anything from private repos (per-x, profile-x, hardware-x,
    tether, dark-factory). Only **public** models, tested locally, with public task prompts.
-2. **Free judge only.** The orchestration/judge/reporting uses a **free** model (hy3:free).
+2. **Free judge only.** Judging uses **free NVIDIA NIM** (`meta/llama-3.3-70b-instruct`).
    No paid spend on this pipeline. The model-under-test runs on local Ollama (free compute).
-3. **The free model is the orchestrator; Ollama is the compute.** The cron agent (hy3:free)
-   does discovery, judging, reporting, and commit. Ollama (127.0.0.1:11434) only *runs* the
-   model-under-test. Don't invert this — a 12GB box can't host a judge + a model at once.
+3. **Cloud judge; local subject.** Discovery/cycle orchestration is local scripts; judging
+   is off-box NIM so the 12 GB card stays free for the model-under-test. Ollama
+   (127.0.0.1:11434) only *runs* the subject. Don't invert this — a 12GB box can't host a
+   judge + a model at once.
 
 ## Operating principles
 4. **Autonomy over interactivity.** When a run is triggered (cron / subagent / user), execute
@@ -26,7 +27,7 @@ a fixed task battery, reports results, and deletes the model to keep the machine
 7. **Reproducibility.** Each run is timestamped `run_id` (YYYYMMDD_HHMMSS). Raw JSON in `runs/`,
    markdown in `reports/`, both committed so runs are diffable over time.
 8. **No `ANTHROPIC_API_KEY`.** Claude (if ever used) routes via OAuth against the Max quota.
-   For this public repo, prefer the free model; paid is unnecessary and off-policy.
+   For this public repo, prefer the free NIM judge; paid APIs are unnecessary and off-policy.
 9. **Honesty in reporting.** Empty/garbage output is reported as such, never scored as correct.
    Uncertain scores marked `±` with reason.
 
@@ -85,7 +86,7 @@ The harness skips a (model, task) pair if the model's tags don't intersect the t
 
 ## Report schema (reports/<run_id>.md)
 1. **Header** — run_id, timestamp, models tested, task count, total cost (local = €0).
-2. **Leaderboard** — model | avg score | avg latency | tier | VRAM fit.
+2. **Per-run scores** — model | avg score | avg latency | tier | VRAM fit (smoke numbers, not a ranking).
 3. **Per-model** — strengths/weaknesses per task, notable quotes (≤200 chars).
 4. **Lifecycle** — model pulled at, VRAM before/after, deleted: true/false.
 5. **Failures** — errored/empty models with the error.
