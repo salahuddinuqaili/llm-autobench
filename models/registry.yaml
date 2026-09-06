@@ -3,7 +3,9 @@
 #
 # Three sections:
 #   battery_tags: the shared text battery every general model is measured on
-#   baseline:     known models used as a comparison reference (run on every cycle)
+#   baseline:     known models used as a comparison reference
+#                 (refreshed via --baselines-only / baseline nights — NOT co-run
+#                 on every discovery cycle; discovery benches one subject only)
 #   watcher:      config for autonomous discovery of NEW models to test
 
 # SINGLE SOURCE OF TRUTH for "the full text battery". Both the baselines below and

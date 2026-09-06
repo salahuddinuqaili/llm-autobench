@@ -20,7 +20,7 @@ bench → report → delete. It runs unattended ("dark factory" pattern: it runs
 7. **Don't fabricate.** Empty/garbage output reported as such, not scored correct.
 
 ## Where things live
-- `models/registry.yaml` — `baseline:` (comparison models) + `watcher:` (discovery/judge config).
+- `models/registry.yaml` — `baseline:` (comparison models; refresh with `--baselines-only`) + `watcher:` (discovery/judge config). Discovery nights bench **one subject** only.
 - `tasks/*.yaml` — eval tasks.
 - `runs/` — raw JSON per run (committed).
 - `reports/` — markdown summaries per run (committed).
@@ -32,8 +32,9 @@ bench → report → delete. It runs unattended ("dark factory" pattern: it runs
   harness strips the prefix and passes the colon-name to Ollama (e.g. `qwen3.5:9b`). Don't use
   `ollama cp` aliases — they don't persist across Ollama restarts.
 - **Add a task:** create `tasks/<name>.yaml` (prompt + `scoring.method` + `tags`).
-- **Run:** `python scripts/run_bench.py --tier local` (smoke), or
-  `python scripts/autobench_cycle.py --model <tag>` (full lifecycle).
+- **Run:** `python scripts/autobench_cycle.py --model <tag>` (one-subject lifecycle),
+  `python scripts/autobench_cycle.py --baselines-only --samples 3` (baseline/vision refresh),
+  or `python scripts/run_bench.py --tier local` (smoke).
 - **Extend the harness:** keep model/provider knowledge in `registry.yaml`; the script must
   not hardcode base URLs or keys.
 

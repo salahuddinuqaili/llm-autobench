@@ -38,7 +38,7 @@ llm-autobench/
 ├── AGENTS.md            # generic coding-agent conventions
 ├── README.md            # public overview + lifecycle diagram
 ├── models/
-│   └── registry.yaml    # baseline: models to compare;  watcher: discovery + judge config
+│   └── registry.yaml    # baseline: refresh via --baselines-only; watcher: discovery
 ├── tasks/               # eval tasks (prompt + scoring + tags)
 ├── runs/                # raw per-run JSON (committed)
 ├── reports/             # markdown summaries (committed)
@@ -49,14 +49,16 @@ llm-autobench/
 
 ## How to run
 ```bash
-# baseline local bench (no pull/delete) — fast smoke test
-python scripts/run_bench.py --tier local
-
-# full lifecycle for one model
+# discovery night: one subject through the full lifecycle
 python scripts/autobench_cycle.py --model qwen3.5:9b
 
-# (autonomous) the cron agent invokes autobench_cycle.py on a schedule,
-# does discovery+judging+reporting itself, and commits the result.
+# baseline / vision refresh (no pull/delete of baselines)
+python scripts/autobench_cycle.py --baselines-only --samples 3
+
+# smoke: run committed registry as-is
+python scripts/run_bench.py --tier local
+
+# (autonomous) nightly discovers ONE subject, judges, reports, commits.
 ```
 
 ## How to add a model to the baseline

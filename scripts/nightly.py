@@ -294,6 +294,9 @@ def main() -> int:
     ap.add_argument("--sleep-when-done", action="store_true",
                     help="suspend afterwards only if this task woke the PC from sleep "
                          "(never if it was already awake at start)")
+    ap.add_argument("--baselines-only", action="store_true",
+                    help="baseline/vision refresh night (no discover pull/delete); "
+                         "default is one-subject discovery")
     args = ap.parse_args()
 
     started = dt.datetime.now(dt.timezone.utc)
@@ -305,16 +308,17 @@ def main() -> int:
     # nightly rather than a power event.
     keep_awake(True)
     try:
-        rc = _run_pipeline()
+        rc = _run_pipeline(baselines_only=args.baselines_only)
     finally:
         keep_awake(False)
         maybe_sleep(args.sleep_when_done, woke)
     return rc
 
 
-def _run_pipeline() -> int:
+def _run_pipeline(baselines_only: bool = False) -> int:
+    mode = "baselines" if baselines_only else "discover"
     log("=" * 62)
-    log("nightly start")
+    log(f"nightly start mode={mode}")
 
     if not preflight():
         log("nightly ABORTED at preflight")
@@ -325,8 +329,11 @@ def _run_pipeline() -> int:
     # --no-report: the cycle can now judge + aggregate + commit itself (P1.2),
     # but nightly runs those as separate logged stages so a failure names which
     # one broke. Letting both do it would judge the same run twice.
-    if not run([sys.executable, str(SCRIPTS / "autobench_cycle.py"),
-                "--no-report", "--samples", str(SAMPLES)], "cycle"):
+    cycle_cmd = [sys.executable, str(SCRIPTS / "autobench_cycle.py"),
+                 "--no-report", "--samples", str(SAMPLES)]
+    if baselines_only:
+        cycle_cmd.append("--baselines-only")
+    if not run(cycle_cmd, "cycle"):
         log("nightly ABORTED: cycle failed")
         return 1
 
