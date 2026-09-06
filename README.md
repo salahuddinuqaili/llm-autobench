@@ -6,6 +6,8 @@
 
 The scores are instrumentation. The product is the lifecycle.
 
+Use it to decide whether an Ollama model is worth keeping on a 12 GB workstation — not to crown a winner.
+
 ## What it's good for
 
 | Question | Answered here |
@@ -21,7 +23,7 @@ The scores are instrumentation. The product is the lifecycle.
 ```
    ┌─ Cycle · orchestrator + judge = FREE NVIDIA NIM (Llama 3.3 70B) ────────────────
    │
-   │   1. discover   find a model tag not yet benchmarked ── fits 12 GB VRAM? (≤ ~14B)
+   │   1. discover   find a model id not yet benchmarked ── fits 12 GB VRAM? (≤ ~14B)
    │   2. pull       ollama pull <model>
    │   3. bench      run_bench.py → local Ollama runs the model-under-test  (heavy)
    │   4. judge      free NVIDIA NIM 70B scores each output against the task rubric
@@ -33,6 +35,8 @@ The scores are instrumentation. The product is the lifecycle.
 ```
 
 A 12 GB box cannot host a judge *and* a subject, so the judge is cloud-side on a free tier. **Step 6 is the one nobody else does.** Without deleting the model, a machine that is also your workstation fills its disk within days.
+
+An Ollama **tag** is the model id / name (`qwen3.5:9b` = name:variant).
 
 **From 2026-09-04**, a requested Ollama tag's parameter size is what runs (`gemma4:12b` is never silently substituted for `gemma4:e4b`). Rows dated before that may predate the fix.
 
@@ -55,9 +59,9 @@ _All-time aggregate across **15 runs** (2026-08-23 → 2026-09-05), **14 models*
 
 | # | Model | Avg | 95% CI | Shared-task | n | Runs / Tasks | Latency |
 |---:|---|---:|---:|---:|---:|---:|---:|
-| 🥇 | `qwen3.5:9b` | **0.88** | 0.83–0.93 | 0.88 | 105 | 4 / 9 | 5.2s |
-| 🥈 | `gemma4:e4b` | **0.84** | 0.78–0.90 | 0.87 | 112 | 4 / 11 | 4.0s |
-| 🥉 | `gemma4:12b` | **0.78** | 0.44–1.00 | 0.78 | 9 | 1 / 9 | 4.2s |
+| 1 | `qwen3.5:9b` | **0.88** | 0.83–0.93 | 0.88 | 105 | 4 / 9 | 5.2s |
+| 2 | `gemma4:e4b` | **0.84** | 0.78–0.90 | 0.87 | 112 | 4 / 11 | 4.0s |
+| 3 | `gemma4:12b` | **0.78** | 0.44–1.00 | 0.78 | 9 | 1 / 9 | 4.2s |
 | 4 | `gemma2:9b` | **0.78** | 0.44–1.00 | 0.78 | 9 | 1 / 9 | 2.1s |
 | 5 | `gemma3:12b` | **0.67** | 0.28–1.00 | 0.67 | 9 | 1 / 9 | 3.4s |
 | 6 | `falcon3:10b` | **0.67** | 0.28–1.00 | 0.67 | 9 | 1 / 9 | 2.5s |
@@ -214,14 +218,14 @@ python scripts/autobench_cycle.py --model qwen3.5:9b --no-delete
 |---|---|
 | `scripts/` | The pipeline — cycle, bench, judge, score, aggregate, telemetry |
 | `tasks/` | The task battery, one YAML per task — **one prompt each** |
-| `models/registry.yaml` | Model tags, VRAM gating, baselines |
+| `models/registry.yaml` | Model ids, VRAM gating, baselines |
 | `runs/` | Raw results, one JSON per run |
 | `reports/` | Per-run markdown |
 | `telemetry/` | Timing and resource data |
 
 ## Vision tasks
 
-`vision_ocr` and `vision_progressive` run only against vision-capable tags. `runs/vision_*.json` are development smoke tests, not benchmark runs — they predate the naming convention and are excluded from aggregates.
+`vision_ocr` and `vision_progressive` run only against vision-capable model ids. `runs/vision_*.json` are development smoke tests, not benchmark runs — they predate the naming convention and are excluded from aggregates.
 
 ## Conventions
 
