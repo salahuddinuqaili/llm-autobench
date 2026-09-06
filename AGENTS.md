@@ -9,8 +9,9 @@ bench → report → delete. It runs unattended ("dark factory" pattern: it runs
 ## Hard rules
 1. **Public repo.** No secrets, no private-repo data (per-x, profile-x, hardware-x, tether,
    dark-factory). Only public models + public task prompts.
-2. **Free judge.** Orchestration/judging/reporting uses a free model (hy3:free). No paid spend.
-   The model-under-test runs on local Ollama — that's the only heavy compute.
+2. **Free judge.** Judging uses free NVIDIA NIM (`meta/llama-3.3-70b-instruct` via
+   `NVIDIA_API_KEY`). No paid spend. The model-under-test runs on local Ollama — that's
+   the only heavy compute.
 3. **Finish the run.** A triggered benchmark produces a report even if some models fail.
    Skip-and-continue; never block on a missing model or clarification mid-run.
 4. **Delete after bench.** `ollama rm` the pulled model when done (unless `--no-delete`).

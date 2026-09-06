@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate every runs/*.json into an all-time results view.
+"""Aggregate current-methodology runs/*.json into a smoke-results view.
 
 The per-run reports in reports/ answer "how did one cycle go?" - nothing in the
 repo answered "what has this pipeline measured, in total?". This script does:
@@ -264,11 +264,12 @@ def render(a):
     smp = a["samples_declared"]
     smp_s = ("/".join(str(x) for x in sorted(smp))) if smp else "1"
     md = []
-    md.append(f"_All-time aggregate across **{a['n_runs']} runs** "
+    md.append(f"_Current-methodology aggregate across **{a['n_runs']} runs** "
               f"({fmt_date(a['span'][0])} → {fmt_date(a['span'][1])}), "
               f"**{n_models} models**, **{n_tasks} tasks**, "
               f"{len(a['rows'])} model×task×sample results "
               f"(**N={smp_s}** draws per model×task). "
+              f"Sorted by mean for scanability — **not a ranking**. "
               f"Judge: free NVIDIA NIM Llama-3.3-70B. Regenerate: "
               f"`python scripts/aggregate_results.py --inject README.md`._")
     md.append("")
@@ -279,26 +280,25 @@ def render(a):
     # Kept to 8 columns: GitHub renders a wider table with a horizontal scrollbar
     # and squeezes the numbers, which is where the reader actually looks.
     any_err = any(a["m_err"].values())
-    hdr = "| # | Model | Avg | 95% CI | Shared-task | n | Runs / Tasks | Latency |"
-    sep = "|---:|---|---:|---:|---:|---:|---:|---:|"
+    hdr = "| Model | Avg | 95% CI | Shared-task | n | Runs / Tasks | Latency |"
+    sep = "|---|---:|---:|---:|---:|---:|---:|"
     if any_err:
         hdr += " Err |"
         sep += "---:|"
     md.append(hdr)
     md.append(sep)
-    for i, m in enumerate(models, 1):
+    for m in models:
         sc, lat = a["m_scores"][m], a["m_lat"][m]
         avg = statistics.mean(sc)
         ci_s = ci_str(sc)
         latm = statistics.mean(lat) if lat else 0.0
         errp = a["m_err"][m]
-        rank = str(i)
         vision_only = bool(a["m_tasks"][m]) and a["m_tasks"][m] <= VISION_TASKS
         vis = " ·\U0001F441" if vision_only else ""
         sh_vals = [s for (mm, t), v in a["mt_scores"].items()
                    if mm == m and t in shared for s in v]
         sh_s = f"{statistics.mean(sh_vals):.2f}" if sh_vals else "—"
-        row = (f"| {rank} | `{short(m)}`{vis} | **{avg:.2f}** | {ci_s} | {sh_s} | "
+        row = (f"| `{short(m)}`{vis} | **{avg:.2f}** | {ci_s} | {sh_s} | "
                f"{len(sc)} | {len(a['m_runs'][m])} / {len(a['m_tasks'][m])} | "
                f"{latm:.1f}s |")
         if any_err:
@@ -353,7 +353,7 @@ def render(a):
         md.append(f"| `{t}` | " + " | ".join(cells) + " |")
     md.append("")
     md.append(f"_Showing the {len(mcols)} model(s) with ≥2 scored results. "
-              "`·` = task not attempted (tag mismatch — see Coverage below). "
+              "`·` = task not attempted (capability tags — see Coverage below). "
               "Ranges are 95% t-intervals over that cell's draws, clamped to the "
               "`[0, 1]` score range; a cell whose draws all agreed shows no range._")
     md.append("")
@@ -391,7 +391,7 @@ def render(a):
     for m in order:
         sk = sorted(set(by_model_skip.get(m, [])))
         md.append(f"| `{short(m)}` | {len(a['m_tasks'].get(m, ()))} | {len(sk)} | "
-                  f"{'tag mismatch' if sk else '—'} |")
+                  f"{'capability tags (no overlap)' if sk else '—'} |")
     md.append("")
     # The task lists live below the table, not inside a cell: a 9-item list in one
     # cell made the rendered table several screens wide on GitHub.
@@ -401,6 +401,11 @@ def render(a):
             md.append(f"- `{short(m)}` did not attempt: "
                       + ", ".join(f"`{t}`" for t in sk) + ".")
     if any(by_model_skip.values()):
+        md.append("")
+        md.append("_Skipped pairs mean the model's capability tags and the task's "
+                  "tags have no intersection (e.g. text models skip `vision_*`; "
+                  "vision-only models skip the text battery). That is by design, "
+                  "not a harness error._")
         md.append("")
     if not a["skips"]:
         md.append("_No run in this aggregate recorded a skipped pair. Runs from earlier "
