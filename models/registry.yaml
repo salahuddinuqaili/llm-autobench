@@ -18,7 +18,7 @@
 battery_tags: [
   general, reasoning, coding, writing, summarization,
   instruction_following, structured_output, communication,
-  security, python, json,
+  security, python, json, tools,
 ]
 
 baseline:
@@ -33,7 +33,7 @@ baseline:
     # hard half and then published the result as a cross-model average.
     tags: [general, reasoning, coding, writing, summarization,
            instruction_following, structured_output, communication,
-           security, python, json]
+           security, python, json, tools]
     enabled: true
 
   - id: custom:ollama/gemma4:e4b
@@ -45,7 +45,7 @@ baseline:
     # Multimodal AND general: full text battery + vision.
     tags: [general, reasoning, coding, writing, summarization,
            instruction_following, structured_output, communication,
-           security, python, json, vision, ocr, progressive]
+           security, python, json, tools, vision, ocr, progressive]
     enabled: true
 
   - id: custom:ollama/minicpm-v:latest

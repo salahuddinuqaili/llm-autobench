@@ -3,7 +3,7 @@
 
 Reads a run JSON, scores remaining rubric-llm tasks via
 meta/llama-3.3-70b-instruct (NVIDIA NIM, free 40 RPM), then writes a markdown
-report. Mechanical methods (exact / json-exact / python-exec) are left alone or
+report. Mechanical methods (exact / json-exact / python-exec / tool-call) are left alone or
 backfilled in-process - never sent to the LLM judge.
 
 Uses direct curl to NVIDIA's OpenAI-compatible endpoint (bypasses the slow
@@ -233,6 +233,8 @@ def should_skip_judge(row, *, retry_judge_errors: bool = False) -> str | None:
         return "truncated"
     if row.get("ingestion_failed"):
         return "ingestion_failed"
+    if row.get("tools_unsupported"):
+        return "tools_unsupported"
     if row.get("score") is not None:
         return "already_scored"
     if row.get("judge_error") and not retry_judge_errors:
@@ -336,11 +338,13 @@ def load_scoring_method(task_id):
     return m.group(1).strip() if m else "rubric-llm"
 
 
-_MECHANICAL = frozenset({"exact", "json-exact", "python-exec"})
+_MECHANICAL = frozenset({"exact", "json-exact", "python-exec", "tool-call"})
+# Agentic tasks (SPEC 13.3/13.6) — separate regime; never fold into text avg.
+AGENTIC_TASKS = frozenset({"tool_weather"})
 
 
-def _mechanical_score(task_id, response):
-    """Backfill exact / json-exact / python-exec via run_bench.score."""
+def _mechanical_score(task_id, response, tool_calls=None):
+    """Backfill exact / json-exact / python-exec / tool-call via run_bench.score."""
     try:
         import yaml
     except ImportError:
@@ -353,7 +357,7 @@ def _mechanical_score(task_id, response):
     if scripts not in sys.path:
         sys.path.insert(0, scripts)
     import run_bench
-    return run_bench.score(task, response or "")
+    return run_bench.score(task, response or "", tool_calls=tool_calls)
 
 
 def _writeback(envelope, results, scored, run_path):
@@ -395,7 +399,10 @@ def build_report(run_stem, scored, *, self_consistency_n: int = 1):
         by_model.setdefault(r.get("model", "unknown"), []).append(r)
 
     def avg_of(rows):
-        vals = [r["score"] for r in rows if _is_num(r.get("score"))]
+        # SPEC 13.6: agentic is a separate regime — do not fold into text avg.
+        vals = [r["score"] for r in rows
+                if _is_num(r.get("score"))
+                and r.get("task") not in AGENTIC_TASKS]
         return (sum(vals) / len(vals)) if vals else None
 
     models = list(by_model)
@@ -458,6 +465,7 @@ def build_report(run_stem, scored, *, self_consistency_n: int = 1):
     # ---- Failures: derived from outcomes only (P0.5 / M2.3 — never hard-coded) ----
     fails = [r for r in scored
              if r.get("error") or r.get("truncated") or r.get("ingestion_failed")
+             or r.get("tools_unsupported")
              or r.get("judge_error") or not _is_num(r.get("score"))]
     lines.append("## Failures")
     lines.append("")
@@ -472,6 +480,9 @@ def build_report(run_stem, scored, *, self_consistency_n: int = 1):
             elif r.get("ingestion_failed"):
                 why = ("model reported no image was supplied — ingestion failure, "
                        "NOT a vision-capability score (unscored, not 0.0)")
+            elif r.get("tools_unsupported"):
+                why = ("no tool_calls emitted — tools_unsupported "
+                       "(unscored, not 0.0; cannot vs wrong are different findings)")
             elif r.get("judge_error"):
                 why = (r.get("score_reason")
                        or r.get("judge_raw")
@@ -554,6 +565,10 @@ def main(argv=None, call_fn=None):
             r.setdefault("judge", "skipped: image not ingested (unscored)")
             scored.append(r)
             continue
+        if skip == "tools_unsupported":
+            r.setdefault("judge", "skipped: tools_unsupported (unscored)")
+            scored.append(r)
+            continue
         if skip == "already_scored":
             scored.append(r)
             continue
@@ -569,13 +584,24 @@ def main(argv=None, call_fn=None):
         # Mechanical methods must never hit the LLM judge (M1). Backfill if the
         # runner left score=null (e.g. re-judge after retargeting a task).
         if method in _MECHANICAL:
-            sc = _mechanical_score(task_id, r.get("response", ""))
-            r["score"] = sc
-            r["judge"] = method
-            r.pop("judge_error", None)
-            if sc is None:
-                r.setdefault("judge_raw", "unparseable/unscored")
-            print(f"  [{method}] {task_id} ... {sc}", file=sys.stderr, flush=True)
+            sc = _mechanical_score(
+                task_id, r.get("response", ""),
+                tool_calls=r.get("tool_calls"))
+            # tool-call with no calls must stay tools_unsupported, never 0.0
+            if method == "tool-call" and sc is None:
+                r["score"] = None
+                r["tools_unsupported"] = True
+                r["judge"] = "tool-call"
+                r.setdefault("judge_raw", "tools_unsupported/unscored")
+                print(f"  [{method}] {task_id} ... tools_unsupported",
+                      file=sys.stderr, flush=True)
+            else:
+                r["score"] = sc
+                r["judge"] = method
+                r.pop("judge_error", None)
+                if sc is None:
+                    r.setdefault("judge_raw", "unparseable/unscored")
+                print(f"  [{method}] {task_id} ... {sc}", file=sys.stderr, flush=True)
             scored.append(r)
             _writeback(data, results, scored, run_path)
             continue

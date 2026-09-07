@@ -1,0 +1,31 @@
+id: tool_weather
+category: agentic
+requires_frontier: false
+prompt: |
+  You must use the get_weather tool to look up the weather.
+  Call get_weather with city set to Berlin. Do not invent the weather
+  yourself — emit the tool call.
+tools:
+  - type: function
+    function:
+      name: get_weather
+      description: Get the current weather for a city.
+      parameters:
+        type: object
+        properties:
+          city:
+            type: string
+            description: City name to look up.
+        required: [city]
+expect_tool_call:
+  name: get_weather
+  arguments:
+    city: Berlin
+scoring:
+  method: tool-call
+  rubric: |
+    Mechanical (method: tool-call). Score 1.0 only if a tool call is emitted for
+    get_weather with city=Berlin. Wrong tool or wrong arguments score 0.0.
+    Absence of tool_calls is tools_unsupported and unscored (null), never 0.0.
+max_tokens: 256
+tags: [tools]
