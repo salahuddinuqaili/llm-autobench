@@ -30,6 +30,7 @@ smoke-results framing.
 | Exact-only local tag match (SPEC 13.2 / D10) | shipped (M0.2) | Exact tag only; same-size fuzzy removed |
 | `_param_from_tag` / F1.3 silent drops | shipped (M0.3) | Suffixes + MoE product; unsized drops logged |
 | Execution-based code scoring | shipped (M1) | `python-exec` fixtures via `scripts/code_exec.py`; era `20260907` |
+| GSM8K-style exact slice (P2.2 thin) | shipped | `gsm8k_s01`..`s05` method: exact; original fixtures; ERA unchanged; no ranking flip |
 | Judge panel + Cohen kappa | open (M2.2 self-consistency opt-in) | Free-judge + one-GPU constraint; self-consistency is not kappa |
 | Agentic tool-call battery (SPEC 13) | specified | Next product question after measurement floor; not ahead of M0-M1 |
 
@@ -106,7 +107,7 @@ Only after M0-M1 (and preferably M2.1):
 
 1. SPEC 13.3 single-turn tool-call (mechanical; tools_unsupported unscored). **Shipped** — separate regime in reports (13.6); not folded into text shared-task avg; no public ranking flip.
 2. SPEC 13.4-13.5 multi-turn tools + trajectory sub-scores. **Shipped (this PR)** — sandboxed loop + sub-scores; separate regime; no ranking flip.
-3. P2.2 [L] GSM8K + coding-suite slices on the now-proven mechanical / exact paths.
+3. P2.2 GSM8K-style thin exact slice **shipped** (`gsm8k_s01`..`s05`, method: exact; original fixtures + provenance). Full GSM8K / coding-suite dumps still out of scope.
 4. Dashboard / trends / post-mortem (P2.6-P2.7) as capacity allows.
 
 Agentic work answers a different question (can it drive tools?) and must stay
@@ -119,7 +120,7 @@ shared-task average.
 2. **M0.1-M0.4** residual honesty / discover / tag match
 3. **M1** mechanical scoring for code_generation (+ era bump) — shipped
 4. **M2.1-M2.2** judge retry cap + optional self-consistency — shipped
-5. **M4 / SPEC 13.3–13.5** agentic Phase 1+2 shipped (tool-call + multi-turn trajectory); suite slices next
+5. **M4 / SPEC 13.3–13.5** agentic shipped; **P2.2 GSM8K thin exact slice** shipped (full suite dumps still later)
 6. Public ranking UI — only after M3 gates + **lina** greenlight
 ---
 
@@ -152,7 +153,7 @@ audit trail stays readable. Do not treat rows as current defects.
 | Caveat | Why it survives | What closes it |
 |---|---|---|
 | Single judge, no kappa | Needs another free cloud judge or local judge on the same 12 GB card | M2.2 optional disclosed self-consistency shipped; true kappa still needs P2.3 |
-| Each task is one prompt | N=3 measures sampling noise, not construct depth | M1 on coding + later suite slices |
+| Each task is one prompt | N=3 measures sampling noise, not construct depth | M1 coding + thin GSM8K exact slice shipped; full suites still later |
 
 M1 mechanical scoring for `code_generation` is in-tree (era `20260907`). README numbers remain smoke-test output on a 12 GB box until new current-era
 runs accumulate; public packaging stays no ranks/medals until lina greenlights

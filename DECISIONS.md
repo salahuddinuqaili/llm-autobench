@@ -3,6 +3,21 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-09-07 · P2.2 thin GSM8K-style exact slice (mechanical path)
+
+Five original grade-school word problems (`gsm8k_s01`..`gsm8k_s05`) scored by the
+existing `exact` extractor (labelled Final answer + numeric value). Tag `gsm8k`
+added to `battery_tags` and full-text baselines so coverage stays symmetric;
+watcher `size_band` 6–10 unchanged. Fixtures are **not** the GSM8K corpus —
+provenance in `tasks/fixtures/GSM8K_SLICE_PROVENANCE.md`. **ERA_CUTOFF unchanged:**
+adding tasks ≠ re-scoring an existing cell (DECISIONS 2026-08-24); current-era
+published aggregate is empty so means are not polluted; shared-task column still
+handles partial coverage. Agentic regime untouched; no medals/ranks; no M3 public
+ranking flip. Why: prove P2.2-style suite slice on the mechanical exact path after
+M0–M2 + SPEC 13.3–13.5, without a full 8.5k dump or download step. Rejected: full
+GSM8K port; rubric-llm grading for these items; era bump with nothing to quarantine;
+folding into a ranked leaderboard.
+
 ## 2026-09-07 · M4 / SPEC 13.4–13.5 multi-turn tools + trajectory sub-scores
 Harness gains `multi_turn` / `turn_cap` tasks, `scripts/tool_sandbox.py` (calc, kv_*, list_files, read_file, finish; no network / no escape), `run_tool_loop` with full trajectory in run JSON, and mechanical method `tool-trajectory` with SPEC 13.5 sub-scores (`completed` is the primary row score; others recorded separately). First task: `tool_multiturn_sum` (injects one `read_file` error for error_recovery). `tools_unsupported` stays unscored; agentic remains a **separate regime** in reports (13.6); no medals/ranks; `ERA_CUTOFF` unchanged. Why: measure whether 6–10B models can *drive* tools across turns without judge subjectivity or contaminating the text shared-task average. Rejected: folding into text avg; scoring unsupported as 0.0; collapsing sub-scores into one opaque number; real network/shell tools.
 

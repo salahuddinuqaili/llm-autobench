@@ -1,0 +1,18 @@
+id: gsm8k_s03
+category: reasoning
+requires_frontier: false
+prompt: |
+  A bus has 40 seats and starts empty. At stop A, 12 people board. At stop B,
+  5 people get off and 9 people board. How many seats are empty after stop B?
+  Show your work, then state your final answer on the last line as
+  "Final answer: <number>".
+expected:
+  answer: "24"
+scoring:
+  method: exact
+  rubric: |
+    Binary (method: exact). Extract the LAST "Final answer:" line and compare
+    by numeric value. Empty seats after stop B is 24 (16 aboard). Reporting
+    aboard count (16) as the final answer scores 0.
+max_tokens: 2048
+tags: [reasoning, gsm8k]

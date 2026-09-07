@@ -8,6 +8,10 @@
 #                 on every discovery cycle; discovery benches one subject only)
 #   watcher:      config for autonomous discovery of NEW models to test
 
+# GSM8K-style slice (`gsm8k_s01`..`s05`, tag `gsm8k`) rides this list so
+# baselines and discovered subjects stay coverage-symmetric (DECISIONS 2026-08-15).
+# Discovery size_band (6-10B) is unchanged — suite slice is tag/coverage wiring,
+# not a new size preference.
 # SINGLE SOURCE OF TRUTH for "the full text battery". Both the baselines below and
 # the discovered model injected by autobench_cycle.build_temp_registry() use this
 # list, so the two can never drift apart again. They did: discovered models were
@@ -18,7 +22,7 @@
 battery_tags: [
   general, reasoning, coding, writing, summarization,
   instruction_following, structured_output, communication,
-  security, python, json, tools,
+  security, python, json, tools, gsm8k,
 ]
 
 baseline:
@@ -33,7 +37,7 @@ baseline:
     # hard half and then published the result as a cross-model average.
     tags: [general, reasoning, coding, writing, summarization,
            instruction_following, structured_output, communication,
-           security, python, json, tools]
+           security, python, json, tools, gsm8k]
     enabled: true
 
   - id: custom:ollama/gemma4:e4b
@@ -45,7 +49,7 @@ baseline:
     # Multimodal AND general: full text battery + vision.
     tags: [general, reasoning, coding, writing, summarization,
            instruction_following, structured_output, communication,
-           security, python, json, tools, vision, ocr, progressive]
+           security, python, json, tools, gsm8k, vision, ocr, progressive]
     enabled: true
 
   - id: custom:ollama/minicpm-v:latest
