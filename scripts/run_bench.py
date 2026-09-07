@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """
-llm-autobench harness (starter skeleton).
+llm-autobench harness.
 
 Loads models/registry.yaml + tasks/*.yaml, then for each enabled model x each
 matching task: calls the model, scores the response, and writes:
   - runs/<run_id>.json   (raw)
   - reports/<run_id>.md  (summary)
 
-This is a STARTING POINT, not a finished runner:
+What works today:
   - call_model() has a real OpenAI-compatible path for local/custom models
-    (verified working against Ollama on 127.0.0.1:11434).
-  - The Anthropic (Claude Max) path is stubbed: wire it to Hermes's OAuth-routed
-    client or the Anthropic SDK with `auth=oauth`, NOT an API key.
-  - Scoring is currently a placeholder; implement exact / reference-compare /
-    rubric-llm per task.scoring.method.
+    (verified against Ollama on 127.0.0.1:11434).
+  - Scoring: exact and json-exact are implemented in-process (answer extraction,
+    type-aware); rubric-llm rows leave score=None here and are graded by
+    nvidia_judge via score_run.py.
+  - Truncation / ingestion_failed stay unscored (null), never fake 0.0.
+  - The Anthropic (Claude Max) path remains stubbed: wire it to Hermes OAuth or
+    the Anthropic SDK with `auth=oauth`, NOT an API key.
 
 Run:  python run_bench.py --tier local,free
 """

@@ -3,6 +3,14 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-09-07 · M0 residual honesty coded (size_band, exact tags, param parse, header)
+Implemented M0.1–M0.4 from IMPROVEMENTS: `watcher.size_band` 6–10 with untested +
+deterministic pick (no prefer-larger); local-tag match exact-only; hardened
+`_param_from_tag` (suffixes + MoE product) with explicit unsized drops; retired the
+stale "scoring is a placeholder" `run_bench.py` header. Why: 2026-08-24 decisions were
+locked but code still preferred largest-fit and same-size fuzzy tags (D10 risk).
+Rejected: leaving size-strict fuzzy as a half-fix; documenting without coding.
+
 ## 2026-09-07 · Measurement-quality backlog before new suite ports
 Active plan lives in `IMPROVEMENTS.md` (M0–M4). Why: Phase 0–1 credibility and N=3 are shipped; residual discover/tag honesty and mechanical scoring for `code_generation` still limit construct validity. Rejected: jumping to SPEC §13 agentic or full suite ports before closing M0–M1.
 

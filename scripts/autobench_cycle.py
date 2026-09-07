@@ -110,34 +110,18 @@ def _local_tags():
 
 
 def model_is_available_locally(model_tag):
-    """Check if the model tag exists in Ollama (already pulled).
+    """Check if the exact model tag exists in Ollama (already pulled).
 
-    An exact tag match always counts. A *fuzzy* match (same base name) only
-    counts when the parameter sizes are equal — e.g. 'qwen2.5:7b' matches
-    'qwen2.5:7b-instruct' (both 7B). Different sizes of the same base name are
-    NOT interchangeable: 'gemma4:12b' must NOT resolve to a locally-pulled
-    'gemma4:e4b'. In that case we return False so the caller pulls the requested
-    size (or skips honestly) instead of silently benchmarking the wrong model.
+    Exact match only (SPEC 13.2 / D10 / M0.2). Same-size variants such as
+    'qwen2.5:7b' vs 'qwen2.5:7b-instruct' are NOT interchangeable — family or
+    size-strict fuzzy matching silently re-benches the wrong local model and
+    livelocks discovery. Missing tag means pull that exact tag, or honest skip.
 
-    Returns the actual local tag name if found, or False.
+    Returns the local tag name if found, or False.
     """
     local_tags = _local_tags()
     if model_tag in local_tags:
         return model_tag
-    base = model_tag.split(":")[0]
-    req_param = _tag_size_b(model_tag)
-    for tag in local_tags:
-        if tag == model_tag:
-            return tag
-        if not tag.startswith(base + ":"):
-            continue
-        if req_param is None:
-            # Requested tag carries no size spec; accept any same-base local tag
-            # (preserves legacy 'llama3' -> 'llama3:8b' behaviour).
-            return tag
-        loc_param = _tag_size_b(tag)
-        if loc_param is not None and loc_param == req_param:
-            return tag
     return False
 
 
@@ -162,7 +146,17 @@ def _other_size_local(model_tag):
 
 
 def _param_from_tag(tag):
-    m = re.search(r"(\d+(?:\.\d+)?)b?$", tag, re.IGNORECASE)
+    """Parse parameter size in billions from an Ollama tag or name:tag.
+
+    Handles sized tags with suffixes (codellama:7b-instruct -> 7) and MoE
+    products (mixtral:8x7b -> 56). Returns None for unsized tags (latest, etc.)
+    so discover can drop them explicitly (F1.3 / M0.3).
+    """
+    part = tag.split(":")[-1] if ":" in tag else tag
+    moe = re.search(r"(\d+)\s*x\s*(\d+(?:\.\d+)?)\s*b", part, re.IGNORECASE)
+    if moe:
+        return float(moe.group(1)) * float(moe.group(2))
+    m = re.search(r"(\d+(?:\.\d+)?)b", part, re.IGNORECASE)
     return float(m.group(1)) if m else None
 
 
@@ -170,13 +164,17 @@ def discover(watcher):
     """Return a new model tag to test, or None.
 
     Strategy: scrape the Ollama library for model names, resolve each model's
-    available tags (concurrent), filter by size <= max_params_billions, exclude
-    already-benchmarked models (present in runs/ or baseline), and require that
-    the model fits the CURRENT free VRAM (so the later pull gate will not skip
-    it). Prefer the largest remaining model. Long-CoT models (deepseek-r1) are
-    excluded because the task battery uses fixed small token budgets.
+    available tags (concurrent), filter by watcher.size_band (default 6-10B) and
+    the absolute max_params_billions VRAM ceiling, exclude already-benchmarked
+    models (present in runs/ or baseline), and require CURRENT free VRAM headroom.
+    Prefer untested-in-band tags with a deterministic (lexicographic) tie-break —
+    never "largest that fits". Unsized tags are logged and dropped (F1.3).
+    Long-CoT models (deepseek-r1) are excluded (fixed token budgets).
     """
     max_b = watcher.get("max_params_billions", 14)
+    band = watcher.get("size_band") or {}
+    band_min = float(band["min"]) if band.get("min") is not None else None
+    band_max = float(band["max"]) if band.get("max") is not None else None
 
     # Get already tested models from runs/
     tested = set()
@@ -202,7 +200,14 @@ def discover(watcher):
     cands = []
 
     def consider(full, param_b):
-        if param_b is None or param_b > max_b:
+        if param_b is None:
+            print(f"[discover] drop unsized tag: {full}", file=sys.stderr)
+            return
+        if param_b > max_b:
+            return
+        if band_min is not None and param_b < band_min:
+            return
+        if band_max is not None and param_b > band_max:
             return
         if full in tested:
             return
@@ -231,9 +236,12 @@ def discover(watcher):
             return []
         out = []
         for tg in re.findall(r"/library/" + re.escape(name) + r":([a-z0-9_.-]+)", h):
+            full = name + ":" + tg
             pb = _param_from_tag(tg)
-            if pb is not None:
-                out.append((pb, name + ":" + tg))
+            if pb is None:
+                print(f"[discover] drop unsized tag: {full}", file=sys.stderr)
+                continue
+            out.append((pb, full))
         return out
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=16) as ex:
@@ -250,8 +258,14 @@ def discover(watcher):
         consider(full, _param_from_tag(full))
 
     if cands:
-        cands.sort(reverse=True)  # prefer larger models
-        print(f"[discover] {len(cands)} candidate(s); picking largest fitting VRAM: {cands[0][1]}",
+        # Untested-in-band already filtered; deterministic tie-break by tag name.
+        # Do NOT prefer larger (M0.1 / DECISIONS 2026-08-24).
+        cands.sort(key=lambda t: t[1])
+        band_note = ""
+        if band_min is not None or band_max is not None:
+            band_note = f" in size_band [{band_min},{band_max}]"
+        print(f"[discover] {len(cands)} candidate(s){band_note}; "
+              f"picking untested (deterministic): {cands[0][1]}",
               file=sys.stderr)
         return cands[0][1]
     return None
@@ -437,16 +451,9 @@ def main():
 
     # VRAM guard before pulling (skip if already available locally)
     already_local = model_is_available_locally(model)
-    match = re.search(r":(\d+(?:\.\d+)?)b?$", model, re.IGNORECASE)
+    param_b = _param_from_tag(model)
     pulled = False
-    if already_local and already_local != model:
-        # Only reachable for genuine same-size variants (e.g. qwen2.5:7b ->
-        # qwen2.5:7b-instruct). Different sizes are never substituted.
-        print(f"[autobench] tag variant: '{model}' resolved to local "
-              f"'{already_local}' (same parameter size — safe to benchmark)")
-        model = already_local
-    if match and not already_local:
-        param_b = float(match.group(1))
+    if param_b is not None and not already_local:
         required = estimate_model_vram_mib(param_b)
         if not has_vram_headroom(required):
             note = ""
