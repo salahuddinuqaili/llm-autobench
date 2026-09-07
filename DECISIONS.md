@@ -3,6 +3,16 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-09-07 · M2 judge visibility / robustness (no second GPU)
+Persistent NVIDIA judge failures set `judge_error=true` with `score=null` and are
+skipped on later cron passes (override: `--retry-judge-errors`) so free-tier RPM is
+not burned forever. Optional `--self-consistency` re-asks the same judge N times at
+temperature 0 and takes the median — disclosed as self-consistency, **never** as
+inter-rater / Cohen kappa. Failures and Judge status stay derived from outcomes
+(P0.5 / M2.3). Why: JOURNAL/nvidia_judge_investigation infinite-retry risk + IMPROVEMENTS M2
+without a second free cloud judge. Rejected: scoring judge failures as 0.0; calling
+self-consistency kappa; hard-coded "judge ran: yes".
+
 ## 2026-09-07 · M1 python-exec mechanical scoring for code_generation
 `tasks/code_generation.yaml` uses `scoring.method: python-exec`: extract the submitted
 function, run fixed fixtures in a subprocess (`scripts/code_exec.py`), score 1.0/0.0.
