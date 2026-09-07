@@ -3,6 +3,12 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-09-07 · Measurement-quality backlog before new suite ports
+Active plan lives in `IMPROVEMENTS.md` (M0–M4). Why: Phase 0–1 credibility and N=3 are shipped; residual discover/tag honesty and mechanical scoring for `code_generation` still limit construct validity. Rejected: jumping to SPEC §13 agentic or full suite ports before closing M0–M1.
+
+## 2026-09-07 · Public copy stays harness scores until packaging OK
+Public README/aggregate stay smoke-results framing (no medals or ordinal ranks) until deliberate OK. `IMPROVEMENTS.md` may describe internal gates (M3). Rejected: changing public ranking affordances in the same change as the measurement-plan docs.
+
 ## 2026-09-06 · One subject LLM per discovery nightly cycle
 `build_temp_registry` for discover / `--model` keeps **only** the subject — no baseline
 co-append. Why: co-running baselines on every discovery night burned VRAM/time on already-
