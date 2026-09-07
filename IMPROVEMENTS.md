@@ -27,9 +27,9 @@ smoke-results framing.
 | N=3 draws + 95% t-CI + sampling-spread table | shipped | N=5 rejected (runtime vs gain); Ollama has no reliable per-call seed |
 | Telemetry wired | shipped | `telemetry/` gitignored |
 | Public README ranks/medals | removed | First-reader trust pass; smoke results are **not a ranking** |
-| Discover `size_band` 6-10B | decided, not coded | Registry has ceiling only; discover still prefers largest |
-| Exact-only local tag match (SPEC 13.2 / D10) | partial | Size-strict fuzzy still allows same-size variant substitute; tests encode that |
-| `_param_from_tag` / F1.3 silent drops | residual | `:instruct` / `:latest` / MoE `8x7b` still weak |
+| Discover `size_band` 6-10B | shipped (M0.1) | `watcher.size_band` 6-10; untested + deterministic pick |
+| Exact-only local tag match (SPEC 13.2 / D10) | shipped (M0.2) | Exact tag only; same-size fuzzy removed |
+| `_param_from_tag` / F1.3 silent drops | shipped (M0.3) | Suffixes + MoE product; unsized drops logged |
 | Execution-based code scoring | open | `tasks/code_generation.yaml` is still `rubric-llm` |
 | Judge panel + Cohen kappa | open | Free-judge + one-GPU constraint; self-consistency is not kappa |
 | Agentic tool-call battery (SPEC 13) | specified | Next product question after measurement floor; not ahead of M0-M1 |

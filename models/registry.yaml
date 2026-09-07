@@ -64,6 +64,12 @@ watcher:
   # Only models that FIT the local GPU are pulled. On 12GB VRAM, ~14B is the
   # practical ceiling (qwen3.5:9b = 6.6GB leaves headroom for the judge on free cloud).
   max_params_billions: 14
+  # Discovery preference band (DECISIONS 2026-08-24 / SPEC 13.2 / M0.1).
+  # Hard VRAM ceiling stays max_params_billions; selection prefers untested tags
+  # inside this band with a deterministic tie-break — not "largest that fits".
+  size_band:
+    min: 6
+    max: 10
   # Sources to poll for new tags. Ollama library is the primary public source.
   sources:
     - type: ollama
