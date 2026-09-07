@@ -1,7 +1,6 @@
 # IMPROVEMENTS.md — llm-autobench roadmap
 
-**Status as of 2026-09-07** (checkout tip `06baf13` on `master`, lineage through
-`9ee529d` / one-subject nightly #16). Grounded in SPEC sections 11-13, DECISIONS.md,
+**Status as of 2026-09-07** (M1 python-exec on branch; base `e30cf23` / M0 #18). Grounded in SPEC sections 11-13, DECISIONS.md,
 README packaging, and a read of run_bench / nvidia_judge / score_run /
 autobench_cycle / aggregate_results / tasks.
 
@@ -30,7 +29,7 @@ smoke-results framing.
 | Discover `size_band` 6-10B | shipped (M0.1) | `watcher.size_band` 6-10; untested + deterministic pick |
 | Exact-only local tag match (SPEC 13.2 / D10) | shipped (M0.2) | Exact tag only; same-size fuzzy removed |
 | `_param_from_tag` / F1.3 silent drops | shipped (M0.3) | Suffixes + MoE product; unsized drops logged |
-| Execution-based code scoring | open | `tasks/code_generation.yaml` is still `rubric-llm` |
+| Execution-based code scoring | shipped (M1) | `python-exec` fixtures via `scripts/code_exec.py`; era `20260907` |
 | Judge panel + Cohen kappa | open | Free-judge + one-GPU constraint; self-consistency is not kappa |
 | Agentic tool-call battery (SPEC 13) | specified | Next product question after measurement floor; not ahead of M0-M1 |
 
@@ -60,8 +59,8 @@ Closes decisions already locked but not fully reflected in code / docs.
 
 #### M1 — Execution-based code scoring [M] · highest measurement unlock
 
-SPEC 5.3 still open: coding cells are graded by the free LLM judge today
-(tasks/code_generation.yaml uses rubric-llm). That is soft construct validity.
+SPEC 5.3 thin path **shipped** for the existing battery item: `code_generation` uses
+`python-exec` (fixture execution), not rubric-llm. Full suite ports stay out of scope.
 
 Plan (thin, not a full suite port):
 1. Add a mechanical scoring method for Python coding tasks that checks the
@@ -118,7 +117,7 @@ shared-task average.
 
 1. P0 credibility shipped · P1 legibility + N=3 shipped · one-subject nightly #16 shipped
 2. **M0.1-M0.4** residual honesty / discover / tag match
-3. **M1** mechanical scoring for code_generation (+ era bump)
+3. **M1** mechanical scoring for code_generation (+ era bump) — shipped
 4. **M2.1-M2.2** judge retry cap + optional self-consistency
 5. **M4 / SPEC 13** agentic Phase 1, then suite slices
 6. Public ranking UI — only after M3 gates + **lina** greenlight
@@ -155,6 +154,6 @@ audit trail stays readable. Do not treat rows as current defects.
 | Single judge, no kappa | Needs another free cloud judge or local judge on the same 12 GB card | M2.2 disclosed self-consistency and/or P2.3 |
 | Each task is one prompt | N=3 measures sampling noise, not construct depth | M1 on coding + later suite slices |
 
-Until M1 lands, README numbers remain smoke-test output on a 12 GB box. That
-framing is accurate scope and is the public packaging until lina greenlights
+M1 mechanical scoring for `code_generation` is in-tree (era `20260907`). README numbers remain smoke-test output on a 12 GB box until new current-era
+runs accumulate; public packaging stays no ranks/medals until lina greenlights
 otherwise.

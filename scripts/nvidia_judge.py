@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """NVIDIA judge pass for autobench runs.
 
-Reads a run JSON, scores all rubric-llm tasks via meta/llama-3.3-70b-instruct
-(NVIDIA NIM, free 40 RPM), then writes a markdown report.
+Reads a run JSON, scores remaining rubric-llm tasks via
+meta/llama-3.3-70b-instruct (NVIDIA NIM, free 40 RPM), then writes a markdown
+report. Mechanical methods (exact / json-exact / python-exec) are left alone or
+backfilled in-process - never sent to the LLM judge.
 
 Uses direct curl to NVIDIA's OpenAI-compatible endpoint (bypasses the slow
 `hermes -z` agent loop). The API key is resolved with this precedence:
@@ -226,6 +228,36 @@ def load_rubric(task_id):
     return re.sub(r"^[ \t]+", "", m.group(1), flags=re.MULTILINE)
 
 
+def load_scoring_method(task_id):
+    """Return scoring.method from tasks/<id>.yaml (default rubric-llm)."""
+    p = REPO / "tasks" / f"{task_id}.yaml"
+    if not p.exists():
+        return "rubric-llm"
+    text = p.read_text(encoding="utf-8")
+    m = re.search(r"^\s*method:\s*(\S+)", text, flags=re.MULTILINE)
+    return m.group(1).strip() if m else "rubric-llm"
+
+
+_MECHANICAL = frozenset({"exact", "json-exact", "python-exec"})
+
+
+def _mechanical_score(task_id, response):
+    """Backfill exact / json-exact / python-exec via run_bench.score."""
+    try:
+        import yaml
+    except ImportError:
+        return None
+    p = REPO / "tasks" / f"{task_id}.yaml"
+    if not p.exists():
+        return None
+    task = yaml.safe_load(p.read_text(encoding="utf-8"))
+    scripts = str(REPO / "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    import run_bench
+    return run_bench.score(task, response or "")
+
+
 def _writeback(envelope, results, scored, run_path):
     """Incremental write-back so partial progress survives timeouts.
 
@@ -396,6 +428,19 @@ def main():
             scored.append(r)
             continue
         task_id = r["task"]
+        method = load_scoring_method(task_id)
+        # Mechanical methods must never hit the LLM judge (M1). Backfill if the
+        # runner left score=null (e.g. re-judge after retargeting a task).
+        if method in _MECHANICAL:
+            sc = _mechanical_score(task_id, r.get("response", ""))
+            r["score"] = sc
+            r["judge"] = method
+            if sc is None:
+                r.setdefault("judge_raw", "unparseable/unscored")
+            print(f"  [{method}] {task_id} ... {sc}", file=sys.stderr, flush=True)
+            scored.append(r)
+            _writeback(data, results, scored, run_path)
+            continue
         rubric = load_rubric(task_id)
         if not rubric:
             print(f"  [skip] no rubric for {task_id}", file=sys.stderr)

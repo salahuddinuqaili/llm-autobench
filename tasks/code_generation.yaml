@@ -2,20 +2,41 @@ id: code_generation
 category: coding
 requires_frontier: false
 prompt: |
-  Write a Python function `def chunk_text(text: str, max_chars: int) -> list[str]`
-  that splits text into chunks of at most max_chars, preferring to break on
-  sentence boundaries ('.', '!', '?'), never cutting a word. Include a docstring
-  and one assert test.
+  Write a Python function `def chunk_text(text: str, max_chars: int) -> list[str]` that:
+  - Returns a list of chunks; empty input returns [].
+  - Each chunk is at most max_chars characters when possible.
+  - Prefers breaking after sentence-ending punctuation ('.', '!', '?') when the
+    next sentence would not fit in the current chunk.
+  - Never splits inside a word. If a single word is longer than max_chars, emit
+    that word as its own chunk (the chunk may exceed max_chars).
+  - Join words within a chunk with a single space.
+  Include a docstring and one assert-based self-check.
+  Put the complete function in a ```python fenced code block.
 expected:
   answer: ""
 scoring:
-  method: rubric-llm
+  method: python-exec
+  function: chunk_text
+  timeout_s: 2
+  # Binary mechanical fixtures (M1). All must pass for 1.0; any miss is 0.0.
+  # Unparseable / missing function stays null (unscored) in the harness.
+  checks:
+    - args: ["", 10]
+      expect: []
+    - args: ["Hi.", 10]
+      expect: ["Hi."]
+    - args: ["Hello. World!", 8]
+      expect: ["Hello.", "World!"]
+    - args: ["Hello. World!", 20]
+      expect: ["Hello. World!"]
+    - args: ["One two three four", 10]
+      expect: ["One two", "three four"]
+    - args: ["Supercalifragilistic", 5]
+      expect: ["Supercalifragilistic"]
   rubric: |
-    Award full marks if the function: (1) respects max_chars, (2) breaks on
-    sentence boundaries when possible, (3) never splits a word, (4) has a
-    docstring and one assert test. Deduct for missing any requirement.
-    Partial if the logic is correct but edge cases (empty string, single long
-    word) are not handled.
+    Mechanical (method: python-exec). The scorer extracts chunk_text, runs the
+    fixed fixtures above, and returns 1.0 or 0.0. No LLM judge. Unparseable
+    submissions are unscored (null), not 0.0.
 # 1024 was not enough: qwen3.5:9b was still truncated at the 2048 retry ceiling
 # writing the function + docstring + assert, so it scored null instead of being
 # graded. 2048 (retrying to 4096) leaves room for a complete implementation.
