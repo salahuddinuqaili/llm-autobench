@@ -269,7 +269,9 @@ def render(a):
     n_models, n_tasks = len(a["m_scores"]), len(a["t_scores"])
     shared = a["shared"]
     smp = a["samples_declared"]
-    smp_s = ("/".join(str(x) for x in sorted(smp))) if smp else "1"
+    # Empty aggregate (no current-era runs) must not claim N=1 — that was a
+    # display lie when inject ran against a zero-run era (lina note).
+    smp_s = ("/".join(str(x) for x in sorted(smp))) if smp else ("—" if a["n_runs"] == 0 else "1")
     md = []
     md.append(f"_Current-methodology aggregate across **{a['n_runs']} runs** "
               f"({fmt_date(a['span'][0])} → {fmt_date(a['span'][1])}), "

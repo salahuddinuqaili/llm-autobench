@@ -1,6 +1,6 @@
 # IMPROVEMENTS.md — llm-autobench roadmap
 
-**Status as of 2026-09-07** (M1 python-exec on branch; base `e30cf23` / M0 #18). Grounded in SPEC sections 11-13, DECISIONS.md,
+**Status as of 2026-09-07** (M2 judge visibility on branch; M1 #19 merged at `bb904d5`). Grounded in SPEC sections 11-13, DECISIONS.md,
 README packaging, and a read of run_bench / nvidia_judge / score_run /
 autobench_cycle / aggregate_results / tasks.
 
@@ -30,7 +30,7 @@ smoke-results framing.
 | Exact-only local tag match (SPEC 13.2 / D10) | shipped (M0.2) | Exact tag only; same-size fuzzy removed |
 | `_param_from_tag` / F1.3 silent drops | shipped (M0.3) | Suffixes + MoE product; unsized drops logged |
 | Execution-based code scoring | shipped (M1) | `python-exec` fixtures via `scripts/code_exec.py`; era `20260907` |
-| Judge panel + Cohen kappa | open | Free-judge + one-GPU constraint; self-consistency is not kappa |
+| Judge panel + Cohen kappa | open (M2.2 self-consistency opt-in) | Free-judge + one-GPU constraint; self-consistency is not kappa |
 | Agentic tool-call battery (SPEC 13) | specified | Next product question after measurement floor; not ahead of M0-M1 |
 
 ### Packaging rules for this pathway (internal)
@@ -79,9 +79,9 @@ Prove the path on the existing battery item first.
 
 | ID | Fix | Notes |
 |---|---|---|
-| **M2.1** | Cap persistent JUDGE_ERROR retries; mark judge_error so cron does not burn free-tier RPM forever | See JOURNAL/nvidia_judge_investigation |
-| **M2.2** | Optional self-consistency (same judge 3x at temp 0, take median) on rubric rows | Disclose as self-consistency, never as inter-rater kappa |
-| **M2.3** | Failures / judge-ran status stay derived from outcomes (already true for NVIDIA path — do not regress) | Protect P0.5 |
+| **M2.1** | Cap persistent JUDGE_ERROR retries; mark judge_error so cron does not burn free-tier RPM forever | **shipped** — `judge_error=true` + skip on later passes (`--retry-judge-errors` to override); see JOURNAL/nvidia_judge_investigation |
+| **M2.2** | Optional self-consistency (same judge 3x at temp 0, take median) on rubric rows | **shipped** — `--self-consistency` / `--self-consistency-n`; disclosed as self-consistency, never as inter-rater kappa |
+| **M2.3** | Failures / judge-ran status stay derived from outcomes (already true for NVIDIA path — do not regress) | **shipped** — Failures + Judge status derived from outcomes; protect P0.5 |
 
 Multi-provider panel + Cohen kappa (P2.3) stays blocked by free-judge + one-GPU
 architecture unless a second free cloud judge appears.
@@ -118,7 +118,7 @@ shared-task average.
 1. P0 credibility shipped · P1 legibility + N=3 shipped · one-subject nightly #16 shipped
 2. **M0.1-M0.4** residual honesty / discover / tag match
 3. **M1** mechanical scoring for code_generation (+ era bump) — shipped
-4. **M2.1-M2.2** judge retry cap + optional self-consistency
+4. **M2.1-M2.2** judge retry cap + optional self-consistency — shipped
 5. **M4 / SPEC 13** agentic Phase 1, then suite slices
 6. Public ranking UI — only after M3 gates + **lina** greenlight
 ---
@@ -151,7 +151,7 @@ audit trail stays readable. Do not treat rows as current defects.
 
 | Caveat | Why it survives | What closes it |
 |---|---|---|
-| Single judge, no kappa | Needs another free cloud judge or local judge on the same 12 GB card | M2.2 disclosed self-consistency and/or P2.3 |
+| Single judge, no kappa | Needs another free cloud judge or local judge on the same 12 GB card | M2.2 optional disclosed self-consistency shipped; true kappa still needs P2.3 |
 | Each task is one prompt | N=3 measures sampling noise, not construct depth | M1 on coding + later suite slices |
 
 M1 mechanical scoring for `code_generation` is in-tree (era `20260907`). README numbers remain smoke-test output on a 12 GB box until new current-era
