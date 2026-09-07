@@ -279,7 +279,7 @@ called done.
 
 ## 13. Small-model agentic focus (2026-08-24) — supersedes §12 as the next action
 
-**Status:** 13.2 shipped (M0); **13.3 thin slice shipped (M4)** — single-turn `tool-call` + `tools_unsupported` unscored + separate report regime. 13.4–13.5 not yet implemented. Decisions locked below.
+**Status:** 13.2 shipped (M0); **13.3 thin slice shipped (M4)** — single-turn `tool-call` + `tools_unsupported` unscored + separate report regime. **13.4–13.5 multi-turn + trajectory sub-scores shipped (this PR)** — sandboxed tools, turn cap, mechanical sub-scores, still a separate agentic regime. Decisions locked below.
 
 ### 13.1 Why this changes the question the repo asks
 

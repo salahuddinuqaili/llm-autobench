@@ -3,13 +3,16 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-09-07 · M4 / SPEC 13.4–13.5 multi-turn tools + trajectory sub-scores
+Harness gains `multi_turn` / `turn_cap` tasks, `scripts/tool_sandbox.py` (calc, kv_*, list_files, read_file, finish; no network / no escape), `run_tool_loop` with full trajectory in run JSON, and mechanical method `tool-trajectory` with SPEC 13.5 sub-scores (`completed` is the primary row score; others recorded separately). First task: `tool_multiturn_sum` (injects one `read_file` error for error_recovery). `tools_unsupported` stays unscored; agentic remains a **separate regime** in reports (13.6); no medals/ranks; `ERA_CUTOFF` unchanged. Why: measure whether 6–10B models can *drive* tools across turns without judge subjectivity or contaminating the text shared-task average. Rejected: folding into text avg; scoring unsupported as 0.0; collapsing sub-scores into one opaque number; real network/shell tools.
+
 ## 2026-09-07 · M4 / SPEC 13.3 thin agentic slice (single-turn tool-call)
 Harness gains `tools:` / `expect_tool_call:` on tasks, `call_model(..., tools=)`, mechanical
 scoring method `tool-call`, and `tools_unsupported` (unscored, not 0.0) when no `tool_calls`
 are emitted. First task: `tasks/tool_weather.yaml`. Agentic rows are a **separate regime** in
 `aggregate_results.py` / per-run reports (SPEC 13.6) — excluded from text shared-task Avg;
 no medals/ranks; README stays smoke framing. `ERA_CUTOFF` unchanged (adding tasks ≠ new era).
-Multi-turn 13.4–13.5 deferred. Why: publish whether 6–10B models can emit a correct single
+Multi-turn 13.4–13.5 was deferred from the 13.3 PR (now shipped separately). Why 13.3 alone: publish whether 6–10B models can emit a correct single
 tool call without conflating "cannot" with "wrong", and without contaminating the text
 leaderboard. Rejected: folding tool-call into shared-task mean (coverage error); scoring
 unsupported as 0.0 (honesty rule); shipping multi-turn in the same PR (scope / runtime).

@@ -3,7 +3,7 @@
 
 Reads a run JSON, scores remaining rubric-llm tasks via
 meta/llama-3.3-70b-instruct (NVIDIA NIM, free 40 RPM), then writes a markdown
-report. Mechanical methods (exact / json-exact / python-exec / tool-call) are left alone or
+report. Mechanical methods (exact / json-exact / python-exec / tool-call / tool-trajectory) are left alone or
 backfilled in-process - never sent to the LLM judge.
 
 Uses direct curl to NVIDIA's OpenAI-compatible endpoint (bypasses the slow
@@ -338,9 +338,9 @@ def load_scoring_method(task_id):
     return m.group(1).strip() if m else "rubric-llm"
 
 
-_MECHANICAL = frozenset({"exact", "json-exact", "python-exec", "tool-call"})
+_MECHANICAL = frozenset({"exact", "json-exact", "python-exec", "tool-call", "tool-trajectory"})
 # Agentic tasks (SPEC 13.3/13.6) — separate regime; never fold into text avg.
-AGENTIC_TASKS = frozenset({"tool_weather"})
+AGENTIC_TASKS = frozenset({"tool_weather", "tool_multiturn_sum"})
 
 
 def _mechanical_score(task_id, response, tool_calls=None):
@@ -584,6 +584,23 @@ def main(argv=None, call_fn=None):
         # Mechanical methods must never hit the LLM judge (M1). Backfill if the
         # runner left score=null (e.g. re-judge after retargeting a task).
         if method in _MECHANICAL:
+            # tool-trajectory scores are produced only by the multi-turn runner
+            # (sandbox + trajectory). Never overwrite from score() (always None).
+            if method == "tool-trajectory":
+                if r.get("tools_unsupported"):
+                    r["score"] = None
+                    r["judge"] = "tool-trajectory"
+                    r.setdefault("judge_raw", "tools_unsupported/unscored")
+                    print(f"  [{method}] {task_id} ... tools_unsupported",
+                          file=sys.stderr, flush=True)
+                else:
+                    r["judge"] = method
+                    r.pop("judge_error", None)
+                    print(f"  [{method}] {task_id} ... {r.get('score')}",
+                          file=sys.stderr, flush=True)
+                scored.append(r)
+                _writeback(data, results, scored, run_path)
+                continue
             sc = _mechanical_score(
                 task_id, r.get("response", ""),
                 tool_calls=r.get("tool_calls"))
