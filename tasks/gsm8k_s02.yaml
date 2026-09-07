@@ -1,0 +1,18 @@
+id: gsm8k_s02
+category: reasoning
+requires_frontier: false
+prompt: |
+  Maya has 35 dollars. She buys 3 notebooks at 4 dollars each and 2 pens at
+  2.50 dollars each. How many dollars does she have left?
+  Show your work, then state your final answer on the last line as
+  "Final answer: <number>".
+expected:
+  answer: "18"
+scoring:
+  method: exact
+  rubric: |
+    Binary (method: exact). Extract the LAST "Final answer:" line and compare
+    by numeric value (18 == 18.0). Intermediate totals that are not the final
+    remainder score 0 if stated as the final answer.
+max_tokens: 2048
+tags: [reasoning, gsm8k]

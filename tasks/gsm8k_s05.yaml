@@ -1,0 +1,19 @@
+id: gsm8k_s05
+category: reasoning
+requires_frontier: false
+prompt: |
+  A rectangular garden is 12 metres by 8 metres. A path 1 metre wide runs
+  all the way around the outside of the garden. What is the area of the path
+  alone, in square metres?
+  Show your work, then state your final answer on the last line as
+  "Final answer: <number>".
+expected:
+  answer: "44"
+scoring:
+  method: exact
+  rubric: |
+    Binary (method: exact). Extract the LAST "Final answer:" line and compare
+    by numeric value. Outer 14x10=140 minus garden 96 = 44. Reporting the
+    outer area (140) or garden area (96) as the final answer scores 0.
+max_tokens: 2048
+tags: [reasoning, gsm8k]
