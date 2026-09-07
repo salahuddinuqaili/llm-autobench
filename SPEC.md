@@ -279,7 +279,7 @@ called done.
 
 ## 13. Small-model agentic focus (2026-08-24) — supersedes §12 as the next action
 
-**Status:** specified, not implemented. Decisions locked below; implement in a fresh session.
+**Status:** 13.2 shipped (M0); **13.3 thin slice shipped (M4)** — single-turn `tool-call` + `tools_unsupported` unscored + separate report regime. 13.4–13.5 not yet implemented. Decisions locked below.
 
 ### 13.1 Why this changes the question the repo asks
 

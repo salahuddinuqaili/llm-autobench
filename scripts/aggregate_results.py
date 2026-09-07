@@ -36,6 +36,10 @@ END = "<!-- RESULTS:END -->"
 # visually separate so text smoke results are not diluted by a different regime.
 VISION_TASKS = {"vision_ocr", "vision_progressive"}
 
+# Agentic tasks (SPEC 13.3 / 13.6) are a separate regime — never folded into the
+# text shared-task average. Own marker + own section in the report.
+AGENTIC_TASKS = {"tool_weather"}
+
 # ---------------------------------------------------------------------------
 # Methodology versions ("eras"): a harness change that alters WHAT is measured
 # makes old runs and new runs different datasets, not a longer time series.
@@ -206,7 +210,9 @@ def aggregate():
     # once at 2x, still cut off -> scored null (excluded from every mean below).
     trunc_rows = retried_rows = rescued_rows = 0
     ingest_fail = 0
+    tools_unsupported = 0
     samples_declared = set()
+    m_agentic = defaultdict(list)  # model -> agentic scores (separate regime)
 
     for r in rows:
         m, t, s = r.get("model", "?"), r.get("task", "?"), r.get("score")
@@ -226,8 +232,14 @@ def aggregate():
                 rescued_rows += 1
         if r.get("ingestion_failed"):
             ingest_fail += 1
+        if r.get("tools_unsupported"):
+            tools_unsupported += 1
         if isinstance(s, (int, float)):
-            m_scores[m].append(s)
+            # SPEC 13.6: never fold agentic into text smoke Avg / shared-task.
+            if t in AGENTIC_TASKS:
+                m_agentic[m].append(s)
+            else:
+                m_scores[m].append(s)
             t_scores[t].append(s)
             t_models[t].add(m)
             mt_scores[(m, t)].append(s)
@@ -238,9 +250,11 @@ def aggregate():
 
     # Shared-task set: the tasks every general (non-vision-only) model attempted.
     # Cross-model averages over different task sets are not comparable; this is
-    # the column that is.
+    # the column that is. Vision + agentic regimes are always excluded.
     text_models = [m for m in m_tasks if not (m_tasks[m] <= VISION_TASKS)]
     shared = set.intersection(*[m_tasks[m] for m in text_models]) if text_models else set()
+    shared -= VISION_TASKS
+    shared -= AGENTIC_TASKS
 
     ids = sorted(x for x in run_ids if re.match(r"\d{8}_\d{6}", str(x)))
     span = (ids[0][:8], ids[-1][:8]) if ids else ("?", "?")
@@ -254,6 +268,8 @@ def aggregate():
         "zero_rows": zero_rows, "err_rows": err_rows,
         "trunc_rows": trunc_rows, "retried_rows": retried_rows,
         "rescued_rows": rescued_rows, "ingest_fail": ingest_fail,
+        "tools_unsupported": tools_unsupported,
+        "m_agentic": m_agentic,
         "shared": shared, "text_models": text_models,
         "samples_declared": samples_declared,
     }
@@ -265,7 +281,11 @@ def fmt_date(d):
 
 def render(a):
     models = sorted(a["m_scores"], key=lambda k: -statistics.mean(a["m_scores"][k]))
-    tasks = sorted(a["t_scores"], key=lambda k: -statistics.mean(a["t_scores"][k]))
+    # Text/vision difficulty table excludes agentic (own section below).
+    tasks = sorted(
+        (t for t in a["t_scores"] if t not in AGENTIC_TASKS),
+        key=lambda k: -statistics.mean(a["t_scores"][k]),
+    )
     n_models, n_tasks = len(a["m_scores"]), len(a["t_scores"])
     shared = a["shared"]
     smp = a["samples_declared"]
@@ -314,14 +334,38 @@ def render(a):
             row += f" {errp or '-'} |"
         md.append(row)
     md.append("")
-    md.append(f"> **Avg** is over every task a model attempted, so two models with "
-              f"different coverage are not comparable there. **Shared-task avg** is over "
-              f"the {len(shared)} task(s) every general model attempted "
+    md.append(f"> **Avg** is over text/vision tasks a model attempted (agentic "
+              f"excluded — separate regime). **Shared-task avg** is over "
+              f"the {len(shared)} text task(s) every general model attempted "
               f"({', '.join('`' + t + '`' for t in sorted(shared)) if shared else 'none'})"
-              f" — that column is the like-for-like one. `—` = vision-only model, "
-              f"which attempts none of the shared text battery. `\U0001F441` = vision-only "
-              f"coverage (different judging regime).")
+              f" — that column is the like-for-like one. Agentic tool-call scores are "
+              f"**never** folded into Avg or Shared-task (SPEC 13.6). `—` = vision-only "
+              f"model. `\U0001F441` = vision-only coverage (different judging regime).")
     md.append("")
+
+    # ---- Agentic regime (SPEC 13.3 / 13.6) — separate from text smoke ----
+    agentic_tasks = sorted(t for t in a["t_scores"] if t in AGENTIC_TASKS)
+    tu = a.get("tools_unsupported", 0)
+    if agentic_tasks or tu:
+        md.append("### Agentic tool-call (separate regime — not ranked with text)")
+        md.append("")
+        md.append("| Model | Task | Mean | n | notes |")
+        md.append("|---|---|---:|---:|---|")
+        any_row = False
+        for m in sorted(set(a.get("m_agentic", {})) | set(a["m_tasks"])):
+            for t in agentic_tasks:
+                vals = a["mt_scores"].get((m, t))
+                if vals:
+                    any_row = True
+                    md.append(f"| `{short(m)}` | `{t}` | {statistics.mean(vals):.2f} | "
+                              f"{len(vals)} | mechanical tool-call |")
+        if not any_row:
+            md.append("| — | — | — | — | no scored agentic rows yet |")
+        md.append("")
+        md.append(f"> Single-turn tool-call correctness (SPEC 13.3). "
+                  f"`tools_unsupported` rows are **unscored** (not 0.0): {tu} this era. "
+                  f"No medals/ranks — smoke framing only. Multi-turn (13.4–13.5) not in this slice.")
+        md.append("")
 
     # ---- Per-task difficulty ----
     md.append("### \U0001F3AF Task difficulty (mean score across all models)")
@@ -467,6 +511,13 @@ def render(a):
                   f"replied that no image was supplied. Those are harness/ingestion "
                   f"failures, **unscored** rather than published as a vision-capability "
                   f"score.")
+    tu = a.get("tools_unsupported", 0)
+    if tu:
+        md.append(
+            f"- **tools_unsupported:** {tu} agentic row(s) emitted no `tool_calls`. "
+            "Flagged unscored (not 0.0) — cannot-use-tools is not used-tools-wrongly "
+            "(SPEC 13.3 / DECISIONS 2026-08-24)."
+        )
     cov = ", ".join(f"`{short(m)}` {len(a['m_tasks'][m])}" for m in models)
     md.append(f"- **Coverage is disclosed, not even.** Tasks attempted: {cov}. Every skipped "
               f"pair is recorded with its reason (see Coverage) and the table carries a "

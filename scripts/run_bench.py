@@ -11,11 +11,11 @@ What works today:
   - call_model() has a real OpenAI-compatible path for local/custom models
     (verified against Ollama on 127.0.0.1:11434).
   - Scoring: exact and json-exact (answer extraction, type-aware) plus
-    python-exec (extract function, run YAML fixtures in a subprocess) are
-    in-process; rubric-llm rows leave score=None here and are graded by
-    nvidia_judge via score_run.py.
-  - Truncation / ingestion_failed / unparseable python-exec stay unscored
-    (null), never fake 0.0.
+    python-exec (extract function, run YAML fixtures in a subprocess) and
+    tool-call (mechanical tool name+args check) are in-process; rubric-llm
+    rows leave score=None here and are graded by nvidia_judge via score_run.py.
+  - Truncation / ingestion_failed / unparseable python-exec / tools_unsupported
+    stay unscored (null), never fake 0.0.
   - The Anthropic (Claude Max) path remains stubbed: wire it to Hermes OAuth or
     the Anthropic SDK with `auth=oauth`, NOT an API key.
 
@@ -108,7 +108,7 @@ def load_tasks(task_dir):
     return tasks
 
 
-def call_model(model, prompt, max_tokens, image_path=None):
+def call_model(model, prompt, max_tokens, image_path=None, tools=None):
     """Call a model. Returns (text, latency_s, error, meta).
 
     `meta` carries provider signals used downstream: `done_reason` (Ollama's
@@ -145,6 +145,11 @@ def call_model(model, prompt, max_tokens, image_path=None):
                 # Ollama accepts this key for non-thinking models too (no-op).
                 "think": False,
             }
+            # SPEC 13.3: pass task tools through to /api/chat when defined.
+            # Models without tool support typically answer in content with no
+            # tool_calls — flagged tools_unsupported (unscored), never 0.0.
+            if tools:
+                payload["tools"] = tools
             # Vision tasks carry an `image:` path (relative to REPO). Ollama's
             # /api/chat expects `images` INSIDE the message that carries the
             # image (not at the payload root). Models without vision simply
@@ -190,6 +195,8 @@ def call_model(model, prompt, max_tokens, image_path=None):
                 # run JSON rather than showing up as mystery truncation.
                 "thinking_chars": len(msg.get("thinking") or ""),
                 "think_disabled": True,
+                # Ollama returns tool_calls on the message when tools were offered.
+                "tool_calls": msg.get("tool_calls") or [],
             }
             return text, latency, None, meta
         except Exception as e:
@@ -220,7 +227,7 @@ def call_model(model, prompt, max_tokens, image_path=None):
     return None, 0.0, f"provider {model.get('provider')} not wired in skeleton", {}
 
 
-def call_model_guarded(model, prompt, max_tokens, image_path=None):
+def call_model_guarded(model, prompt, max_tokens, image_path=None, tools=None):
     """Call the model and guard against token-budget truncation.
 
     If Ollama reports `done_reason == "length"` (the response was cut off before
@@ -230,7 +237,7 @@ def call_model_guarded(model, prompt, max_tokens, image_path=None):
     where `meta["truncated"]` is True only if it was STILL cut off after the retry
     — the caller must then score it `null`, never `0.0`.
     """
-    text, latency, err, meta = call_model(model, prompt, max_tokens, image_path)
+    text, latency, err, meta = call_model(model, prompt, max_tokens, image_path, tools=tools)
     meta = dict(meta or {})
     meta["attempts"] = 1
     meta["max_tokens_used"] = max_tokens
@@ -240,7 +247,7 @@ def call_model_guarded(model, prompt, max_tokens, image_path=None):
     meta["gen_latency_s"] = latency
     if err is None and meta.get("done_reason") == "length":
         bigger = max_tokens * 2
-        text2, latency2, err2, meta2 = call_model(model, prompt, bigger, image_path)
+        text2, latency2, err2, meta2 = call_model(model, prompt, bigger, image_path, tools=tools)
         latency += latency2  # report total wall-clock incl. the wasted first attempt
         if err2 is None:
             text, err = text2, err2
@@ -344,8 +351,72 @@ def score_exact(expected, response):
     return 1.0 if re.search(left + re.escape(exp) + right, region, re.I) else 0.0
 
 
-def score(task, response):
-    """Score a response. Handles exact, json-exact, python-exec, rubric-llm."""
+
+def _normalize_tool_calls(raw):
+    """Flatten Ollama / OpenAI-ish tool_calls into [{name, arguments}, ...]."""
+    if not raw:
+        return []
+    out = []
+    for tc in raw:
+        if not isinstance(tc, dict):
+            continue
+        fn = tc.get("function") if isinstance(tc.get("function"), dict) else tc
+        name = fn.get("name") or tc.get("name")
+        args = fn.get("arguments", tc.get("arguments", {}))
+        if isinstance(args, str):
+            try:
+                args = json.loads(args) if args.strip() else {}
+            except Exception:
+                args = {}
+        if not isinstance(args, dict):
+            args = {}
+        if name:
+            out.append({"name": name, "arguments": args})
+    return out
+
+
+def _arg_equal(got, want):
+    """Loose equality for tool args: strip strings, numeric coercion."""
+    if got == want:
+        return True
+    if isinstance(got, str) and isinstance(want, str):
+        return got.strip() == want.strip()
+    # "Berlin" vs Berlin already covered; try number-ish
+    try:
+        if float(got) == float(want):
+            return True
+    except (TypeError, ValueError):
+        pass
+    return False
+
+
+def score_tool_call(task, tool_calls):
+    """Mechanical SPEC 13.3 tool-call score.
+
+    Returns:
+      1.0 — expected tool name + all required arguments match
+      0.0 — at least one tool_call was emitted but none matched
+      None — no tool_calls (caller must flag tools_unsupported, not 0.0)
+    """
+    expect = task.get("expect_tool_call") or {}
+    want_name = expect.get("name")
+    want_args = expect.get("arguments") or {}
+    if not want_name:
+        return None
+    calls = _normalize_tool_calls(tool_calls)
+    if not calls:
+        return None
+    for c in calls:
+        if c["name"] != want_name:
+            continue
+        got = c["arguments"]
+        if all(k in got and _arg_equal(got[k], v) for k, v in want_args.items()):
+            return 1.0
+    return 0.0
+
+
+def score(task, response, tool_calls=None):
+    """Score a response. Handles exact, json-exact, python-exec, tool-call, rubric-llm."""
     method = task.get("scoring", {}).get("method", "rubric-llm")
     expected = task.get("expected", {}).get("answer", "")
 
@@ -373,6 +444,11 @@ def score(task, response):
             sys.path.insert(0, os.path.join(REPO, "scripts"))
             import code_exec  # type: ignore
         return code_exec.score_python_exec(task, response)
+
+    if method == "tool-call":
+        # Mechanical agentic Phase 1 (SPEC 13.3). None = no tool_calls emitted
+        # (tools_unsupported); never treat that as 0.0 here.
+        return score_tool_call(task, tool_calls)
 
     # rubric-llm / reference-compare: implement with a scorer model.
     return None  # None = unscored (report as ±)
@@ -466,12 +542,23 @@ def main():
             for sample_i in range(args.samples):
                 text, latency, err, meta = call_model_guarded(
                     model, task["prompt"], task.get("max_tokens", 512),
-                    image_path=task.get("image"))
+                    image_path=task.get("image"),
+                    tools=task.get("tools"))
                 # A response cut off at the token budget is a non-answer: score it
                 # `null` (unscored), NEVER 0.0 - a truncated CoT is not a wrong answer.
                 truncated = bool(meta.get("truncated"))
+                tool_calls = meta.get("tool_calls") or []
+                method = task.get("scoring", {}).get("method", "rubric-llm")
+                tools_unsupported = False
                 if truncated:
                     sc = None
+                elif method == "tool-call":
+                    # Absence of tool_calls is not a wrong call — leave unscored.
+                    if not tool_calls:
+                        sc = None
+                        tools_unsupported = True
+                    else:
+                        sc = score_tool_call(task, tool_calls)
                 else:
                     sc = score(task, text) if text else None
                 tps = None
@@ -499,13 +586,18 @@ def main():
                     "think_disabled": meta.get("think_disabled"),
                     "ingestion_failed": bool(
                         task.get("image") and looks_like_ingestion_failure(text)),
+                    # SPEC 13.3: recorded even when empty so reports can distinguish
+                    # "cannot use tools" from "used tools wrongly".
+                    "tool_calls": tool_calls if task.get("tools") else None,
+                    "tools_unsupported": tools_unsupported,
                 })
                 if tracker is not None:
                     _record_telemetry(tracker, run_id, model, task, latency, meta, err)
                 flag = ("ERR" if err else
                         ("TRUNC/unscored" if truncated else
                          ("INGEST-FAIL/unscored" if results[-1]["ingestion_failed"] else
-                          ("score=" + str(sc) if sc is not None else "unscored"))))
+                          ("TOOLS-UNSUPPORTED/unscored" if tools_unsupported else
+                           ("score=" + str(sc) if sc is not None else "unscored")))))
                 tag = (f" [sample {sample_i + 1}/{args.samples}]"
                        if args.samples > 1 else "")
                 print(f"[{run_id}] {model['id']} x {task['id']}{tag}: {flag}"
