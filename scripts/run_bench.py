@@ -10,10 +10,12 @@ matching task: calls the model, scores the response, and writes:
 What works today:
   - call_model() has a real OpenAI-compatible path for local/custom models
     (verified against Ollama on 127.0.0.1:11434).
-  - Scoring: exact and json-exact are implemented in-process (answer extraction,
-    type-aware); rubric-llm rows leave score=None here and are graded by
+  - Scoring: exact and json-exact (answer extraction, type-aware) plus
+    python-exec (extract function, run YAML fixtures in a subprocess) are
+    in-process; rubric-llm rows leave score=None here and are graded by
     nvidia_judge via score_run.py.
-  - Truncation / ingestion_failed stay unscored (null), never fake 0.0.
+  - Truncation / ingestion_failed / unparseable python-exec stay unscored
+    (null), never fake 0.0.
   - The Anthropic (Claude Max) path remains stubbed: wire it to Hermes OAuth or
     the Anthropic SDK with `auth=oauth`, NOT an API key.
 
@@ -343,7 +345,7 @@ def score_exact(expected, response):
 
 
 def score(task, response):
-    """Score a response. Handles exact, json-exact, and rubric-llm methods."""
+    """Score a response. Handles exact, json-exact, python-exec, rubric-llm."""
     method = task.get("scoring", {}).get("method", "rubric-llm")
     expected = task.get("expected", {}).get("answer", "")
 
@@ -361,6 +363,16 @@ def score(task, response):
             return 1.0 if got == exp else 0.0
         except Exception:
             return 0.0
+
+    if method == "python-exec":
+        # Mechanical coding score (M1 / SPEC 5.3 thin path). Import deferred so
+        # non-coding runs pay nothing; failure to import must not crash a bench.
+        try:
+            import code_exec
+        except ImportError:
+            sys.path.insert(0, os.path.join(REPO, "scripts"))
+            import code_exec  # type: ignore
+        return code_exec.score_python_exec(task, response)
 
     # rubric-llm / reference-compare: implement with a scorer model.
     return None  # None = unscored (report as ±)

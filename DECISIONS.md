@@ -3,6 +3,15 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-09-07 · M1 python-exec mechanical scoring for code_generation
+`tasks/code_generation.yaml` uses `scoring.method: python-exec`: extract the submitted
+function, run fixed fixtures in a subprocess (`scripts/code_exec.py`), score 1.0/0.0.
+Unparseable stays null (unscored). `run_bench.score` and `nvidia_judge` (backfill / never
+LLM) wired; era bumped to `20260907` (`python-exec code_generation`). Why: SPEC §5.3 /
+IMPROVEMENTS M1 — coding cells need ground truth, not only rubric-llm softness.
+Rejected: full HumanEval suite port this slice; scoring unparseable as 0.0 (conflates
+missing extract with wrong code); leaving judge on coding rows after retarget.
+
 ## 2026-09-07 · M0 residual honesty coded (size_band, exact tags, param parse, header)
 Implemented M0.1–M0.4 from IMPROVEMENTS: `watcher.size_band` 6–10 with untested +
 deterministic pick (no prefer-larger); local-tag match exact-only; hardened

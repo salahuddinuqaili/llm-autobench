@@ -58,11 +58,18 @@ ERAS = [
                "pairs silently so coverage gaps were invisible",
     },
     {
-        "from": "20260823", "to": "99999999",
+        "from": "20260823", "to": "20260906",
         "label": "multi-sample + disclosed coverage",
         "why": "N>1 draws per (model, task) with spread reported, every skipped "
                "pair recorded with its reason, truncation counted from recorded "
                "`done_reason` instead of estimated from response endings",
+    },
+    {
+        "from": "20260907", "to": "99999999",
+        "label": "python-exec code_generation",
+        "why": "code_generation scored by in-process Python fixture execution "
+               "(method: python-exec) instead of rubric-llm; coding cells have "
+               "mechanical ground truth (M1 / SPEC 5.3 thin path)",
     },
 ]
 
