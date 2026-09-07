@@ -108,7 +108,7 @@ def load_tasks(task_dir):
     return tasks
 
 
-def call_model(model, prompt, max_tokens, image_path=None, tools=None):
+def call_model(model, prompt, max_tokens, image_path=None, tools=None, messages=None):
     """Call a model. Returns (text, latency_s, error, meta).
 
     `meta` carries provider signals used downstream: `done_reason` (Ollama's
@@ -128,10 +128,17 @@ def call_model(model, prompt, max_tokens, image_path=None, tools=None):
             # lives at the root. Normalise either form.
             base = base.replace("/v1", "").rstrip("/")
             url = base + "/api/chat"
-            message = {"role": "user", "content": prompt}
+            # messages= enables SPEC 13.4 multi-turn tool loops; prompt-only
+            # remains the default single-turn path used by every other task.
+            if messages is not None:
+                chat_messages = list(messages)
+                message = chat_messages[-1] if chat_messages else {"role": "user", "content": prompt}
+            else:
+                message = {"role": "user", "content": prompt}
+                chat_messages = [message]
             payload = {
                 "model": ollama_model,
-                "messages": [message],
+                "messages": chat_messages,
                 "stream": False,
                 "options": {"num_predict": max_tokens},
                 # Thinking OFF is this benchmark's standard condition, for two
@@ -227,7 +234,7 @@ def call_model(model, prompt, max_tokens, image_path=None, tools=None):
     return None, 0.0, f"provider {model.get('provider')} not wired in skeleton", {}
 
 
-def call_model_guarded(model, prompt, max_tokens, image_path=None, tools=None):
+def call_model_guarded(model, prompt, max_tokens, image_path=None, tools=None, messages=None):
     """Call the model and guard against token-budget truncation.
 
     If Ollama reports `done_reason == "length"` (the response was cut off before
@@ -237,7 +244,7 @@ def call_model_guarded(model, prompt, max_tokens, image_path=None, tools=None):
     where `meta["truncated"]` is True only if it was STILL cut off after the retry
     — the caller must then score it `null`, never `0.0`.
     """
-    text, latency, err, meta = call_model(model, prompt, max_tokens, image_path, tools=tools)
+    text, latency, err, meta = call_model(model, prompt, max_tokens, image_path, tools=tools, messages=messages)
     meta = dict(meta or {})
     meta["attempts"] = 1
     meta["max_tokens_used"] = max_tokens
@@ -247,7 +254,7 @@ def call_model_guarded(model, prompt, max_tokens, image_path=None, tools=None):
     meta["gen_latency_s"] = latency
     if err is None and meta.get("done_reason") == "length":
         bigger = max_tokens * 2
-        text2, latency2, err2, meta2 = call_model(model, prompt, bigger, image_path, tools=tools)
+        text2, latency2, err2, meta2 = call_model(model, prompt, bigger, image_path, tools=tools, messages=messages)
         latency += latency2  # report total wall-clock incl. the wasted first attempt
         if err2 is None:
             text, err = text2, err2
@@ -415,8 +422,262 @@ def score_tool_call(task, tool_calls):
     return 0.0
 
 
+
+def _answer_equal(got, want):
+    """Compare finish answers: strip, casefold strings, numeric coercion."""
+    if got is None or want is None:
+        return False
+    if _arg_equal(got, want):
+        return True
+    try:
+        return float(str(got).strip().replace(",", "")) == float(str(want).strip().replace(",", ""))
+    except (TypeError, ValueError):
+        return str(got).strip().casefold() == str(want).strip().casefold()
+
+
+def _calc_expr_equal(got, want):
+    """True if calc expressions are equal after whitespace strip or safe eval."""
+    if not isinstance(got, str) or not isinstance(want, str):
+        return _arg_equal(got, want)
+    g, w = got.replace(" ", ""), want.replace(" ", "")
+    if g == w:
+        return True
+    try:
+        import tool_sandbox as _ts
+        return _ts._safe_calc(got) == _ts._safe_calc(want)
+    except Exception:
+        return False
+
+
+def _required_call_matched(required, calls_norm):
+    """Whether a required {name, arguments} appears in normalized calls."""
+    rname = required.get("name")
+    rargs = required.get("arguments") or {}
+    for c in calls_norm:
+        if c["name"] != rname:
+            continue
+        ok = True
+        for k, v in rargs.items():
+            if k not in c["arguments"]:
+                ok = False
+                break
+            got = c["arguments"][k]
+            if rname == "calc" and k == "expression":
+                if not _calc_expr_equal(str(got), str(v)):
+                    ok = False
+                    break
+            elif not _arg_equal(got, v):
+                ok = False
+                break
+        if ok:
+            return True
+    return False
+
+
+def score_trajectory(task, sandbox, trajectory, turn_cap):
+    """Mechanical SPEC 13.5 trajectory sub-scores (no judge).
+
+    Returns (primary_score, sub_scores_dict).
+    primary_score is `completed` (1.0/0.0) so agentic aggregates stay interpretable.
+    Sub-scores are always recorded separately on the run row.
+    """
+    scoring = task.get("scoring") or {}
+    expect = scoring.get("expect_finish")
+    optimal = int(scoring.get("optimal_turns") or 1)
+    required = list(scoring.get("required_calls") or [])
+    allowed = set()
+    for tdef in task.get("tools") or []:
+        fn = (tdef.get("function") or {}) if isinstance(tdef, dict) else {}
+        n = fn.get("name") or tdef.get("name")
+        if n:
+            allowed.add(n)
+    if not allowed:
+        allowed = set(__import__("tool_sandbox", fromlist=["ToolSandbox"]).ToolSandbox.TOOL_NAMES)
+
+    all_calls = []
+    for turn in trajectory or []:
+        all_calls.extend(_normalize_tool_calls(turn.get("tool_calls") or []))
+
+    finished = bool(sandbox and sandbox.finished)
+    answer = sandbox.finish_answer if sandbox else None
+    completed = 1.0 if finished and _answer_equal(answer, expect) else 0.0
+
+    if required:
+        hits = sum(1 for r in required if _required_call_matched(r, all_calls))
+        tool_choice = hits / len(required)
+    else:
+        tool_choice = 1.0 if all_calls else 0.0
+
+    turns_used = len(trajectory or [])
+    if finished and turns_used > 0:
+        efficiency = min(1.0, float(optimal) / float(turns_used))
+    else:
+        efficiency = 0.0
+
+    # error_recovery: if inject_error configured, require a successful call to
+    # that tool AFTER an injected failure; else vacuously 1.0.
+    inj = task.get("inject_error") or scoring.get("inject_error")
+    if inj and sandbox is not None:
+        on_tool = inj.get("on_tool")
+        saw_inject = False
+        recovered = False
+        for c in sandbox.calls:
+            res = c.get("result") or {}
+            if res.get("injected"):
+                saw_inject = True
+                continue
+            if saw_inject and c.get("name") == on_tool and res.get("ok"):
+                recovered = True
+                break
+        error_recovery = 1.0 if recovered else 0.0
+    else:
+        error_recovery = 1.0
+
+    if not all_calls:
+        no_hall = 0.0
+    else:
+        no_hall = 1.0 if all(c["name"] in allowed for c in all_calls) else 0.0
+
+    terminated = 1.0 if finished else 0.0  # 0 if hit turn cap / never finish()
+
+    subs = {
+        "completed": completed,
+        "tool_choice": round(tool_choice, 4),
+        "efficiency": round(efficiency, 4),
+        "error_recovery": error_recovery,
+        "no_hallucinated_tools": no_hall,
+        "terminated": terminated,
+        "turns_used": turns_used,
+        "turn_cap": int(turn_cap),
+    }
+    return completed, subs
+
+
+def run_tool_loop(model, task, call_fn=None):
+    """SPEC 13.4 multi-turn loop with sandboxed tools.
+
+    call_fn: injectable (model, messages, max_tokens, tools) -> (text, latency, err, meta)
+    for offline tests. Default uses call_model_guarded.
+
+    Returns dict with keys: text, latency_s, error, meta, tool_calls (flat),
+    tools_unsupported, trajectory, trajectory_scores, score, sandbox_calls.
+    """
+    import tool_sandbox as ts
+
+    tools = task.get("tools") or ts.openai_tool_schemas()
+    # Ensure task carries schemas for scoring allowed-set + run JSON audit.
+    task = dict(task)
+    task["tools"] = tools
+    turn_cap = int(task.get("turn_cap") or 8)
+    max_tokens = int(task.get("max_tokens") or 256)
+    fixture_dir = task.get("fixture_dir")
+    if fixture_dir and not os.path.isabs(fixture_dir):
+        fixture_dir = os.path.join(REPO, fixture_dir)
+    inject = task.get("inject_error") or (task.get("scoring") or {}).get("inject_error")
+
+    sandbox = ts.ToolSandbox(
+        fixture_dir=fixture_dir,
+        fixture_files=task.get("fixture_files"),
+        inject_error=inject,
+    )
+    messages = [{"role": "user", "content": task["prompt"]}]
+    trajectory = []
+    total_latency = 0.0
+    last_meta = {}
+    last_text = ""
+    last_err = None
+    flat_calls = []
+
+    def _default_call(model, messages, max_tokens, tools):
+        return call_model_guarded(
+            model, task["prompt"], max_tokens, tools=tools, messages=messages)
+
+    call = call_fn or _default_call
+
+    try:
+        for turn_i in range(turn_cap):
+            text, latency, err, meta = call(model, messages, max_tokens, tools)
+            meta = dict(meta or {})
+            total_latency += float(latency or 0.0)
+            last_meta, last_text, last_err = meta, text, err
+            raw_calls = meta.get("tool_calls") or []
+            norm = _normalize_tool_calls(raw_calls)
+            turn_rec = {
+                "turn": turn_i,
+                "content": text,
+                "tool_calls": raw_calls,
+                "done_reason": meta.get("done_reason"),
+                "error": err,
+            }
+            trajectory.append(turn_rec)
+
+            if err:
+                break
+
+            # Turn 0 with no tool_calls => model cannot / will not use tools.
+            if turn_i == 0 and not norm:
+                sc = None
+                return {
+                    "text": text,
+                    "latency_s": total_latency,
+                    "error": err,
+                    "meta": meta,
+                    "tool_calls": [],
+                    "tools_unsupported": True,
+                    "trajectory": trajectory,
+                    "trajectory_scores": None,
+                    "score": None,
+                    "sandbox_calls": list(sandbox.calls),
+                }
+
+            # Append assistant message (Ollama-style tool_calls on the message).
+            asst = {"role": "assistant", "content": text or ""}
+            if raw_calls:
+                asst["tool_calls"] = raw_calls
+            messages.append(asst)
+
+            if not norm:
+                # Spoke without tools — keep looping until finish or cap.
+                continue
+
+            for tc, nrm in zip(raw_calls, norm):
+                result = sandbox.execute(nrm["name"], nrm["arguments"])
+                flat_calls.append({"name": nrm["name"], "arguments": nrm["arguments"], "result": result})
+                # Ollama accepts role:tool with content string; include name when known.
+                tool_msg = {
+                    "role": "tool",
+                    "content": json.dumps(result),
+                }
+                # Prefer tool_name / name fields some servers echo.
+                if nrm.get("name"):
+                    tool_msg["name"] = nrm["name"]
+                # Propagate id if provider sent one.
+                if isinstance(tc, dict) and tc.get("id"):
+                    tool_msg["tool_call_id"] = tc["id"]
+                messages.append(tool_msg)
+
+            if sandbox.finished:
+                break
+
+        score, subs = score_trajectory(task, sandbox, trajectory, turn_cap)
+        return {
+            "text": last_text,
+            "latency_s": total_latency,
+            "error": last_err,
+            "meta": last_meta,
+            "tool_calls": flat_calls,
+            "tools_unsupported": False,
+            "trajectory": trajectory,
+            "trajectory_scores": subs,
+            "score": score,
+            "sandbox_calls": list(sandbox.calls),
+        }
+    finally:
+        sandbox.close()
+
+
 def score(task, response, tool_calls=None):
-    """Score a response. Handles exact, json-exact, python-exec, tool-call, rubric-llm."""
+    """Score a response. Handles exact, json-exact, python-exec, tool-call, tool-trajectory, rubric-llm."""
     method = task.get("scoring", {}).get("method", "rubric-llm")
     expected = task.get("expected", {}).get("answer", "")
 
@@ -450,8 +711,13 @@ def score(task, response, tool_calls=None):
         # (tools_unsupported); never treat that as 0.0 here.
         return score_tool_call(task, tool_calls)
 
+    if method == "tool-trajectory":
+        # Multi-turn scores live on the run row (score_trajectory); score() alone
+        # cannot re-run the sandbox. Prefer row["score"] / trajectory_scores.
+        return None
+
     # rubric-llm / reference-compare: implement with a scorer model.
-    return None  # None = unscored (report as ±)
+    return None  # None = unscored (report as —)
 
 
 def _record_telemetry(tracker, run_id, model, task, latency, meta, err):
@@ -540,27 +806,50 @@ def main():
                 print(f"[{run_id}] {model['id']} x {task['id']}: SKIP (tag mismatch)")
                 continue
             for sample_i in range(args.samples):
-                text, latency, err, meta = call_model_guarded(
-                    model, task["prompt"], task.get("max_tokens", 512),
-                    image_path=task.get("image"),
-                    tools=task.get("tools"))
-                # A response cut off at the token budget is a non-answer: score it
-                # `null` (unscored), NEVER 0.0 - a truncated CoT is not a wrong answer.
-                truncated = bool(meta.get("truncated"))
-                tool_calls = meta.get("tool_calls") or []
                 method = task.get("scoring", {}).get("method", "rubric-llm")
-                tools_unsupported = False
-                if truncated:
-                    sc = None
-                elif method == "tool-call":
-                    # Absence of tool_calls is not a wrong call — leave unscored.
-                    if not tool_calls:
+                trajectory = None
+                trajectory_scores = None
+                sandbox_calls = None
+                if method == "tool-trajectory" or task.get("multi_turn"):
+                    # SPEC 13.4 multi-turn sandboxed tool loop.
+                    loop = run_tool_loop(model, task)
+                    text = loop["text"]
+                    latency = loop["latency_s"]
+                    err = loop["error"]
+                    meta = dict(loop.get("meta") or {})
+                    tool_calls = loop.get("tool_calls") or []
+                    tools_unsupported = bool(loop.get("tools_unsupported"))
+                    truncated = bool(meta.get("truncated"))
+                    trajectory = loop.get("trajectory")
+                    trajectory_scores = loop.get("trajectory_scores")
+                    sandbox_calls = loop.get("sandbox_calls")
+                    if truncated:
                         sc = None
-                        tools_unsupported = True
+                    elif tools_unsupported:
+                        sc = None
                     else:
-                        sc = score_tool_call(task, tool_calls)
+                        sc = loop.get("score")
                 else:
-                    sc = score(task, text) if text else None
+                    text, latency, err, meta = call_model_guarded(
+                        model, task["prompt"], task.get("max_tokens", 512),
+                        image_path=task.get("image"),
+                        tools=task.get("tools"))
+                    # A response cut off at the token budget is a non-answer: score it
+                    # `null` (unscored), NEVER 0.0 - a truncated CoT is not a wrong answer.
+                    truncated = bool(meta.get("truncated"))
+                    tool_calls = meta.get("tool_calls") or []
+                    tools_unsupported = False
+                    if truncated:
+                        sc = None
+                    elif method == "tool-call":
+                        # Absence of tool_calls is not a wrong call — leave unscored.
+                        if not tool_calls:
+                            sc = None
+                            tools_unsupported = True
+                        else:
+                            sc = score_tool_call(task, tool_calls)
+                    else:
+                        sc = score(task, text) if text else None
                 tps = None
                 gen_latency = meta.get("gen_latency_s") or latency
                 if meta.get("completion_tokens") and gen_latency > 0:
@@ -588,8 +877,11 @@ def main():
                         task.get("image") and looks_like_ingestion_failure(text)),
                     # SPEC 13.3: recorded even when empty so reports can distinguish
                     # "cannot use tools" from "used tools wrongly".
-                    "tool_calls": tool_calls if task.get("tools") else None,
+                    "tool_calls": tool_calls if (task.get("tools") or method == "tool-trajectory") else None,
                     "tools_unsupported": tools_unsupported,
+                    "trajectory": trajectory,
+                    "trajectory_scores": trajectory_scores,
+                    "sandbox_calls": sandbox_calls,
                 })
                 if tracker is not None:
                     _record_telemetry(tracker, run_id, model, task, latency, meta, err)

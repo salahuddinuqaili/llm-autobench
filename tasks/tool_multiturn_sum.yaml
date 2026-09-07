@@ -1,0 +1,39 @@
+id: tool_multiturn_sum
+category: agentic
+requires_frontier: false
+multi_turn: true
+turn_cap: 8
+prompt: |
+  You have sandboxed tools. Solve this in multiple turns — do not guess.
+  1. Use list_files or read_file to find the number in notes/n.txt.
+  2. Use calc to add 17 to that number.
+  3. Call finish with the final numeric answer (digits only).
+  Available tools: calc, kv_get, kv_set, list_files, read_file, finish.
+  Do not invent tool results; wait for the tool role messages.
+fixture_dir: tasks/fixtures/tool_multiturn
+# First read_file fails once (SPEC 13.5 error_recovery); model must retry.
+inject_error:
+  on_tool: read_file
+  message: "transient read failure — retry"
+scoring:
+  method: tool-trajectory
+  expect_finish: "59"
+  optimal_turns: 4
+  required_calls:
+    - name: read_file
+      arguments:
+        path: notes/n.txt
+    - name: calc
+      # expression matched loosely after whitespace strip / eval equality
+      arguments:
+        expression: "42+17"
+    - name: finish
+      arguments:
+        answer: "59"
+  rubric: |
+    Mechanical (method: tool-trajectory). Sub-scores: completed, tool_choice,
+    efficiency, error_recovery, no_hallucinated_tools, terminated (SPEC 13.5).
+    Primary row score = completed. Absence of any tool_calls on turn 0 is
+    tools_unsupported and unscored (null), never 0.0.
+max_tokens: 256
+tags: [tools]

@@ -38,7 +38,7 @@ VISION_TASKS = {"vision_ocr", "vision_progressive"}
 
 # Agentic tasks (SPEC 13.3 / 13.6) are a separate regime — never folded into the
 # text shared-task average. Own marker + own section in the report.
-AGENTIC_TASKS = {"tool_weather"}
+AGENTIC_TASKS = {"tool_weather", "tool_multiturn_sum"}
 
 # ---------------------------------------------------------------------------
 # Methodology versions ("eras"): a harness change that alters WHAT is measured
@@ -347,7 +347,7 @@ def render(a):
     agentic_tasks = sorted(t for t in a["t_scores"] if t in AGENTIC_TASKS)
     tu = a.get("tools_unsupported", 0)
     if agentic_tasks or tu:
-        md.append("### Agentic tool-call (separate regime — not ranked with text)")
+        md.append("### Agentic tools (separate regime — not ranked with text)")
         md.append("")
         md.append("| Model | Task | Mean | n | notes |")
         md.append("|---|---|---:|---:|---|")
@@ -358,13 +358,15 @@ def render(a):
                 if vals:
                     any_row = True
                     md.append(f"| `{short(m)}` | `{t}` | {statistics.mean(vals):.2f} | "
-                              f"{len(vals)} | mechanical tool-call |")
+                              f"{len(vals)} | "
+                              f"{'mechanical trajectory' if t == 'tool_multiturn_sum' else 'mechanical tool-call'} |")
         if not any_row:
             md.append("| — | — | — | — | no scored agentic rows yet |")
         md.append("")
-        md.append(f"> Single-turn tool-call correctness (SPEC 13.3). "
-                  f"`tools_unsupported` rows are **unscored** (not 0.0): {tu} this era. "
-                  f"No medals/ranks — smoke framing only. Multi-turn (13.4–13.5) not in this slice.")
+        md.append(f"> Agentic regime (SPEC 13.3 single-turn + 13.4/13.5 multi-turn). "
+                  f"Primary multi-turn score is `completed`; full trajectory sub-scores "
+                  f"live on run rows. `tools_unsupported` rows are **unscored** (not 0.0): "
+                  f"{tu} this era. No medals/ranks — smoke framing only.")
         md.append("")
 
     # ---- Per-task difficulty ----

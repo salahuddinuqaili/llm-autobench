@@ -104,8 +104,8 @@ public copy stays smoke results / not a ranking.
 
 Only after M0-M1 (and preferably M2.1):
 
-1. SPEC 13.3 single-turn tool-call (mechanical; tools_unsupported unscored). **Shipped (this PR)** — separate regime in reports (13.6); not folded into text shared-task avg; no public ranking flip.
-2. SPEC 13.4-13.5 multi-turn tools + trajectory sub-scores. *(not this PR)*
+1. SPEC 13.3 single-turn tool-call (mechanical; tools_unsupported unscored). **Shipped** — separate regime in reports (13.6); not folded into text shared-task avg; no public ranking flip.
+2. SPEC 13.4-13.5 multi-turn tools + trajectory sub-scores. **Shipped (this PR)** — sandboxed loop + sub-scores; separate regime; no ranking flip.
 3. P2.2 [L] GSM8K + coding-suite slices on the now-proven mechanical / exact paths.
 4. Dashboard / trends / post-mortem (P2.6-P2.7) as capacity allows.
 
@@ -119,7 +119,7 @@ shared-task average.
 2. **M0.1-M0.4** residual honesty / discover / tag match
 3. **M1** mechanical scoring for code_generation (+ era bump) — shipped
 4. **M2.1-M2.2** judge retry cap + optional self-consistency — shipped
-5. **M4 / SPEC 13.3** agentic Phase 1 shipped (tool-call); 13.4–13.5 + suite slices next
+5. **M4 / SPEC 13.3–13.5** agentic Phase 1+2 shipped (tool-call + multi-turn trajectory); suite slices next
 6. Public ranking UI — only after M3 gates + **lina** greenlight
 ---
 
