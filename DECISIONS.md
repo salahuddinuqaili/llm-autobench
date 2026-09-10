@@ -3,6 +3,22 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-09-11 · A verdict must be stated, never inferred from prose
+
+**Decided:** `parse_score` accepts an explicit verdict (`score: 0.4`, `0.4/1`) or a
+terse numeric reply, and returns `None` for prose that never states one; the judge
+token budget rises 256 -> 1024 (`NVIDIA_JUDGE_MAX_TOKENS`). New judge default is
+`nvidia/nemotron-3-super-120b-a12b` (9 of 69 catalog ids are invokable on this
+account; every 70B-class dense one 404s).
+**Why:** every available replacement is a reasoning model. At 256 tokens it
+truncates mid-thought without a verdict, and the old "first float anywhere"
+fallback then read the 1.0 out of the *restated rubric* — scoring a garbage
+summarization 1.0. Confident wrong scores are worse than the outage that
+prompted the swap, which at least produced honest nulls.
+**Rejected:** raising max_tokens alone (fixes today's models, not tomorrow's
+verbose one); prompt-engineering the judge into terseness (unenforceable — the
+parser is the only place the guarantee can actually hold).
+
 ## 2026-09-11 · Preflight proves the judge answers; coverage is always published
 
 **Decided:** one live judge call at preflight, aborting the night on failure, plus a

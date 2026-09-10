@@ -42,7 +42,12 @@ import procutil
 # under us: meta/llama-3.3-70b-instruct reached end of life on 2026-08-26 and
 # every rubric-llm task silently went unscored for 13 nights. Override without
 # editing code: NVIDIA_JUDGE_MODEL=<id>. See STATUS.md.
-JUDGE_MODEL = os.environ.get("NVIDIA_JUDGE_MODEL", "meta/llama-3.3-70b-instruct")
+JUDGE_MODEL = os.environ.get("NVIDIA_JUDGE_MODEL", "nvidia/nemotron-3-super-120b-a12b")
+
+
+# A reasoning judge spends tokens thinking before it answers. At 256 every
+# candidate tested truncated mid-thought and emitted no verdict at all.
+JUDGE_MAX_TOKENS = int(os.environ.get("NVIDIA_JUDGE_MAX_TOKENS", "1024"))
 
 
 def _redact(text: str, api_key: str = "") -> str:
@@ -94,7 +99,7 @@ def find_nvidia_key() -> str:
 
 
 def call_judge(prompt: str, api_key: str, max_retries: int = 4,
-               max_tokens: int = 256) -> str:
+               max_tokens: int = JUDGE_MAX_TOKENS) -> str:
     """Call NVIDIA directly via curl with exponential backoff retry."""
     payload = json.dumps({
         "model": JUDGE_MODEL,
@@ -247,17 +252,30 @@ and the ground-truth description? Return ONLY a single float between 0.0 and 1.0
 (e.g. 0.85). Do not explain."""
 
 
+# A verdict is a number the judge *stated*, not a number that happens to appear
+# somewhere in its reasoning. Prose with a stray float is unscored, not guessed.
+_PROSE_CHARS = 220
+
+
 def parse_score(text: str):
-    # Prefer an explicit "score: 0.85" or "0.85/1.0" form, else first float 0..1.
+    # Prefer an explicit "score: 0.85" or "0.85/1.0" form, else a bare float.
     m = re.search(r"score[\"']?\s*[:=]\s*(0(?:\.\d+)?|1(?:\.0+)?)", text, re.I)
     if m:
         return max(0.0, min(1.0, float(m.group(1))))
     m = re.search(r"(0(?:\.\d+)?|1(?:\.0+)?)\s*/\s*1", text)
     if m:
         return max(0.0, min(1.0, float(m.group(1))))
-    m = re.search(r"\b(0(?:\.\d+)?|1(?:\.0+)?)\b", text)
-    if m:
-        return max(0.0, min(1.0, float(m.group(1))))
+    stripped = (text or "").strip()
+    # The bare-float fallback applies ONLY to a terse reply, and to the LAST
+    # float in it (a verdict closes a reply, it does not open one). Long prose
+    # with no explicit score means the judge never reached a verdict: return
+    # None so the row is written back unscored. Guessing here scored a garbage
+    # summarization 1.0 off the "1.0" in a restated rubric.
+    if len(stripped) > _PROSE_CHARS:
+        return None
+    hits = re.findall(r"\b(0(?:\.\d+)?|1(?:\.0+)?)\b", stripped)
+    if hits:
+        return max(0.0, min(1.0, float(hits[-1])))
     return None
 
 

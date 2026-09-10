@@ -80,16 +80,52 @@ returned as an `ERROR:` string and **committed to this public repo**. History wa
 scanned: `git grep nvapi- $(git rev-list --all)` is clean, no key was ever
 committed. The path was latent, not exercised — it is now closed at both ends.
 
+### Judge replacement (chosen 2026-09-11)
+
+**`nvidia/nemotron-3-super-120b-a12b`** is now the default, verified live on this
+account. Selection was not free: of 69 chat-capable catalog ids, **9** are
+invokable here — `/v1/models` is NVIDIA's catalog, not an entitlement list, and
+every 70B-class dense candidate (`nemotron-70b`, `nemotron-ultra-253b`,
+`mistral-large-2`) returns `404 Not found for account`.
+
+Candidates were scored on this repo's own rubric and parser, good vs garbage:
+
+| Model | latency | garbage @256 tok | garbage @1024 tok |
+|---|---:|---|---|
+| `nemotron-3-super-120b-a12b` | 2.9s | **1.0** ❌ | 0.0 ✅ |
+| `nemotron-3-ultra-550b-a55b` | 2.7s | **1.0** ❌ | 0.0 ✅ |
+| `nemotron-3.5-lightning-30b-a3b` | 15.5s | **1.0** ❌ | 0.0 ✅ |
+
+**The near-miss worth recording:** every replacement is a *reasoning* model. It
+spends tokens thinking before answering, and the old 256-token judge budget —
+sized for a model that replied with a bare float — truncated it mid-thought, so
+no verdict was ever emitted. `parse_score` then fell through to "first float
+anywhere in the text" and lifted the **1.0 out of the restated rubric**, scoring a
+deliberately garbage summarization as perfect. Swapping the judge without
+noticing would have been strictly worse than the outage it fixed: the outage
+produced honest nulls, this produces confident wrong scores.
+
+Both halves are fixed: the budget is now 1024 (`NVIDIA_JUDGE_MAX_TOKENS`), and
+`parse_score` no longer guesses — a stated verdict (`score: 0.4`, `0.4/1`) or a
+terse numeric reply is parsed, prose without a verdict returns `None` and the row
+is written back unscored. `tests/test_judge_parse_score.py` pins the exact
+truncated-reasoning string that mis-scored. Full suite: 18/18 offline tests pass.
+
+### Also broken by the 08 Sep move
+
+The scheduled task was re-registered pointing at `~/.local/bin/python3.14.exe`, a
+uv-managed interpreter with **no PyYAML** — which `run_bench.py` and
+`autobench_cycle.py` import at module top. Preflight never reached them, so this
+never surfaced in a log; it would have crashed the first night the judge worked.
+A project venv now exists (`.venv/`, gitignored) with pyyaml 6.0.3, and every
+pipeline module imports under it.
+
 ### Still open
 
-- **A live judge model has not been chosen.** Every 70B-class candidate probed on
-  this account returned `404 Not found for account`
-  (`nvidia/llama-3.1-nemotron-70b-instruct`, `nvidia/llama-3.1-nemotron-ultra-253b-v1`,
-  `mistralai/mistral-large-2-instruct`). `/v1/models` lists 80 ids, but that is a
-  catalog, not this account's entitlements. Needs an entitlement check against a
-  valid key before the nightly can resume scoring rubric tasks.
-- Until then preflight aborts every night by design. Mechanical scoring still
-  works; running with a dead judge would only reproduce the hole this entry is about.
+- **The scheduled task still points at the interpreter without PyYAML.** It needs
+  repointing to `.venv\Scripts\pythonw.exe` — note `pythonw`, not `python`: the
+  console-less interpreter is a deliberate choice documented in `procutil.py`, and
+  the 08 Sep re-registration lost it. Until that is done the nightly cannot run.
 
 ### The learning
 
