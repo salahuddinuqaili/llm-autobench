@@ -9,8 +9,9 @@ backfilled in-process - never sent to the LLM judge.
 Uses direct curl to NVIDIA's OpenAI-compatible endpoint (bypasses the slow
 `hermes -z` agent loop). The API key is resolved with this precedence:
   1. env var NVIDIA_API_KEY
-  2. Hermes .env (cross-platform: ~/AppData/Local/hermes/.env on Windows,
-     ~/.local/share/hermes/.env or ~/.config/hermes/.env on Linux/macOS)
+  2. a project-owned .env outside the repo: %LOCALAPPDATA%/llm-autobench/.env
+     on Windows, ~/.config/llm-autobench/.env on Linux/macOS (legacy Hermes
+     .env paths are still checked after these, for existing boxes)
   3. --key CLI arg
 
 Hardened vs v1: cross-platform key load, exponential backoff retry, larger
@@ -37,7 +38,19 @@ from pathlib import Path
 
 import procutil
 
-JUDGE_MODEL = "meta/llama-3.3-70b-instruct"
+# The judge model is configurable because a hosted model can be retired out from
+# under us: meta/llama-3.3-70b-instruct reached end of life on 2026-08-26 and
+# every rubric-llm task silently went unscored for 13 nights. Override without
+# editing code: NVIDIA_JUDGE_MODEL=<id>. See STATUS.md.
+JUDGE_MODEL = os.environ.get("NVIDIA_JUDGE_MODEL", "meta/llama-3.3-70b-instruct")
+
+
+def _redact(text: str, api_key: str = "") -> str:
+    """Strip anything key-shaped. This repo is public and judge error strings
+    are written into runs/*.json and reports/*.md, both committed."""
+    if api_key:
+        text = text.replace(api_key, "<REDACTED>")
+    return re.sub(r"nvapi-[A-Za-z0-9_\-]{8,}", "<REDACTED>", text)
 # Two-stage vision judging (per user direction):
 #   1. ONE good local vision model looks at the image ONCE and writes a detailed
 #      factual description (ground truth). We use the benchmark's best vision
@@ -58,12 +71,19 @@ def find_nvidia_key() -> str:
     if env_key:
         return env_key.strip()
 
-    # Candidate .env locations (Hermes stores it gitignored, not in shell env).
+    # Candidate .env locations, ours first. The key lives OUTSIDE the repo
+    # (public repo, rule 1) but in a directory this project owns, so another
+    # tool reinstalling or relocating its config cannot take the judge down.
+    local_appdata = os.environ.get("LOCALAPPDATA")
     candidates = [
-        Path.home() / "AppData" / "Local" / "hermes" / ".env",       # Windows
-        Path.home() / ".local" / "share" / "hermes" / ".env",         # Linux XDG
-        Path.home() / ".config" / "hermes" / ".env",                  # Linux alt
-        Path.home() / ".hermes" / ".env",                             # generic
+        Path(local_appdata) / "llm-autobench" / ".env" if local_appdata
+        else Path.home() / "AppData" / "Local" / "llm-autobench" / ".env",
+        Path.home() / ".config" / "llm-autobench" / ".env",            # POSIX
+        # Legacy Hermes locations, kept so an existing box keeps working.
+        Path.home() / "AppData" / "Local" / "hermes" / ".env",         # Windows
+        Path.home() / ".local" / "share" / "hermes" / ".env",          # Linux XDG
+        Path.home() / ".config" / "hermes" / ".env",                   # Linux alt
+        Path.home() / ".hermes" / ".env",                              # generic
     ]
     for cand in candidates:
         if cand.exists():
@@ -85,27 +105,58 @@ def call_judge(prompt: str, api_key: str, max_retries: int = 4,
     last_err = ""
     for attempt in range(1, max_retries + 1):
         try:
+            # The key is fed through a stdin config file, never argv: argv is
+            # visible in any process listing, and subprocess exceptions embed
+            # the whole command in their message -- which is returned below as
+            # an ERROR string and committed into runs/ and reports/.
             cmd = [
                 "curl", "-s", "--max-time", "180", NVIDIA_URL,
-                "-H", f"Authorization: Bearer {api_key}",
                 "-H", "Content-Type: application/json",
-                "-d", payload,
+                "-d", payload, "--config", "-",
             ]
-            res = procutil.run(cmd, capture_output=True, text=True, timeout=200)
+            res = procutil.run(cmd, capture_output=True, text=True, timeout=200,
+                               input=f'header = "Authorization: Bearer {api_key}"\n')
             out = res.stdout.strip()
             if not out:
                 last_err = f"empty response (HTTP {res.returncode})"
                 raise RuntimeError(last_err)
             data = json.loads(out)
+            if "choices" not in data:
+                # An HTTP error body parses as JSON perfectly well. Indexing
+                # straight to ["choices"] turned a 410 "model has reached end of
+                # life" into the message "'choices'", which is why a dead judge
+                # looked like a transient glitch for 13 nights.
+                detail = (data.get("detail") or data.get("title")
+                          or data.get("error") or out[:300])
+                last_err = f"judge API said: {_redact(str(detail), api_key)}"
+                raise RuntimeError(last_err)
             return data["choices"][0]["message"]["content"].strip()
         except Exception as e:  # noqa: BLE001
-            last_err = str(e)
+            last_err = _redact(str(e), api_key)
             if attempt < max_retries:
                 backoff = 2 ** attempt
                 print(f"    retry {attempt}/{max_retries} after {backoff}s ({last_err})",
                       file=sys.stderr, flush=True)
                 time.sleep(backoff)
     return f"ERROR: {last_err}"
+
+
+def check_judge_alive(api_key: str = "") -> tuple[bool, str]:
+    """One cheap call to prove the configured judge model still answers.
+
+    Exists because the failure it catches is invisible otherwise: when a hosted
+    model is retired, every judged task returns an error string, the row is
+    written back with score=null, and the run still 'succeeds' with a report and
+    a mean computed from the mechanically-scored rows only. That is what
+    happened between 2026-08-26 and 2026-09-07 (see STATUS.md).
+    """
+    api_key = api_key or find_nvidia_key()
+    if not api_key:
+        return False, "no API key resolvable"
+    reply = call_judge("Reply with exactly: OK", api_key, max_retries=1, max_tokens=8)
+    if reply.startswith("ERROR:"):
+        return False, _redact(reply[len("ERROR:"):].strip(), api_key)
+    return True, reply.strip()[:40]
 
 
 def describe_image(img_path: str, max_retries: int = 2) -> str:

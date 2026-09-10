@@ -205,6 +205,7 @@ def aggregate():
     t_scores, t_models = defaultdict(list), defaultdict(set)
     mt_scores = defaultdict(list)  # (model, task) -> [scores]
     zero_rows = err_rows = 0
+    unscored_rows = 0
     # Truncation is READ from what the harness recorded, never inferred from how a
     # response happens to end. `truncated` means: cut off at the budget, retried
     # once at 2x, still cut off -> scored null (excluded from every mean below).
@@ -234,6 +235,8 @@ def aggregate():
             ingest_fail += 1
         if r.get("tools_unsupported"):
             tools_unsupported += 1
+        if not isinstance(s, (int, float)):
+            unscored_rows += 1
         if isinstance(s, (int, float)):
             # SPEC 13.6: never fold agentic into text smoke Avg / shared-task.
             if t in AGENTIC_TASKS:
@@ -266,6 +269,7 @@ def aggregate():
         "m_tasks": m_tasks, "m_rows": m_rows, "m_err": m_err,
         "t_scores": t_scores, "t_models": t_models, "mt_scores": mt_scores,
         "zero_rows": zero_rows, "err_rows": err_rows,
+        "unscored_rows": unscored_rows,
         "trunc_rows": trunc_rows, "retried_rows": retried_rows,
         "rescued_rows": rescued_rows, "ingest_fail": ingest_fail,
         "tools_unsupported": tools_unsupported,
@@ -299,8 +303,23 @@ def render(a):
               f"{len(a['rows'])} model×task×sample results "
               f"(**N={smp_s}** draws per model×task). "
               f"Sorted by mean for scanability — **not a ranking**. "
-              f"Judge: free NVIDIA NIM Llama-3.3-70B. Regenerate: "
+              f"Judge: free NVIDIA NIM. Regenerate: "
               f"`python scripts/aggregate_results.py --inject README.md`._")
+    md.append("")
+    total_rows = len(a["rows"])
+    unscored = a.get("unscored_rows", 0)
+    if total_rows:
+        pct = 100.0 * (total_rows - unscored) / total_rows
+        cov = (f"_Judged coverage: **{total_rows - unscored}/{total_rows} rows scored "
+               f"({pct:.0f}%)**")
+        if unscored:
+            # Printed unconditionally so a judge outage can never again hide
+            # behind a healthy-looking mean (2026-08-26 → 09-07: the judge model
+            # was retired and only mechanically-scored rows survived).
+            cov += (f"; {unscored} row(s) carry no score and are excluded from every "
+                    f"mean above. A large unscored share means the LLM judge did not "
+                    f"run — read the per-run report before trusting these numbers")
+        md.append(cov + "._")
     md.append("")
 
     # ---- Smoke results ----

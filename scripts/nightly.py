@@ -260,7 +260,7 @@ def preflight() -> bool:
 
     sys.path.insert(0, str(SCRIPTS))
     try:
-        from nvidia_judge import find_nvidia_key
+        from nvidia_judge import find_nvidia_key, check_judge_alive, JUDGE_MODEL
         if not find_nvidia_key():
             log("preflight: NVIDIA_API_KEY not resolvable -- aborting (judge would fail)")
             return False
@@ -268,6 +268,18 @@ def preflight() -> bool:
         log(f"preflight: cannot import judge ({exc}) -- aborting")
         return False
     log("preflight: NVIDIA key resolves")
+
+    # A resolvable key is not a working judge. Between 2026-08-26 and
+    # 2026-09-07 the key was fine and the MODEL was retired, so every judged
+    # task returned an error, every row was written back score=null, and the
+    # run still produced a report with a mean over the mechanical rows only.
+    # One call up front converts that silent 13-night hole into a loud abort.
+    alive, detail = check_judge_alive()
+    if not alive:
+        log(f"preflight: judge model {JUDGE_MODEL} NOT ANSWERING -- aborting ({detail})")
+        log("preflight: set NVIDIA_JUDGE_MODEL to a live model id; see STATUS.md")
+        return False
+    log(f"preflight: judge {JUDGE_MODEL} answers")
 
     if not wait_for_network():
         log("preflight: network unreachable -- aborting (discovery and the judge "

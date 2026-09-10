@@ -3,6 +3,20 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-09-11 · Preflight proves the judge answers; coverage is always published
+
+**Decided:** one live judge call at preflight, aborting the night on failure, plus a
+judged-coverage line (`n/N rows scored`) in every generated README aggregate. Judge
+model moves to `NVIDIA_JUDGE_MODEL` so a retirement is a config change, not a patch.
+**Why:** `meta/llama-3.3-70b-instruct` was retired 2026-08-26 and the pipeline
+published 13 nights of means computed from mechanical rows only — the 410 surfaced
+as `KeyError: 'choices'`, which reads as a blip. Per-row honesty (null, excluded)
+was already correct; what was missing was any statement of how little was covered.
+**Rejected:** scoring through a dead judge (guarantees the same hole); alerting only
+in the log (the log is gitignored and nobody reads a healthy-looking night); pinning
+a model forever (retirement is the normal case for hosted models, not the exception).
+See `STATUS.md`.
+
 ## 2026-09-07 · P2.2 thin GSM8K-style exact slice (mechanical path)
 
 Five original grade-school word problems (`gsm8k_s01`..`gsm8k_s05`) scored by the
