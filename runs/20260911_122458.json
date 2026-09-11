@@ -1,0 +1,725 @@
+{
+  "run_id": "20260911_122458",
+  "provenance": {
+    "schema_version": 1,
+    "recorded_at": "2026-09-11T10:26:21+00:00",
+    "pipeline_sha": "e1acde9",
+    "pipeline_dirty": true,
+    "task_battery_sha": "f67072c9db37",
+    "task_count": 18,
+    "judge": {
+      "provider": "nvidia_nim",
+      "model": "meta/llama-3.3-70b-instruct"
+    },
+    "hardware": {
+      "gpu": "NVIDIA GeForce RTX 5070, 12227 MiB"
+    },
+    "ollama_version": "ollama version is 0.34.0",
+    "samples_per_pair": 1
+  },
+  "results": [
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "arithmetic_reasoning",
+      "sample": 0,
+      "samples": 1,
+      "response": "To solve this problem, we need to determine when the distance traveled by both trains is equal. Let's break it down step-by-step.\n\n**Step 1: Define the variables and speeds.**\n*   Speed of Train 1 ($v_1$) = $60$ km/h.\n*   Speed of Train 2 ($v_2$) = $90$ km/h.\n*   Start time of Train 1 ($t_{start\\_1}$) = 02:00.\n*   Start time of Train 2 ($t_{start\\_2}$) = 03:00.\n\n**Step 2: Calculate the head start.**\nTrain 1 leaves one hour before Train 2. In that one hour, Train 1 covers a certain distance before Train 2 even starts moving.\n$$ \\text{Distance}_{head\\_start} = v_1 \\times \\Delta t $$\n$$ \\text{Distance}_{head\\_start} = 60 \\text{ km/h} \\times 1 \\text{ h} = 60 \\text{ km} $$\nSo, when Train 2 starts at 03:00, Train 1 is already 60 km ahead.\n\n**Step 3: Determine the relative speed.**\nWe need to find out how long it takes for Train 2 to close that 60 km gap. This depends on how much faster Train 2 is moving than Train 1.\n$$ \\text{Relative Speed} = v_2 - v_1 $$\n$$ \\text{Relative Speed} = 90 \\text{ km/h} - 60 \\text{ km/h} = 30 \\text{ km/h} $$\n\n**Step 4: Calculate the time required to catch up.**\nNow we calculate the time ($t$) it takes for Train 2 to cover the 60 km gap at the relative speed of 30 km/h.\n$$ t = \\frac{\\text{Distance Gap}}{\\text{Relative Speed}} $$\n$$ t = \\frac{60 \\text{ km}}{30 \\text{ km/h}} = 2 \\text{ hours} $$\n\n**Step 5: Determine the final time.**\nThis time ($t$) is measured from when Train 2 starts moving (or simply added to the start time of the catch-up period). Since the gap closing happens after Train 2 has started, we add these 2 hours to Train 2's departure time.\n*   Start time of Train 2: 03:00\n*   Time taken to catch up: 2 hours\n\n$$ \\text{Catch-up Time} = 03:00 + 2 \\text{ hours} = 05:00 $$\n\n*Verification:*\n*   At 05:00, Train 1 has been traveling for 3 hours (from 02:00 to 05:00). Distance = $60 \\times 3 = 180$ km.\n*   At 05:00, Train 2 has been traveling for 2 hours (from 03:00 to 05:00). Distance = $90 \\times 2 = 180$ km.\nThe distances are equal.\n\nFinal answer: 05:00",
+      "latency_s": 11.597096,
+      "score": 1.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 2048,
+      "prompt_tokens": 96,
+      "completion_tokens": 727,
+      "tokens_per_s": 62.7,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "changelog_generation",
+      "sample": 0,
+      "samples": 1,
+      "response": "- **Reliable Login Sessions**: Automatically handles login interruptions to keep your sessions secure and active.\n- **One-Click Data Export**: Easily download sprint reports as CSV files directly from the dashboard for offline analysis.\n- **Improved System Stability**: Enhanced error handling ensures critical data like user IDs is always captured correctly in webhooks.",
+      "latency_s": 0.801863,
+      "score": 0.8,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 768,
+      "prompt_tokens": 105,
+      "completion_tokens": 68,
+      "tokens_per_s": 84.8,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null,
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "0.8"
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "code_generation",
+      "sample": 0,
+      "samples": 1,
+      "response": "```python\ndef chunk_text(text: str, max_chars: int) -> list[str]:\n    \"\"\"\n    Chunk a text into pieces of at most `max_chars` characters.\n\n    Behavior:\n      - If the input string is empty, returns an empty list.\n      - Words are separated by one or more spaces; those extra spaces are collapsed.\n        (The simplest interpretation is to split on whitespace and rejoin with a single space.)\n      - Each chunk tries to stay within `max_chars` characters.\n      - When adding the next word would exceed `max_chars`, the function:\n          * Checks if the current sentence (ending at '.' , '!' or '?') can be closed cleanly.\n            If closing the current sentence would keep the chunk <= max_chars, it does so.\n          * If even closing the sentence still forces an overflow beyond max_chars,\n            the chunk is cut before the overflow happens, and the next chunk starts with that word.\n        (In practice, for this problem we break only after a sentence-ending mark if possible;\n         otherwise we break right before exceeding max_chars.)\n      - If a single word is longer than `max_chars`, it is emitted as its own chunk\n        (ignoring the `max_chars` limit for that specific chunk).\n\n    Parameters\n    ----------\n    text : str\n        The input text to chunk.\n    max_chars : int\n        Maximum number of characters allowed per chunk (except when a single word exceeds this).\n\n    Returns\n    -------\n    list[str]\n        A list of non-empty string chunks, joined internally with single spaces.\n    \"\"\"\n\n    if not text:\n        return []\n\n    # Normalize whitespace and split into words while keeping track of original tokens?\n    # For simplicity, we will split on whitespace and treat each resulting token as a \"word\".\n    # This handles multiple spaces by collapsing them into single separators.\n    import re\n\n    # Split on any whitespace sequence\n    raw_words = text.split()\n    \n    # Clean sentence-ending punctuation: keep it attached to the preceding word for breaking logic\n    words = []\n    current_chunk_chars = 0\n    chunks = []\n    \n    # We'll process word by word, building a temporary buffer for the current chunk.\n    # When we can't fit the next word, we check sentence break opportunities.\n    \n    def try_add_word_to_current(chunk_so_far: list[str], new_word: str) -> tuple[list[str], list[str]]:\n        \"\"\"\n        Tries to add `new_word` to `chunk_so_far`.\n        Returns (success, updated_list_of_words_in_chunk).\n        If success is True, the word is added.\n        If False, breaking is attempted after a sentence ending if possible.\n        Otherwise, we start a new chunk with the current word (or the whole leftover if needed).\n        However, per spec: \"If a single word is longer than max_chars, emit that word as its own chunk\".\n        So if new_word alone exceeds max_chars, we immediately start a new chunk with it.\n        \"\"\"\n        nonlocal current_chunk_chars\n        \n        # Calculate length if added\n        potential_len = len(chunk_so_far)\n        for w in chunk_so_far:\n            potential_len += len(w) + 1\n        # Adjust because our calculation above includes extra spaces; let's redo cleanly:\n        new_chunk_len = sum(len(w) for w in chunk_so_far) + (len(chunk_so_far) - 1 if chunk_so_far else 0) + len(new_word) + 1\n        \n        # Actually, simpler: compute the length of joining words with single spaces.\n        def calc_len(word_list):\n            return sum(len(w) for w in word_list) + max(0, len(word_list) - 1)\n\n        current_len = calc_len(chunk_so_far)\n        new_total = current_len + len(new_word) + 1  # +1 for space between\n\n        if new_total <= max_chars:\n            return True, chunk_so_far + [new_word]\n\n        # Cannot fit; need to break.\n        # Try to break after a sentence-ending punctuation at the end of `chunk_so_far`\n        last_word = chunk_so_far[-1] if chunk_so_far else \"\"\n        can_break_here = False\n        break_after_index = -1\n        \n        for i, w in enumerate(chunk_so_far):\n            if w.endswith('. ') or w.endswith('! ') or w.endswith('? ') or \\\n               w.endswith('.') or w.endswith('!') or w.endswith('?'):\n                # Check if breaking after this word keeps the remaining part + new_word <= max_chars?\n                # Actually, we break here: the chunk ends at i. The next chunk will start with new_word.\n                # But we must ensure that the words from i+1 to end are not lost; they become the start of next chunk.\n                pass\n\n        # Simpler strategy as per typical implementation for such problems:\n        # If we can't fit, and the current chunk ends with a sentence punctuation, break there.\n        if chunk_so_far:\n            last = chunk_so_far[-1]\n            if last.rstrip().endswith(('.', '!', '?')):\n                # Break here: release all but the last word? No: break before the new_word, after this last word.\n                # The current chunk remains as is (without new_word). The next chunk starts with new_word.\n                # But what about words between previous break and now? They are already in chunk_so_far.\n                # So we finalize current chunk as `chunk_so_far`, start fresh with [new_word].\n                chunks.append(' '.join(chunk_so_far))\n                return True, [new_word]  # Continue building next chunk starting with new_word\n        \n        # If no sentence break available or even breaking doesn't help (because next chunk might still be huge),\n        # we have two choices:\n        #   a) Break at the last possible point to minimize damage? \n        #   b) Since spec says \"Prefers breaking after sentence-ending punctuation... when the next sentence would not fit\",\n        #      implying if no such punctuation, just break where necessary, possibly mid-sentence.\n        #   c) But also: \"Never splits inside a word.\" -> We don't split words; we only break between words.\n        # So if we can't fit new_word and there's no sentence break at the very end of current chunk,\n        # we still must break before new_word. That means the current chunk ends, and new_word starts next.\n        # But what about the content of chunk_so_far? It stays complete as the current chunk.\n        # So simply: finalize current chunk, start new with new_word.\n        \n        chunks.append(' '.join(chunk_so_far))\n        return True, [new_word]\n    \n    # Re-think algorithm for clarity and correctness per spec:\n\n    # Approach:\n    # Iterate over words. Build a temporary list for the current chunk.\n    # Before adding a word, check if including it exceeds max_chars.\n    # If yes:\n    #   - Check if current chunk ends with a sentence terminator (., !, ?).\n    #       If yes -> close current chunk here, start new chunk with the offending word.\n    #       If no -> close current chunk at its natural end (before the offending word), \n    #                and start new chunk with the offending word.\n    #   - In both cases, the current chunk is finalized, and we begin a new one with the current word.\n    # BUT: What if the offending word itself is longer than max_chars?\n    #   Then we emit that word as its own chunk immediately (bypassing max_chars).\n    \n    def get_length(word_list):\n        return sum(len(w) for w in word_list) + max(0, len(word_list) - 1)\n\n    current_words = []\n    \n    for i, word in enumerate(raw_words):\n        # Check if this word alone exceeds max_chars\n        if len(word) > max_chars:\n            chunks.append(word)\n            continue\n        \n        # Calculate length if added to current chunk\n        new_len = get_length(current_words + [word])\n        \n        if new_len <= max_chars:\n            current_words.append(word)\n            continue\n        \n        # Cannot add; need to break.\n        last_word = current_words[-1] if current_words else \"\"\n        \n        # Determine where to break: after the last sentence-ending word in current_words\n        break_index = -1\n        for j, w in enumerate(current_words):\n            stripped = w.rstrip()\n            if stripped.endswith('.') or stripped.endswith('!') or stripped.endswith('?'):\n                break_index = j\n        \n        # If we found a sentence-ending word, break after it.\n        if break_index != -1:\n            final_chunk = current_words[:break_index+1]\n            remaining_words = current_words[break_index+1:] + [word]\n            chunks.append(' '.join(final_chunk))\n            current_words = remaining_words  # Continue building next chunk from remainder\n        else:\n            # No sentence break available -> break at the very end of current chunk\n            final_chunk = current_words[:]\n            remaining = [word]\n            chunks.append(' '.join(final_chunk))\n            current_words = remaining\n\n    # After loop, if there's anything left in current_words, add it.\n    if current_words:\n        chunks.append(' '.join(current_words))\n\n    return chunks\n\n\n# Self-check\nassert chunk_text(\"Hello world.\", 10) == [\"Hello\", \"world.\"]\n```",
+      "latency_s": 43.144994,
+      "score": 1.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 2,
+      "max_tokens_used": 4096,
+      "prompt_tokens": 162,
+      "completion_tokens": 2078,
+      "tokens_per_s": 95.7,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "code_review",
+      "sample": 0,
+      "samples": 1,
+      "response": "- **Security**: Critical SQL injection vulnerability\u2014`{user_id}` is interpolated directly into the query string. Use parameterized queries instead:  \n  ```python\n  cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))\n  ```\n- **Style/Best Practices**:  \n  - Use `contextlib.contextmanager` or a context manager (`with conn:`) for automatic connection closing.  \n  - Validate `user_id` type (e.g., ensure it\u2019s an int) before executing.  \n  - Add error handling (`try/except`) for DB exceptions.  \n- **Performance**: No indexing hint, but acceptable for small tables; ensure `id` is a primary key.  \n\n**Refactored snippet**:\n```python\nimport sqlite3\n\ndef get_user(user_id: int):\n    if not isinstance(user_id, int):\n        raise TypeError(\"user_id must be an integer\")\n    conn = sqlite3.connect('users.db')\n    try:\n        with conn:  # autocommit/rollback handled\n            cursor = conn.cursor()\n            cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))\n            return cursor.fetchone()\n    except sqlite3.Error as e:\n        raise",
+      "latency_s": 2.847085,
+      "score": 1.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 512,
+      "prompt_tokens": 91,
+      "completion_tokens": 263,
+      "tokens_per_s": 92.4,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null,
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "1.0"
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "gsm8k_s01",
+      "sample": 0,
+      "samples": 1,
+      "response": "**Step 1: Calculate the total number of loaves made.**\nThe bakery made 48 loaves in the morning and 36 loaves in the afternoon.\n$$ \\text{Total loaves} = 48 + 36 = 84 $$\n\n**Step 2: Calculate the number of loaves sold.**\nThey sold $5/6$ of all the loaves.\n$$ \\text{Loaves sold} = 84 \\times \\frac{5}{6} $$\nFirst, divide 84 by 6:\n$$ 84 / 6 = 14 $$\nThen, multiply by 5:\n$$ 14 \\times 5 = 70 $$\nSo, 70 loaves were sold.\n\n**Step 3: Calculate the number of loaves left unsold.**\nSubtract the number of sold loaves from the total number of loaves.\n$$ \\text{Loaves left} = \\text{Total loaves} - \\text{Loaves sold} $$\n$$ \\text{Loaves left} = 84 - 70 = 14 $$\n\nAlternatively, if $5/6$ were sold, then $1 - 5/6 = 1/6$ remain unsold.\n$$ \\text{Loaves left} = 84 \\times \\frac{1}{6} = 14 $$\n\nFinal answer: 14",
+      "latency_s": 3.279603,
+      "score": 1.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 2048,
+      "prompt_tokens": 77,
+      "completion_tokens": 312,
+      "tokens_per_s": 95.1,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "gsm8k_s02",
+      "sample": 0,
+      "samples": 1,
+      "response": "Maya starts with **$35.00**.\n\nFirst, calculate the cost of the notebooks:\nShe buys 3 notebooks at $4 each.\n$$3 \\times 4 = 12$$\nThe notebooks cost **$12.00**.\n\nNext, calculate the cost of the pens:\nShe buys 2 pens at $2.50 each.\n$$2 \\times 2.50 = 5.00$$\nThe pens cost **$5.00**.\n\nNow, add the costs together to find the total amount spent:\n$$12.00 + 5.00 = 17.00$$\nTotal spent is **$17.00**.\n\nFinally, subtract the total spent from the initial amount to find what is left:\n$$35.00 - 17.00 = 18.00$$\n\nMaya has $18 left.\n\nFinal answer: 18",
+      "latency_s": 2.274556,
+      "score": 1.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 2048,
+      "prompt_tokens": 74,
+      "completion_tokens": 212,
+      "tokens_per_s": 93.2,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "gsm8k_s03",
+      "sample": 0,
+      "samples": 1,
+      "response": "To determine how many seats are empty after Stop B, let's break down the passenger count step-by-step.\n\n1.  **Initial State**: The bus starts with 0 people.\n2.  **At Stop A**:\n    *   People boarding: 12\n    *   Current passengers: $0 + 12 = 12$\n3.  **At Stop B**:\n    *   People getting off: 5\n    *   New calculation of passengers: $12 - 5 = 7$\n    *   People boarding: 9\n    *   Current passengers: $7 + 9 = 16$\n4.  **Calculate Empty Seats**:\n    *   Total seats available: 40\n    *   Current number of passengers: 16\n    *   Empty seats = Total seats - Current passengers\n    *   Empty seats = $40 - 16 = 24$\n\nFinal answer: 24",
+      "latency_s": 2.25084,
+      "score": 1.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 2048,
+      "prompt_tokens": 80,
+      "completion_tokens": 210,
+      "tokens_per_s": 93.3,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "gsm8k_s04",
+      "sample": 0,
+      "samples": 1,
+      "response": "To find the total number of miles Tom runs over 4 full weeks, we can break the problem down into steps:\n\n1.  **Calculate weekly distance:**\n    *   Tom runs 3 miles per day.\n    *   He runs for 5 days each week.\n    *   Miles per week = $3 \\text{ miles/day} \\times 5 \\text{ days/week} = 15 \\text{ miles/week}$.\n\n2.  **Calculate total distance over 4 weeks:**\n    *   He runs this amount for 4 full weeks.\n    *   Total miles = $15 \\text{ miles/week} \\times 4 \\text{ weeks} = 60 \\text{ miles}$.\n\nFinal answer: 60",
+      "latency_s": 1.808149,
+      "score": 1.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 2048,
+      "prompt_tokens": 70,
+      "completion_tokens": 168,
+      "tokens_per_s": 92.9,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "gsm8k_s05",
+      "sample": 0,
+      "samples": 1,
+      "response": "To find the area of the path alone, we can calculate the area of the larger rectangle (which includes both the garden and the path) and subtract the area of the garden itself.\n\n**Step 1: Determine the dimensions of the garden.**\nThe garden is a rectangle with:\n*   Length ($L_{garden}$) = $12$ metres\n*   Width ($W_{garden}$) = $8$ metres\n\n**Step 2: Determine the dimensions of the large rectangle (Garden + Path).**\nThe path runs all the way around the *outside* of the garden and is $1$ metre wide. This adds $1$ metre to both sides of the length and both sides of the width.\n*   Total Length ($L_{total}$) = $L_{garden} + 1 \\text{ (left)} + 1 \\text{ (right)} = 12 + 1 + 1 = 14$ metres.\n*   Total Width ($W_{total}$) = $W_{garden} + 1 \\text{ (top)} + 1 \\text{ (bottom)} = 8 + 1 + 1 = 10$ metres.\n\n**Step 3: Calculate the area of the large rectangle.**\n$$ \\text{Area}_{total} = L_{total} \\times W_{total} $$\n$$ \\text{Area}_{total} = 14 \\text{ m} \\times 10 \\text{ m} = 140 \\text{ m}^2 $$\n\n**Step 4: Calculate the area of the garden.**\n$$ \\text{Area}_{garden} = L_{garden} \\times W_{garden} $$\n$$ \\text{Area}_{garden} = 12 \\text{ m} \\times 8 \\text{ m} = 96 \\text{ m}^2 $$\n\n**Step 5: Calculate the area of the path.**\nThe area of the path is the difference between the total area and the garden's area.\n$$ \\text{Area}_{path} = \\text{Area}_{total} - \\text{Area}_{garden} $$\n$$ \\text{Area}_{path} = 140 \\text{ m}^2 - 96 \\text{ m}^2 = 44 \\text{ m}^2 $$\n\nFinal answer: 44",
+      "latency_s": 5.43563,
+      "score": 1.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 2048,
+      "prompt_tokens": 80,
+      "completion_tokens": 521,
+      "tokens_per_s": 95.8,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "instruction_following",
+      "sample": 0,
+      "samples": 1,
+      "response": "Apple\nBanana\nOrange",
+      "latency_s": 0.158162,
+      "score": 1.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 128,
+      "prompt_tokens": 39,
+      "completion_tokens": 7,
+      "tokens_per_s": 44.3,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null,
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "1.0"
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "logical_reasoning",
+      "sample": 0,
+      "samples": 1,
+      "response": "To find the number of remaining items, we will calculate the total number of items first and then determine how many remain after removing 1/4.\n\n**Step 1: Calculate the total number of boxes.**\nThe warehouse has 12 shelves, and each shelf holds 8 boxes.\n$$ \\text{Total Boxes} = 12 \\text{ shelves} \\times 8 \\text{ boxes/shelf} = 96 \\text{ boxes} $$\n\n**Step 2: Calculate the total number of items.**\nEach box holds 10 items.\n$$ \\text{Total Items} = 96 \\text{ boxes} \\times 10 \\text{ items/box} = 960 \\text{ items} $$\n\n**Step 3: Calculate the number of items removed.**\n1/4 of the items are removed for shipping.\n$$ \\text{Items Removed} = \\frac{1}{4} \\times 960 = 240 \\text{ items} $$\n\n**Step 4: Calculate the number of remaining items.**\nSubtract the removed items from the total.\n$$ \\text{Remaining Items} = \\text{Total Items} - \\text{Items Removed} $$\n$$ \\text{Remaining Items} = 960 - 240 = 720 $$\n\nAlternatively, if 1/4 are removed, then 3/4 remain:\n$$ \\text{Remaining Items} = \\frac{3}{4} \\times 960 = 720 $$\n\nFinal answer: 720",
+      "latency_s": 3.615428,
+      "score": 1.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 2048,
+      "prompt_tokens": 77,
+      "completion_tokens": 343,
+      "tokens_per_s": 94.9,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "sprint_narrative",
+      "sample": 0,
+      "samples": 1,
+      "response": "We successfully shipped the user authentication revamp and implemented reliable billing webhook retries despite external hurdles. However, progress was stalled for three days due to an SSO integration blocker caused by unavoidable vendor API downtime. Moving forward, we must prioritize fixing the unstable CI pipeline on our mobile builds to eliminate this recurring risk before the next sprint.",
+      "latency_s": 0.77446,
+      "score": 1.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 768,
+      "prompt_tokens": 79,
+      "completion_tokens": 66,
+      "tokens_per_s": 85.2,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null,
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "1.0"
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "structured_output",
+      "sample": 0,
+      "samples": 1,
+      "response": "{\"project_name\": \"Phoenix\", \"deadline\": \"2026-09-15\", \"budget_eur\": 120000, \"team_size\": 4}",
+      "latency_s": 0.546238,
+      "score": 0.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 128,
+      "prompt_tokens": 97,
+      "completion_tokens": 43,
+      "tokens_per_s": 78.7,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "summarization",
+      "sample": 0,
+      "samples": 1,
+      "response": "The database system went offline briefly because its storage drive filled up after log files were not cleared as scheduled. This happened because a critical warning about low disk space was accidentally left turned off during recent maintenance work instead of being re-enabled. We have now restored the necessary monitoring alerts and added extra checks to our routine procedures to prevent this issue from happening again.",
+      "latency_s": 0.828908,
+      "score": null,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 512,
+      "prompt_tokens": 122,
+      "completion_tokens": 71,
+      "tokens_per_s": 85.7,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": null,
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null,
+      "judge_error": true,
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "We need to evaluate the model response against the rubric.\n\nRubric: Award full marks for exactly 3 sentences that convey: (1) what happened (DB went down briefly), (2) why (disk full, alert off), (3) impact (8min downtime) and fix (alert back on + checklist). No technical jargon. Deduct for missing ",
+      "score_reason": "JUDGE_ERROR: unparseable judge output: We need to evaluate the model response against the rubric.\n\nRubric: Award full marks for exactly 3 sentences that convey: (1) what happened (DB went down briefly), (2) why (disk full, alert off), (3) "
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "tool_multiturn_sum",
+      "sample": 0,
+      "samples": 1,
+      "response": "The result of 42 + 17 is 59.",
+      "latency_s": 2.385103,
+      "score": 1.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 256,
+      "prompt_tokens": 967,
+      "completion_tokens": 43,
+      "tokens_per_s": 82.8,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": [
+        {
+          "name": "list_files",
+          "arguments": {
+            "dir": "notes"
+          },
+          "result": {
+            "ok": true,
+            "dir": "notes",
+            "files": [
+              "n.txt"
+            ]
+          }
+        },
+        {
+          "name": "read_file",
+          "arguments": {
+            "path": "notes/n.txt"
+          },
+          "result": {
+            "ok": false,
+            "error": "transient read failure \u2014 retry",
+            "injected": true
+          }
+        },
+        {
+          "name": "read_file",
+          "arguments": {
+            "path": "notes/n.txt"
+          },
+          "result": {
+            "ok": true,
+            "path": "notes/n.txt",
+            "content": "42"
+          }
+        },
+        {
+          "name": "calc",
+          "arguments": {
+            "expression": "42+17"
+          },
+          "result": {
+            "ok": true,
+            "value": 59
+          }
+        },
+        {
+          "name": "finish",
+          "arguments": {
+            "answer": "59"
+          },
+          "result": {
+            "ok": true,
+            "finished": true,
+            "answer": "59"
+          }
+        }
+      ],
+      "tools_unsupported": false,
+      "trajectory": [
+        {
+          "turn": 0,
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_epq1c3lo",
+              "function": {
+                "index": 0,
+                "name": "list_files",
+                "arguments": {
+                  "dir": "notes"
+                }
+              }
+            }
+          ],
+          "done_reason": "stop",
+          "error": null
+        },
+        {
+          "turn": 1,
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_lgrqp955",
+              "function": {
+                "index": 0,
+                "name": "read_file",
+                "arguments": {
+                  "path": "notes/n.txt"
+                }
+              }
+            }
+          ],
+          "done_reason": "stop",
+          "error": null
+        },
+        {
+          "turn": 2,
+          "content": "",
+          "tool_calls": [
+            {
+              "id": "call_sv47ji5o",
+              "function": {
+                "index": 0,
+                "name": "read_file",
+                "arguments": {
+                  "path": "notes/n.txt"
+                }
+              }
+            }
+          ],
+          "done_reason": "stop",
+          "error": null
+        },
+        {
+          "turn": 3,
+          "content": "The number in notes/n.txt is 42. Now I'll add 17 to it using calc.",
+          "tool_calls": [
+            {
+              "id": "call_b8v7y0os",
+              "function": {
+                "index": 0,
+                "name": "calc",
+                "arguments": {
+                  "expression": "42+17"
+                }
+              }
+            }
+          ],
+          "done_reason": "stop",
+          "error": null
+        },
+        {
+          "turn": 4,
+          "content": "The result of 42 + 17 is 59.",
+          "tool_calls": [
+            {
+              "id": "call_g8whhunp",
+              "function": {
+                "index": 0,
+                "name": "finish",
+                "arguments": {
+                  "answer": "59"
+                }
+              }
+            }
+          ],
+          "done_reason": "stop",
+          "error": null
+        }
+      ],
+      "trajectory_scores": {
+        "completed": 1.0,
+        "tool_choice": 1.0,
+        "efficiency": 0.8,
+        "error_recovery": 1.0,
+        "no_hallucinated_tools": 1.0,
+        "terminated": 1.0,
+        "turns_used": 5,
+        "turn_cap": 8
+      },
+      "sandbox_calls": [
+        {
+          "name": "list_files",
+          "arguments": {
+            "dir": "notes"
+          },
+          "result": {
+            "ok": true,
+            "dir": "notes",
+            "files": [
+              "n.txt"
+            ]
+          }
+        },
+        {
+          "name": "read_file",
+          "arguments": {
+            "path": "notes/n.txt"
+          },
+          "result": {
+            "ok": false,
+            "error": "transient read failure \u2014 retry",
+            "injected": true
+          }
+        },
+        {
+          "name": "read_file",
+          "arguments": {
+            "path": "notes/n.txt"
+          },
+          "result": {
+            "ok": true,
+            "path": "notes/n.txt",
+            "content": "42"
+          }
+        },
+        {
+          "name": "calc",
+          "arguments": {
+            "expression": "42+17"
+          },
+          "result": {
+            "ok": true,
+            "value": 59
+          }
+        },
+        {
+          "name": "finish",
+          "arguments": {
+            "answer": "59"
+          },
+          "result": {
+            "ok": true,
+            "finished": true,
+            "answer": "59"
+          }
+        }
+      ]
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "tool_weather",
+      "sample": 0,
+      "samples": 1,
+      "response": "",
+      "latency_s": 0.431137,
+      "score": 1.0,
+      "error": null,
+      "image": null,
+      "truncated": false,
+      "done_reason": "stop",
+      "attempts": 1,
+      "max_tokens_used": 256,
+      "prompt_tokens": 318,
+      "completion_tokens": 26,
+      "tokens_per_s": 60.3,
+      "thinking_chars": 0,
+      "think_disabled": true,
+      "ingestion_failed": false,
+      "tool_calls": [
+        {
+          "id": "call_ng5244f8",
+          "function": {
+            "index": 0,
+            "name": "get_weather",
+            "arguments": {
+              "city": "Berlin"
+            }
+          }
+        }
+      ],
+      "tools_unsupported": false,
+      "trajectory": null,
+      "trajectory_scores": null,
+      "sandbox_calls": null
+    }
+  ],
+  "skipped": [
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "vision_ocr",
+      "reason": "tag mismatch: model tags do not intersect task tags",
+      "model_tags": [
+        "coding",
+        "communication",
+        "general",
+        "gsm8k",
+        "instruction_following",
+        "json",
+        "python",
+        "reasoning",
+        "security",
+        "structured_output",
+        "summarization",
+        "tools",
+        "writing"
+      ],
+      "task_tags": [
+        "ocr",
+        "vision"
+      ]
+    },
+    {
+      "model": "custom:ollama/qwen3.5:9b",
+      "task": "vision_progressive",
+      "reason": "tag mismatch: model tags do not intersect task tags",
+      "model_tags": [
+        "coding",
+        "communication",
+        "general",
+        "gsm8k",
+        "instruction_following",
+        "json",
+        "python",
+        "reasoning",
+        "security",
+        "structured_output",
+        "summarization",
+        "tools",
+        "writing"
+      ],
+      "task_tags": [
+        "progressive",
+        "vision"
+      ]
+    }
+  ]
+}
