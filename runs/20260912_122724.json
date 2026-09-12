@@ -103,7 +103,7 @@
       "samples": 3,
       "response": "*   **More reliable logins**: Automatically handles temporary connection issues during account verification.\n*   **New download option**: Export your sprint reports directly as CSV files from the dashboard.\n*   **Faster processing**: Enhanced performance for high-volume data updates and webhook integrations.\n*   **Improved stability**: Prevents unexpected errors when integrating with external applications.",
       "latency_s": 0.896722,
-      "score": null,
+      "score": 0.75,
       "error": null,
       "image": null,
       "truncated": false,
@@ -121,10 +121,8 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "0.75"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -133,7 +131,7 @@
       "samples": 3,
       "response": "- **Reliable Authentication**: Automatically handles connection interruptions while signing in, ensuring your session stays active even if the network fluctuates.\n- **Easy Data Export**: Now you can download sprint reports directly from the dashboard as CSV files for offline analysis or sharing.\n- **Stable Integrations**: Systematically handles incomplete data from connected tools, preventing errors when syncing information from webhooks.",
       "latency_s": 0.868454,
-      "score": null,
+      "score": 0.7,
       "error": null,
       "image": null,
       "truncated": false,
@@ -151,10 +149,8 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "0.7"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -163,7 +159,7 @@
       "samples": 3,
       "response": "*   **Safer logins**: We've updated our secure sign-in process to automatically recover from temporary connection hiccups, ensuring you stay logged in without interruption.\n*   **New export option**: You can now download your team's sprint reports directly as a CSV file from the dashboard for easy sharing or offline analysis.\n*   **Faster reporting**: Our system has been optimized to handle high-volume data requests more smoothly, so your reports generate and load quicker than ever.\n*   **Webhook reliability**: We've strengthened our automated notifications to ensure they fire correctly even when external systems send incomplete data.",
       "latency_s": 1.358856,
-      "score": null,
+      "score": 0.85,
       "error": null,
       "image": null,
       "truncated": false,
@@ -181,10 +177,8 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "0.85"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -273,7 +267,7 @@
       "samples": 3,
       "response": "The code has a critical SQL injection vulnerability. It directly interpolates the `user_id` into the query string without sanitization or parameter binding, which allows attackers to manipulate the query logic by injecting malicious input. Additionally, it does not close the database connection (`conn`) in the function scope (typically using `with sqlite3.connect(...) as conn:`), leading to resource leaks if exceptions occur. The variable naming is functional but could be slightly more descriptive.\n\n**Secure and corrected version:**\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    with sqlite3.connect('users.db') as conn:\n        cursor = conn.cursor()\n        # Use parameterized query to prevent SQL injection\n        cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))\n        return cursor.fetchone()\n```",
       "latency_s": 1.885967,
-      "score": null,
+      "score": 0.66,
       "error": null,
       "image": null,
       "truncated": false,
@@ -291,10 +285,8 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "0.66"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -303,7 +295,7 @@
       "samples": 3,
       "response": "- **Critical Bug**: The code uses string formatting (`f\"...{user_id}...\"`) directly in the SQL query. This is highly vulnerable to **SQL injection attacks**. An attacker could supply a `user_id` like `' OR '1'='1` to bypass authentication or retrieve all data.\n- **Security Issue**: No input validation or sanitization on `user_id`. Always use parameterized queries.\n- **Style/Resource Management**: Database connections and cursors are not closed explicitly. Use a `with` statement (context manager) to ensure resources are released even if an error occurs.\n\n**Fixed Version:**\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    with sqlite3.connect('users.db') as conn:\n        cursor = conn.cursor()\n        # Parameterized query prevents SQL injection\n        cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))\n        return cursor.fetchone()\n```",
       "latency_s": 2.127715,
-      "score": null,
+      "score": 0.5,
       "error": null,
       "image": null,
       "truncated": false,
@@ -321,10 +313,8 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "0.5"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -333,7 +323,7 @@
       "samples": 3,
       "response": "1. **SQL Injection**: The `query` string uses an f-string to insert `user_id`, which is vulnerable to injection attacks. Use parameterized queries instead.\n2. **Resource Management**: Database connection and cursor are not closed explicitly; use a context manager (`with` statement) to ensure proper cleanup.\n3. **Style/Best Practices**: Extracted constants or hardcoded paths (e.g., `'users.db'`) can be moved to config if needed, but this is minor.\n\n**Fixed Version:**\n```python\nimport sqlite3\n\ndef get_user(user_id):\n    conn = sqlite3.connect('users.db')\n    try:\n        cursor = conn.cursor()\n        # Parameterized query prevents SQL injection\n        cursor.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))\n        return cursor.fetchone()\n    finally:\n        conn.close()\n```",
       "latency_s": 2.027963,
-      "score": null,
+      "score": 0.67,
       "error": null,
       "image": null,
       "truncated": false,
@@ -351,10 +341,8 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "0.67"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -753,7 +741,7 @@
       "samples": 3,
       "response": "Apple\nBanana\nOrange",
       "latency_s": 0.16385,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -771,10 +759,8 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -783,7 +769,7 @@
       "samples": 3,
       "response": "Apple\nBanana\nOrange",
       "latency_s": 0.110432,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -801,10 +787,8 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -813,7 +797,7 @@
       "samples": 3,
       "response": "Apple\nBanana\nCherry",
       "latency_s": 0.128898,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -831,10 +815,8 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -921,7 +903,7 @@
       "samples": 3,
       "response": "We successfully shipped the user auth revamp and stabilized billing webhook retries, though our progress halted for three days due to external vendor API downtime blocking SSO integration. We are actively investigating the root cause of flaky CI failures in the mobile pipeline to mitigate deployment risks before they impact production. Going forward, we will establish a stricter incident response protocol for third-party dependencies and automate flakiness detection in our CI jobs.",
       "latency_s": 0.975249,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -939,10 +921,8 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -951,7 +931,7 @@
       "samples": 3,
       "response": "We successfully delivered the user auth revamp and billing webhook retries, demonstrating strong execution despite external hurdles. Our progress on SSO integration was entirely halted by a three-day vendor API outage that we could not mitigate. Going forward, we must stabilize our mobile CI pipeline immediately, as its current flakiness poses a significant risk to release quality.",
       "latency_s": 0.784699,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -969,10 +949,8 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -981,7 +959,7 @@
       "samples": 3,
       "response": "We successfully delivered the user auth revamp and stabilized billing webhook retries despite external hurdles. The SSO integration was blocked entirely due to a three-day outage from the vendor's API. Looking ahead, we must address the flaky CI issues in the mobile pipeline immediately to prevent further delays.",
       "latency_s": 0.646905,
-      "score": null,
+      "score": 1.0,
       "error": null,
       "image": null,
       "truncated": false,
@@ -999,10 +977,8 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "1.0"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -1108,9 +1084,9 @@
       "trajectory_scores": null,
       "sandbox_calls": null,
       "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "We need to evaluate the model response against the rubric.\n\nRubric: Award full marks for exactly 3 sentences that convey: (1) what happened (DB went down briefly), (2) why (disk full, alert off), (3) impact (8min downtime) and fix (alert back on + checklist). No technical jargon. Deduct for missing ",
+      "score_reason": "JUDGE_ERROR: unparseable judge output: We need to evaluate the model response against the rubric.\n\nRubric: Award full marks for exactly 3 sentences that convey: (1) what happened (DB went down briefly), (2) why (disk full, alert off), (3) "
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -1138,9 +1114,9 @@
       "trajectory_scores": null,
       "sandbox_calls": null,
       "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "We need to evaluate the model response against the rubric.\n\nRubric: full marks for exactly 3 sentences that convey:\n1) what happened (DB went down briefly)\n2) why (disk full, alert off)\n3) impact (8min downtime) and fix (alert back on + checklist)\nNo technical jargon.\nDeduct for missing elements, ja",
+      "score_reason": "JUDGE_ERROR: unparseable judge output: We need to evaluate the model response against the rubric.\n\nRubric: full marks for exactly 3 sentences that convey:\n1) what happened (DB went down briefly)\n2) why (disk full, alert off)\n3) impact (8mi"
     },
     {
       "model": "custom:ollama/qwen3.5:9b",
@@ -1149,7 +1125,7 @@
       "samples": 3,
       "response": "Our main database went offline briefly because its hard drive filled up due to a failure to automatically clear old files. This happened after a system alert was accidentally turned off during routine maintenance and not restarted afterward. We have fixed the issue by restoring the alert and added a specific step to our checklist to prevent this from occurring again in the future.",
       "latency_s": 0.748638,
-      "score": null,
+      "score": 0.75,
       "error": null,
       "image": null,
       "truncated": false,
@@ -1167,10 +1143,8 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge_error": true,
-      "judge": "nvidia/meta/llama-3.1-nemotron-70b-instruct",
-      "judge_raw": "ERROR: Extra data: line 1 column 5 (char 4)",
-      "score_reason": "JUDGE_ERROR: Extra data: line 1 column 5 (char 4)"
+      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge_raw": "We need to evaluate the model response against the rubric.\n\nRubric: Award full marks for exactly 3 sentences that convey: (1) what happened (DB went down briefly), (2) why (disk full, alert off), (3) impact (8min downtime) and fix (alert back on + checklist). No technical jargon. Deduct for missing "
     },
     {
       "model": "custom:ollama/qwen3.5:9b",

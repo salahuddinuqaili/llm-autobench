@@ -6,9 +6,19 @@ the design is the way it is, and `IMPROVEMENTS.md` tracks planned work.
 
 ---
 
+## 2026-09-12 · Extra data was a 404 (judge model not on NIM)
+
+**Status: parser names HTTP 404. Same run re-judged on default NIM model: 13/15 rubric rows scored.**
+
+`Extra data: line 1 column 5` was `json.loads("404 page not found\\n")` — NIM returned plain text because `meta/llama-3.1-nemotron-70b-instruct` is not on the catalogue. Default `nvidia/nemotron-3-super-120b-a12b` still works (live probe + re-judge). `decode_judge_response` now surfaces 404 and does not retry it. Tests: `tests/test_judge_http_body.py`.
+
+Re-judge of `20260912_122724` (`--retry-judge-errors`, default judge): report now 16 tasks, 46 scored / 2 unscored, avg **0.84**. Rubric NVIDIA judge **13** rows (was 0). Two `summarization` rows still `unparseable`. Did not fire 21:00.
+
+---
+
 ## 2026-09-12 · Ad hoc post-fix full cycle
 
-**Status: cycle EXIT:0. PATH/`ollama.exe` spawn worked. LLM judge still did not read rubric rows.**
+**Status: cycle EXIT:0. PATH/`ollama.exe` spawn worked. First judge pass was 0 rubric rows (404, see above); re-judged.**
 
 Ad hoc (not 21:00, not factory): `autobench_cycle.py --model qwen3.5:9b --no-delete --samples 3`. Judge env `NVIDIA_JUDGE_MODEL=meta/llama-3.1-nemotron-70b-instruct` (llama-3.3 is EOL; `.env` had no `NVIDIA_JUDGE_MODEL`). Did not pull gemma/minicpm.
 

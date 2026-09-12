@@ -98,6 +98,38 @@ def find_nvidia_key() -> str:
     return ""
 
 
+def decode_judge_response(out: str) -> dict:
+    """Parse a NVIDIA chat-completions HTTP body.
+
+    Success and many errors (410 EOL) are JSON. A missing model id can
+    instead return the plain text ``404 page not found``. json.loads then
+    treats the leading 404 as an int and raises Extra data at column 5 —
+    which is how 2026-09-12 wrote JUDGE_ERROR Extra data on every rubric
+    row for meta/llama-3.1-nemotron-70b-instruct.
+    """
+    text = (out or "").strip()
+    if not text:
+        raise ValueError("empty response")
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as e:
+        low = text.lower()
+        if text.startswith("404") or "page not found" in low:
+            raise ValueError(
+                f"judge API HTTP 404 (model not on NIM?): {text[:200]}"
+            ) from e
+        raise ValueError(f"judge API body is not JSON: {e}: {text[:200]}") from e
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"judge API returned {type(data).__name__}, not an object: {text[:200]}"
+        )
+    if "choices" not in data:
+        detail = (data.get("detail") or data.get("title")
+                  or data.get("error") or text[:300])
+        raise ValueError(f"judge API said: {detail}")
+    return data
+
+
 def call_judge(prompt: str, api_key: str, max_retries: int = 4,
                max_tokens: int = JUDGE_MAX_TOKENS) -> str:
     """Call NVIDIA directly via curl with exponential backoff retry."""
@@ -125,16 +157,14 @@ def call_judge(prompt: str, api_key: str, max_retries: int = 4,
             if not out:
                 last_err = f"empty response (HTTP {res.returncode})"
                 raise RuntimeError(last_err)
-            data = json.loads(out)
-            if "choices" not in data:
-                # An HTTP error body parses as JSON perfectly well. Indexing
-                # straight to ["choices"] turned a 410 "model has reached end of
-                # life" into the message "'choices'", which is why a dead judge
-                # looked like a transient glitch for 13 nights.
-                detail = (data.get("detail") or data.get("title")
-                          or data.get("error") or out[:300])
-                last_err = f"judge API said: {_redact(str(detail), api_key)}"
-                raise RuntimeError(last_err)
+            try:
+                data = decode_judge_response(out)
+            except ValueError as e:
+                # 404 / 410 / non-JSON are the model-missing class, not a
+                # flaky transport. Retrying burns free-tier RPM and still
+                # writes Extra data / 'choices' as JUDGE_ERROR.
+                last_err = _redact(str(e), api_key)
+                return f"ERROR: {last_err}"
             return data["choices"][0]["message"]["content"].strip()
         except Exception as e:  # noqa: BLE001
             last_err = _redact(str(e), api_key)
