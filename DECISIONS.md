@@ -3,6 +3,12 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-09-12 · NIM 404 is a named error, not Extra data
+
+**Decided:** `decode_judge_response` maps a plain-text `404 page not found` body to a named error and does not retry; reports label `JUDGE_MODEL` as-is (no `nvidia/` prefix).
+**Why:** `json.loads` treats `404` as an int then Extra data at column 5, which looked like a parser miss. Pin `meta/llama-3.1-nemotron-70b-instruct` is not on NIM; default `nvidia/nemotron-3-super-120b-a12b` is.
+**Rejected:** retrying 404s (same miss, burns RPM); treating Extra data as truncated JSON; hardcoding llama-3.3 in reports/provenance.
+
 ## 2026-09-12 · ollama argv is an absolute path
 
 **Decided:** every `ollama` CLI spawn goes through `procutil.ollama_exe` / `ollama_argv`; nightly also prepends that directory to PATH for child processes.

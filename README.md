@@ -21,7 +21,7 @@ Use it to decide whether an Ollama model is worth keeping on a 12 GB workstation
 ## Architecture — delete is the feature
 
 ```
-   ┌─ Cycle · orchestrator + judge = FREE NVIDIA NIM (70B-class text judge) ─────────
+   ┌─ Cycle · orchestrator + judge = FREE NVIDIA NIM (NVIDIA_JUDGE_MODEL) ─────────
    │
    │   1. discover   find a model id not yet benchmarked ── fits 12 GB VRAM? (≤ ~14B)
    │   2. pull       ollama pull <model>
@@ -48,19 +48,18 @@ An Ollama **tag** is the model id / name (`qwen3.5:9b` = name:variant).
 - **Label ≠ content** — e.g. `logical_reasoning` is an arithmetic word problem.
 - **Public only** — MIT; run JSONs are model outputs on fixed public tasks. Don't paste secrets into custom tasks if you fork.
 
-## Reading gap (expired judge)
+## Reading gap (judge outages we didn't count)
 
-The table can look complete while almost nothing was actually *read*.
+The table can look complete while almost nothing was actually *read*. Twice the judge was gone and the harness still published a mean.
 
-From 2026-08-26 the NVIDIA NIM judge we were using (`meta/llama-3.3-70b-instruct`) was end-of-life. Every rubric-llm row came back `null`. Mechanical tasks still scored, so the README still showed a mean. Thirteen nights of “the model scored X” were really “the judge never ran.”
+1. **Expired model (2026-08-26).** Pin `meta/llama-3.3-70b-instruct` went end-of-life. Every rubric-llm row came back `null`. Mechanical tasks still scored, so README still showed a mean. Thirteen nights of “the model scored X” were really “the judge never ran.” Error bodies looked like a blip (`KeyError: 'choices'`). Keep-going-through-a-failing-model (meant for the *subject*) produced a report that looked ordinary. A later, louder break (repo move, key left behind) is the only reason it was noticed.
+2. **Missing catalogue id (2026-09-12).** Pin `meta/llama-3.1-nemotron-70b-instruct` is not on NIM. HTTP body is the plain text `404 page not found`. `json.loads` treats the leading `404` as an int → `Extra data: line 1 column 5`. Same class of miss: 0 rubric rows on an otherwise ordinary-looking report.
 
-That was not treated as a failure mode. The harness already knew how to leave a subject-model miss unscored. It did **not** treat “the judge model itself expired” as an outage. Error bodies looked like a blip; keep-going-through-a-failing-model (meant for the *subject*) produced a report that looked ordinary. A later, louder break (repo move, key left behind) is the only reason the quiet outage was noticed.
+Neither was truncated JSON. Neither was `parse_score`.
 
-Fixes in the pipeline (not a claim that tonight is proven): live judge preflight, `NVIDIA_JUDGE_MODEL` swap without a code edit, judged-coverage on every aggregate (`n/N` rows scored), `parse_score` no longer guessing a float out of truncated reasoning.
+**Now in the pipeline** (not a claim that 21:00 is proven): live judge preflight; `NVIDIA_JUDGE_MODEL` swap without a code edit; judged-coverage `n/N` on every aggregate; `parse_score` does not guess a float from truncated reasoning; `decode_judge_response` names a 404 and does not retry it.
 
-A later, different miss — `summarization` on run `20260911_122458` — is a **judge parse error** (unscored, not a 0.00). `structured_output` **0.00** on that run is a real zero.
-
-Ad hoc 2026-09-12 run `20260912_122724` first scored **0 rubric rows** with `JUDGE_ERROR: Extra data: line 1 column 5 (char 4)`. That was not a truncated JSON blob. The pin `meta/llama-3.1-nemotron-70b-instruct` is **not on NIM**; the HTTP body is the plain text `404 page not found`. `json.loads` treats the leading `404` as an int, then Extra data at column 5. The harness did not treat “judge model missing / 404” as a first-class failure (same class of miss as the expired llama-3.3). Re-judged the same run on default `nvidia/nemotron-3-super-120b-a12b`: **13 rubric rows scored**, 2 `summarization` still unparseable (reasoning preamble, not Extra data). `structured_output` **0.00** is a real zero.
+**This era:** run `20260912_122724` re-judged on default `nvidia/nemotron-3-super-120b-a12b` — **13/15 rubric rows**. Two `summarization` rows still unparseable (reasoning preamble, not Extra data). `structured_output` **0.00** is a real zero. Nightly 21:00 is still unproven in Task Scheduler.
 
 ## Results
 
@@ -179,7 +178,7 @@ _Every run above is still committed in `runs/`. A harness change that alters wha
 - **Errors:** 0 results errored (Ollama unreachable / model tag failed to pull). Errored rows are excluded from means.
 - **tools_unsupported:** 3 agentic row(s) emitted no `tool_calls`. Flagged unscored (not 0.0) — cannot-use-tools is not used-tools-wrongly (SPEC 13.3 / DECISIONS 2026-08-24).
 - **Coverage is disclosed, not even.** Tasks attempted: `qwen3.5:9b` 16, `aya-expanse:8b` 16. Every skipped pair is recorded with its reason (see Coverage) and the table carries a **shared-task column** so cross-model comparison is like-for-like. Vision-only models attempt no text tasks by design — their overall average is not comparable to a text model's and is marked `👁`.
-- **Multi-sample, single judge.** N=1/3 draws per (model, task) with the spread reported above, so a number here is a mean with an interval rather than one draw. **The judge is still a single NVIDIA-70B pass** — there is no inter-rater agreement, and there will not be while the free-judge + one-GPU constraint holds (a second judge means either another cloud key or evicting the model-under-test from the 12 GB card).
+- **Multi-sample, single judge.** N=1/3 draws per (model, task) with the spread reported above, so a number here is a mean with an interval rather than one draw. **The judge is still a single NVIDIA NIM pass** — there is no inter-rater agreement, and there will not be while the free-judge + one-GPU constraint holds (a second judge means either another cloud key or evicting the model-under-test from the 12 GB card).
 - **Item count is the real ceiling.** Each task is still **one prompt** graded binary. Repeating a draw measures sampling noise; it cannot fix a battery of 11 items. Retiring that needs suites with mechanical ground truth (`IMPROVEMENTS.md` P2.2) — until then these are smoke-test numbers.
 
 <!-- RESULTS:END -->

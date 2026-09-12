@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """NVIDIA judge pass for autobench runs.
 
-Reads a run JSON, scores remaining rubric-llm tasks via
-meta/llama-3.3-70b-instruct (NVIDIA NIM, free 40 RPM), then writes a markdown
-report. Mechanical methods (exact / json-exact / python-exec / tool-call / tool-trajectory) are left alone or
-backfilled in-process - never sent to the LLM judge.
+Reads a run JSON, scores remaining rubric-llm tasks via NVIDIA NIM
+(default `nvidia/nemotron-3-super-120b-a12b`, override `NVIDIA_JUDGE_MODEL`),
+then writes a markdown report. Mechanical methods (exact / json-exact /
+python-exec / tool-call / tool-trajectory) are left alone or backfilled
+in-process - never sent to the LLM judge.
 
 Uses direct curl to NVIDIA's OpenAI-compatible endpoint (bypasses the slow
 `hermes -z` agent loop). The API key is resolved with this precedence:
@@ -61,9 +62,9 @@ def _redact(text: str, api_key: str = "") -> str:
 #      factual description (ground truth). We use the benchmark's best vision
 #      model (minicpm-v) as the describer -- it is promoted by promote_vision_
 #      model.py, so the judge reuses the fleet's chosen vision model.
-#   2. The 70B TEXT judge (meta/llama-3.3-70b-instruct) scores the benchmarked
-#      model's response against that description. Text-vs-text at 70B is far more
-#      reliable than a small 11B vision judge scoring directly.
+#   2. The NIM text judge (NVIDIA_JUDGE_MODEL) scores the benchmarked
+#      model's response against that description. Text-vs-text is far more
+#      reliable than a small local vision judge scoring directly.
 VISION_DESCRIBER = "minicpm-v:latest"
 VISION_DESCRIBER_URL = "http://127.0.0.1:11434/api/chat"
 NVIDIA_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
@@ -475,6 +476,13 @@ def _writeback(envelope, results, scored, run_path):
     pending = results[len(scored):]
     data = dict(envelope)
     data["results"] = scored + pending
+    # Stamp the judge that actually scored this write, not a hardcoded id.
+    prov = dict(data.get("provenance") or {})
+    judge = dict(prov.get("judge") or {})
+    judge["provider"] = "nvidia_nim"
+    judge["model"] = JUDGE_MODEL
+    prov["judge"] = judge
+    data["provenance"] = prov
     run_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
@@ -510,7 +518,7 @@ def build_report(run_stem, scored, *, self_consistency_n: int = 1):
     lines.append("")
     lines.append(f"**Run:** `{run_stem}.json`  ")
     lines.append(f"**Models:** {', '.join('`' + m + '`' for m in models)}  ")
-    judge_note = f"**Judge:** `nvidia/{JUDGE_MODEL}` (70B text judge) + Claude vision describer (stage 1)"
+    judge_note = f"**Judge:** `{JUDGE_MODEL}` (NIM text judge) + Claude vision describer (stage 1)"
     if self_consistency_n and self_consistency_n > 1:
         judge_note += (f"  \n**Self-consistency:** median of {self_consistency_n} draws at "
                        f"temperature 0 (same judge — **not** inter-rater kappa)")
@@ -612,7 +620,7 @@ def build_report(run_stem, scored, *, self_consistency_n: int = 1):
     # deleted. The judge cannot observe the lifecycle, so it no longer asserts one.
     lines.append("- Model-under-test ran locally on Ollama; the judge ran in the cloud, "
                  "so the GPU never hosted both.")
-    lines.append("- Judge: nvidia/meta/llama-3.3-70b-instruct (NVIDIA NIM, free tier, "
+    lines.append(f"- Judge: `{JUDGE_MODEL}` (NVIDIA NIM, free tier, "
                  "direct API). No paid API spend.")
     lines.append("- Pull/delete is handled by `autobench_cycle.py` and recorded in its "
                  "commit, not observable from this run file.")
@@ -650,7 +658,7 @@ def main(argv=None, call_fn=None):
     data = json.loads(run_path.read_text(encoding="utf-8"))
     results = data["results"]
     scored = []
-    judge_label = f"nvidia/{JUDGE_MODEL}"
+    judge_label = JUDGE_MODEL
 
     for r in results:
         skip = should_skip_judge(r, retry_judge_errors=args.retry_judge_errors)

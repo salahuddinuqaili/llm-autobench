@@ -40,6 +40,17 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SCHEMA_VERSION = 1
 
 
+def _judge_model_id() -> str:
+    """Same default as nvidia_judge.JUDGE_MODEL (lazy import: no cycle)."""
+    try:
+        import nvidia_judge as _nj
+        return _nj.JUDGE_MODEL
+    except Exception:
+        return os.environ.get(
+            "NVIDIA_JUDGE_MODEL", "nvidia/nemotron-3-super-120b-a12b"
+        )
+
+
 def _shell(args, default=""):
     """Best-effort capture; provenance must never break a benchmark run."""
     try:
@@ -85,7 +96,7 @@ def build_provenance():
         "task_count": len([n for n in os.listdir(tasks_dir)
                            if n.endswith(".yaml")]) if os.path.isdir(tasks_dir) else None,
         # The judge is asserted here so a run can be checked rather than trusted.
-        "judge": {"provider": "nvidia_nim", "model": "meta/llama-3.3-70b-instruct"},
+        "judge": {"provider": "nvidia_nim", "model": _judge_model_id()},
         "hardware": {"gpu": gpu[0].strip() if gpu else None},
         "ollama_version": ollama or None,
     }

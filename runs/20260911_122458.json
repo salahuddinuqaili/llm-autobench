@@ -9,7 +9,7 @@
     "task_count": 18,
     "judge": {
       "provider": "nvidia_nim",
-      "model": "meta/llama-3.3-70b-instruct"
+      "model": "nvidia/nemotron-3-super-120b-a12b"
     },
     "hardware": {
       "gpu": "NVIDIA GeForce RTX 5070, 12227 MiB"
@@ -69,7 +69,7 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge": "nvidia/nemotron-3-super-120b-a12b",
       "judge_raw": "0.8"
     },
     {
@@ -123,7 +123,7 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge": "nvidia/nemotron-3-super-120b-a12b",
       "judge_raw": "1.0"
     },
     {
@@ -281,7 +281,7 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge": "nvidia/nemotron-3-super-120b-a12b",
       "judge_raw": "1.0"
     },
     {
@@ -335,7 +335,7 @@
       "trajectory": null,
       "trajectory_scores": null,
       "sandbox_calls": null,
-      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge": "nvidia/nemotron-3-super-120b-a12b",
       "judge_raw": "1.0"
     },
     {
@@ -390,7 +390,7 @@
       "trajectory_scores": null,
       "sandbox_calls": null,
       "judge_error": true,
-      "judge": "nvidia/nvidia/nemotron-3-super-120b-a12b",
+      "judge": "nvidia/nemotron-3-super-120b-a12b",
       "judge_raw": "We need to evaluate the model response against the rubric.\n\nRubric: Award full marks for exactly 3 sentences that convey: (1) what happened (DB went down briefly), (2) why (disk full, alert off), (3) impact (8min downtime) and fix (alert back on + checklist). No technical jargon. Deduct for missing ",
       "score_reason": "JUDGE_ERROR: unparseable judge output: We need to evaluate the model response against the rubric.\n\nRubric: Award full marks for exactly 3 sentences that convey: (1) what happened (DB went down briefly), (2) why (disk full, alert off), (3) "
     },

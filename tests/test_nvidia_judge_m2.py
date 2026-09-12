@@ -214,6 +214,22 @@ def test_main_self_consistency_writes_draws():
         assert "kappa" not in row["judge"].lower()
 
 
+def test_build_report_uses_judge_model_once():
+    """Report labels the live NIM id once — no nvidia/nvidia and no llama-3.3."""
+    md = nj.build_report("x", [{
+        "model": "m",
+        "task": "t",
+        "score": 0.5,
+        "latency_s": 1,
+        "method": "exact",
+        "status": "ok",
+    }])
+    assert f"`{nj.JUDGE_MODEL}`" in md
+    assert f"nvidia/{nj.JUDGE_MODEL}" not in md
+    assert "llama-3.3-70b-instruct" not in md
+    assert "70B text judge" not in md
+
+
 if __name__ == "__main__":
     # Allow running without pytest.
     test_median_score()
@@ -227,4 +243,5 @@ if __name__ == "__main__":
     test_failures_and_judge_status_derived()
     test_main_marks_judge_error_and_second_pass_skips()
     test_main_self_consistency_writes_draws()
+    test_build_report_uses_judge_model_once()
     print("all m2 tests passed")

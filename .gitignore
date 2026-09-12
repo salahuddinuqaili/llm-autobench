@@ -10,3 +10,7 @@ telemetry/
 .autobench_tmp_registry.yaml
 .tmp_*
 
+# Agent scratch + lockfile from a non-uv pyproject.
+.claude/
+uv.lock
+

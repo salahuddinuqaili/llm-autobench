@@ -547,7 +547,7 @@ def render(a):
               f"comparable to a text model's and is marked `\U0001F441`.")
     md.append(f"- **Multi-sample, single judge.** N={smp_s} draws per (model, task) with the "
               f"spread reported above, so a number here is a mean with an interval rather "
-              f"than one draw. **The judge is still a single NVIDIA-70B pass** — there is "
+              f"than one draw. **The judge is still a single NVIDIA NIM pass** — there is "
               f"no inter-rater agreement, and there will not be while the free-judge + "
               f"one-GPU constraint holds (a second judge means either another cloud key or "
               f"evicting the model-under-test from the 12 GB card).")
