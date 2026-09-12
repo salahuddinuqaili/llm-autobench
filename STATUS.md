@@ -6,6 +6,100 @@ the design is the way it is, and `IMPROVEMENTS.md` tracks planned work.
 
 ---
 
+## 2026-09-12 · Nightly 21:00 WinError 2 (bare `ollama`)
+
+**Status: code fix landed. Not re-run. Next proof is the 21:00 task or an explicit `--no-report` cycle.**
+
+11 Sep 21:00: preflight started ollama via the full installer path; `autobench_cycle.py` then spawned bare `ollama` and died in ~4s with `FileNotFoundError: [WinError 2]`. Reproduced this session: PATH without the Ollama dir → bare `ollama` is WinError 2; `procutil.ollama_argv("list")` hits `%LOCALAPPDATA%\Programs\Ollama\ollama.exe` and `ollama list` returns 0 (`qwen3.5:9b` present).
+
+Every cycle `list` / `pull` / `rm` and `run_bench --version` now use that absolute path. Nightly also prepends the exe dir to PATH for children.
+
+Limited 11 Sep midday cycle (`4ec6a40`, `qwen3.5:9b` avg 0.91, judged 45/64) is unchanged. Did not pull models. Did not fire 21:00.
+
+Tests this pass: `tests/test_ollama_resolve.py`, `test_nightly_preflight_imports.py`, `test_install_nightly_task.py`, plus `test_tag_match` / `test_python_exec` / `test_gsm8k_exact` / `test_discover_size_band` / `test_build_temp_registry` / `test_tool_call` — all EXIT:0.
+
+---
+
+## 2026-09-11 · Current state after interpreter retarget (disk check)
+
+**Status: nightly is still PAUSED at preflight. The scheduled-task interpreter
+is no longer the blocker. Ollama is not answering on 127.0.0.1:11434.**
+
+Verified this pass by reading disk and probing the host — not by trusting the
+kanban card if it disagreed.
+
+### Scheduled task / interpreter
+
+Live `schtasks /query` from this session returned `Access is denied`. Exported
+task XML / LIST dumps under `%TEMP%\ab_fix` (`task.xml`,
+`titan2_schtasks_before.xml`, `task_after_xml.txt`) all show:
+
+- Name: `llm-autobench nightly (salahuddin)`
+- Command: `C:\projects\llm-autobench\.venv\Scripts\pythonw.exe`
+- Args: `C:\projects\llm-autobench\scripts\nightly.py`
+
+`.venv\Scripts\pythonw.exe` exists (alongside `python.exe`). The venv has
+PyYAML 6.0.3 (`pyyaml-6.0.3.dist-info`). The 08 Sep wrong interpreter
+(`C:\Users\salahuddin\.local\bin\python3.14.exe`) is still on disk; it is not
+what the task runs.
+
+`pythonw` (not `python`) remains the right host: a console window on the task
+would flash, and closing it kills the run (`scripts/procutil.py`).
+
+### Ollama
+
+Queried just now:
+
+- `curl http://127.0.0.1:11434/api/tags` → `{"models":[]}` after a manual
+  `ollama serve` (v0.34.0). No models pulled (nightly discover owns that).
+- `sc query ollama` → the specified service does not exist (1060). Windows
+  build is a user-local app under `%LOCALAPPDATA%\Programs\Ollama\`, not a
+  Windows service.
+- Binaries: `ollama.exe` + `ollama app.exe`. winget `Ollama.Ollama` 0.34.0
+  dropped files at 10:18; daemon was started by default (`Listening on
+  127.0.0.1:11434`). Venv preflight then passed (judge answers). Zero models
+  on disk until the 21:00 cycle pulls one.
+
+Nightly log `telemetry/nightly/20260911.log` (one line):
+
+`2026-09-11T01:26:35  preflight: ollama UNREACHABLE (URLError) -- aborting`
+
+Nights 08–10 Sep still had Ollama up (7 models, then 2 on the 10th) and aborted
+on `NVIDIA_API_KEY not resolvable`. The 11 Sep abort is a different failure:
+nothing listening on 11434.
+
+### Judge
+
+Code default is `nvidia/nemotron-3-super-120b-a12b`
+(`scripts/nvidia_judge.py`, overridable via `NVIDIA_JUDGE_MODEL`). Not
+re-probed this pass. Preflight will not reach the judge until Ollama answers.
+
+### What default / titans were asked to do (sibling cards, not this one)
+
+- **default:** retarget the live scheduled task onto `.venv\Scripts\pythonw.exe`.
+  XML dumps already match that.
+- **titan1:** loud preflight abort if the interpreter cannot `import yaml`,
+  before any Ollama/network work. On disk: `scripts/nightly.py` does that;
+  `tests/test_nightly_preflight_imports.py` pins the abort. Pytest was **not**
+  run this pass — no pass-count claimed.
+- **titan2:** durable repo-local installer so the task cannot regress onto
+  `python.exe` or the uv interpreter. On disk: `scripts/install_nightly_task.ps1`.
+  This card did not register the task and did not add that script.
+
+This card did not edit `scripts/nightly.py`, did not pull Ollama models, and
+did not git commit.
+
+### Still open
+
+- **Ollama is not listening.** 11434 refused; Windows service `ollama` is not
+  installed. Binaries exist but the daemon is down. Nightly cannot pass
+  preflight until 11434 answers. Do not pull models from this card.
+- **Judge liveness at the next night that clears Ollama.** Key resolution failed
+  08–10 Sep (the 08 Sep move left the NVIDIA key behind); the later hardening
+  reads `%LOCALAPPDATA%\llm-autobench\.env`. Not re-verified here.
+
+---
+
 ## 2026-09-11 · Judge outage: retired model, silent for 13 nights
 
 **Status: nightly is PAUSED at preflight. Awaiting a live judge model id.**
@@ -120,12 +214,14 @@ never surfaced in a log; it would have crashed the first night the judge worked.
 A project venv now exists (`.venv/`, gitignored) with pyyaml 6.0.3, and every
 pipeline module imports under it.
 
-### Still open
+### Still open (closed later the same day — see current-state above)
 
-- **The scheduled task still points at the interpreter without PyYAML.** It needs
-  repointing to `.venv\Scripts\pythonw.exe` — note `pythonw`, not `python`: the
-  console-less interpreter is a deliberate choice documented in `procutil.py`, and
-  the 08 Sep re-registration lost it. Until that is done the nightly cannot run.
+- **The scheduled task still points at the interpreter without PyYAML.** Closed
+  2026-09-11: exported task XML now runs `.venv\Scripts\pythonw.exe`. The 08 Sep
+  re-registration *did* lose `pythonw` for a uv-managed `python3.14.exe` with no
+  PyYAML; that was the crash waiting behind the key/judge aborts. Lesson stands.
+  Nightly is still paused, but the remaining blocker is Ollama on 11434, not the
+  interpreter.
 
 ### The learning
 

@@ -21,9 +21,11 @@ import ctypes
 import datetime as dt
 import glob
 import json
+import os
 import shutil
 import subprocess
 import sys
+import time
 import urllib.request
 from pathlib import Path
 
@@ -238,18 +240,87 @@ def wait_for_network(timeout_s: int = 90) -> bool:
             return True
         except Exception:  # noqa: BLE001 - any failure means "not yet"
             time.sleep(5)
-    log(f"preflight: no outbound network after {timeout_s}s")
+    log(f"preflight: no outbound network after {timeout_s}s -- aborting")
+    return False
+
+
+def ollama_exe() -> Path | None:
+    """Kept on this module so tests can patch nightly.ollama_exe."""
+    return procutil.ollama_exe()
+
+
+def ollama_up() -> tuple[bool, int | None]:
+    try:
+        with urllib.request.urlopen(OLLAMA, timeout=10) as r:
+            n = len(json.loads(r.read()).get("models", []))
+        return True, n
+    except Exception:  # noqa: BLE001
+        return False, None
+
+
+def start_ollama(exe: Path) -> bool:
+    """Detach `ollama serve`. Do not pull models. Do not wait on the process."""
+    kwargs: dict = {
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+        "stdin": subprocess.DEVNULL,
+    }
+    if sys.platform == "win32":
+        kwargs["creationflags"] = (
+            getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            | getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        )
+        kwargs["close_fds"] = True
+    try:
+        subprocess.Popen([str(exe), "serve"], **kwargs)
+        return True
+    except (OSError, subprocess.SubprocessError) as exc:
+        log(f"preflight: failed to start ollama ({exc.__class__.__name__})")
+        return False
+
+
+def ensure_ollama(timeout_s: int = 45) -> bool:
+    """11434 up, or start the local daemon once and wait. Never pull."""
+    ok, n = ollama_up()
+    exe = ollama_exe()
+    if exe is not None:
+        procutil.prepend_ollama_dir(exe)
+    if ok:
+        log(f"preflight: ollama UP, {n} models present")
+        return True
+    if exe is None:
+        log("preflight: ollama UNREACHABLE and ollama.exe not found -- aborting")
+        return False
+    log(f"preflight: ollama down; starting {exe} serve")
+    if not start_ollama(exe):
+        log("preflight: ollama UNREACHABLE (start failed) -- aborting")
+        return False
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        ok, n = ollama_up()
+        if ok:
+            log(f"preflight: ollama UP after start, {n} models present")
+            return True
+        time.sleep(1)
+    log("preflight: ollama UNREACHABLE after start -- aborting")
     return False
 
 
 def preflight() -> bool:
     """Refuse to start rather than fail halfway. Each check is a real failure seen before."""
+    # Cycle/run_bench import yaml at module top. A uv-managed interpreter
+    # without PyYAML used to pass preflight and crash on the first cycle
+    # subprocess. Fail here, before any Ollama/network work.
     try:
-        with urllib.request.urlopen(OLLAMA, timeout=10) as r:
-            n = len(json.loads(r.read()).get("models", []))
-        log(f"preflight: ollama UP, {n} models present")
-    except Exception as exc:
-        log(f"preflight: ollama UNREACHABLE ({exc.__class__.__name__}) -- aborting")
+        import yaml  # noqa: F401
+    except ImportError as exc:
+        log(f"preflight: cannot import yaml ({exc}) -- aborting")
+        log(f"preflight: interpreter is {sys.executable}")
+        log(r"preflight: use .venv\Scripts\pythonw.exe")
+        return False
+
+    if not ensure_ollama():
         return False
 
     free_gb = shutil.disk_usage(REPO).free / 1e9

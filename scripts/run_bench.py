@@ -71,7 +71,10 @@ def build_provenance():
 
     gpu = _shell(["nvidia-smi", "--query-gpu=name,memory.total",
                   "--format=csv,noheader"]).splitlines()
-    ollama = _shell(["ollama", "--version"])
+    try:
+        ollama = _shell(procutil.ollama_argv("--version"))
+    except FileNotFoundError:
+        ollama = ""
 
     return {
         "schema_version": SCHEMA_VERSION,

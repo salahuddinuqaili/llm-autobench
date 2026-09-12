@@ -103,7 +103,9 @@ def _local_tags():
     Returns [] on any failure so callers fail closed (treat as "not present").
     """
     try:
-        out = procutil.check_output(["ollama", "list"], text=True, stderr=subprocess.DEVNULL)
+        out = procutil.check_output(
+            procutil.ollama_argv("list"), text=True, stderr=subprocess.DEVNULL
+        )
         return [line.split()[0] for line in out.splitlines() if line.split()]
     except Exception:
         return []
@@ -308,7 +310,7 @@ def build_temp_registry(model, watcher):
 
 def pull(model):
     print(f"[autobench] ollama pull {model}")
-    procutil.run(["ollama", "pull", model], check=True)
+    procutil.run(procutil.ollama_argv("pull", model), check=True)
 
 
 def _runs_snapshot():
@@ -401,7 +403,7 @@ def report(run_path):
 
 def delete(model):
     print(f"[autobench] ollama rm {model}")
-    procutil.run(["ollama", "rm", model], check=True)
+    procutil.run(procutil.ollama_argv("rm", model), check=True)
 
 
 def commit(msg):

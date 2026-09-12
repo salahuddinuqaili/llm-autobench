@@ -3,6 +3,12 @@
 Architecture / methodology decisions. Newest first. 2–3 lines each: **decided · why · rejected.**
 Full context for the 2026-07-18 batch: `SPEC.md` §11 (audit findings) and §12 (remediation plan).
 
+## 2026-09-12 · ollama argv is an absolute path
+
+**Decided:** every `ollama` CLI spawn goes through `procutil.ollama_exe` / `ollama_argv`; nightly also prepends that directory to PATH for child processes.
+**Why:** Task Scheduler PATH does not include `%LOCALAPPDATA%\Programs\Ollama` even after preflight starts `serve` by full path. Bare `ollama` is WinError 2 in four seconds.
+**Rejected:** relying on the user-shell PATH; `cmd /c ollama`; attaching the task to an interactive console.
+
 ## 2026-09-11 · A verdict must be stated, never inferred from prose
 
 **Decided:** `parse_score` accepts an explicit verdict (`score: 0.4`, `0.4/1`) or a
