@@ -6,9 +6,26 @@ the design is the way it is, and `IMPROVEMENTS.md` tracks planned work.
 
 ---
 
+## 2026-09-12 · Ad hoc post-fix full cycle
+
+**Status: cycle EXIT:0. PATH/`ollama.exe` spawn worked. LLM judge still did not read rubric rows.**
+
+Ad hoc (not 21:00, not factory): `autobench_cycle.py --model qwen3.5:9b --no-delete --samples 3`. Judge env `NVIDIA_JUDGE_MODEL=meta/llama-3.1-nemotron-70b-instruct` (llama-3.3 is EOL; `.env` had no `NVIDIA_JUDGE_MODEL`). Did not pull gemma/minicpm.
+
+- Run `20260912_122724` / report `reports/20260912_122724.md`
+- Cycle commit `7f45f0d` (README inject + run JSON + report)
+- `qwen3.5:9b`: 16 tasks, 48 draws, 32 scored / 16 unscored, avg **0.81** on that report; era README now **3 runs / 2 models**, judged **77/112 (69%)**
+- Rubric NVIDIA judge: **0** rows scored; **15** persistent `JUDGE_ERROR: Extra data: line 1 column 5 (char 4)`
+- Mechanical gsm8k / arithmetic / tools scored; `structured_output` **0.00** (real zero)
+- README **Reading gap** section records expired llama-3.3 + this parse miss
+
+Did not fire 21:00. Nightly task still unproven in production.
+
+---
+
 ## 2026-09-12 · Nightly 21:00 WinError 2 (bare `ollama`)
 
-**Status: code fix landed. Not re-run. Next proof is the 21:00 task or an explicit `--no-report` cycle.**
+**Status: code fix landed. Ad hoc full cycle (above) exercised the spawn path. 21:00 task still not re-fired.**
 
 11 Sep 21:00: preflight started ollama via the full installer path; `autobench_cycle.py` then spawned bare `ollama` and died in ~4s with `FileNotFoundError: [WinError 2]`. Reproduced this session: PATH without the Ollama dir → bare `ollama` is WinError 2; `procutil.ollama_argv("list")` hits `%LOCALAPPDATA%\Programs\Ollama\ollama.exe` and `ollama list` returns 0 (`qwen3.5:9b` present).
 

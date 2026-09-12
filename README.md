@@ -60,6 +60,8 @@ Fixes in the pipeline (not a claim that tonight is proven): live judge preflight
 
 A later, different miss — `summarization` on run `20260911_122458` — is a **judge parse error** (unscored, not a 0.00). `structured_output` **0.00** on that run is a real zero.
 
+Ad hoc 2026-09-12 run `20260912_122724` (N=3, `qwen3.5:9b`, judge pinned to `meta/llama-3.1-nemotron-70b-instruct` because llama-3.3 is EOL): **0 rubric rows scored**. Persistent `JUDGE_ERROR: Extra data: line 1 column 5 (char 4)` on changelog / code_review / instruction_following / sprint_narrative / summarization. Mechanical tasks still scored; `structured_output` is again a real 0.00. Swapping the judge model is not enough if the parser still cannot read the reply.
+
 ## Results
 
 Current methodology only (runs since 2026-09-07 — earlier harness versions are kept as history, not averaged in). Shared-task column is the like-for-like one — not a model ranking. Methodology that used to live here (old truncation estimates, silent skips) is in the generated block below and in [`IMPROVEMENTS.md`](IMPROVEMENTS.md).
