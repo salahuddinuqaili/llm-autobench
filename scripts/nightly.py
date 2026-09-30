@@ -21,7 +21,6 @@ import ctypes
 import datetime as dt
 import glob
 import json
-import os
 import shutil
 import subprocess
 import sys
@@ -33,9 +32,9 @@ import procutil
 
 REPO = Path(__file__).resolve().parent.parent
 SCRIPTS = REPO / "scripts"
-LOG_DIR = REPO / "telemetry" / "nightly"     # gitignored, stays local
+LOG_DIR = REPO / "telemetry" / "nightly"  # gitignored, stays local
 OLLAMA = "http://127.0.0.1:11434/api/tags"
-MIN_FREE_GB = 30                              # a model pull needs headroom
+MIN_FREE_GB = 30  # a model pull needs headroom
 # Draws per (model, task). N=1 published single draws as if they were measurements;
 # 3 is the smallest N that yields a spread the aggregate can report.
 SAMPLES = 3
@@ -53,10 +52,14 @@ IDLE_BEFORE_SLEEP_MIN = 10
 
 
 def log(msg: str) -> None:
-    line = f"{dt.datetime.now().isoformat(timespec='seconds')}  {msg}"
+    # Local wall clock, same YYYY-MM-DDTHH:MM:SS shape as naive isoformat(timespec="seconds").
+    local_now = dt.datetime.now(dt.timezone.utc).astimezone()
+    line = f"{local_now.strftime('%Y-%m-%dT%H:%M:%S')}  {msg}"
     print(line, flush=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
-    with open(LOG_DIR / f"{dt.date.today():%Y%m%d}.log", "a", encoding="utf-8") as f:
+    # Local calendar date. A UTC date would rename this log across midnight.
+    log_day = dt.date.today()  # noqa: DTZ011
+    with open(LOG_DIR / f"{log_day:%Y%m%d}.log", "a", encoding="utf-8") as f:
         f.write(line + "\n")
 
 
@@ -71,6 +74,7 @@ def keep_awake(on: bool) -> None:
 
 def idle_minutes() -> float:
     """Minutes since the last real keyboard/mouse input. -1.0 if unreadable."""
+
     class LASTINPUTINFO(ctypes.Structure):
         _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
 
@@ -89,6 +93,7 @@ def idle_minutes() -> float:
 
 WAKE_GRACE_SEC = 180
 
+
 def _last_wake_event():
     """Return {time: datetime (UTC), source: str} or None. Fail closed.
 
@@ -97,10 +102,18 @@ def _last_wake_event():
     """
     try:
         p = procutil.run(
-            ["wevtutil", "qe", "System",
-             "/q:*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1)]]",
-             "/c:1", "/rd:true", "/f:text"],
-            capture_output=True, text=True, timeout=15,
+            [
+                "wevtutil",
+                "qe",
+                "System",
+                "/q:*[System[Provider[@Name='Microsoft-Windows-Power-Troubleshooter'] and (EventID=1)]]",
+                "/c:1",
+                "/rd:true",
+                "/f:text",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         out = (p.stdout or "").strip()
         if p.returncode != 0 or not out:
@@ -126,7 +139,7 @@ def _last_wake_event():
         if not src:
             src = _powercfg_lastwake_source() or ""
         return {"time": t, "source": src}
-    except Exception:
+    except Exception:  # noqa: BLE001 - unreadable wake event fails closed (None)
         return None
 
 
@@ -135,12 +148,14 @@ def _powercfg_lastwake_source() -> str:
     try:
         p = procutil.run(
             ["powercfg", "/lastwake"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if p.returncode != 0:
             return ""
         return (p.stdout or "").strip()[:800]
-    except Exception:
+    except Exception:  # noqa: BLE001 - powercfg failure is an empty source, not fatal
         return ""
 
 
@@ -164,11 +179,11 @@ def this_run_woke_machine(started: dt.datetime) -> bool:
     if not src:
         return False
     low = src.lower()
-    if not any(k in low for k in ("wake timer", "timer", "scheduled", "task scheduler")):
+    if not any(
+        k in low for k in ("wake timer", "timer", "scheduled", "task scheduler")
+    ):
         return False
-    if "device" in low and "timer" not in low:
-        return False
-    return True
+    return not ("device" in low and "timer" not in low)
 
 
 def maybe_sleep(enabled: bool, woke: bool) -> None:
@@ -190,7 +205,9 @@ def maybe_sleep(enabled: bool, woke: bool) -> None:
     if idle < IDLE_BEFORE_SLEEP_MIN:
         log(f"sleep-when-done: last input {idle:.1f} min ago -- staying awake")
         return
-    log(f"sleep-when-done: this run woke the machine and idle {idle:.0f} min -- suspending to S3")
+    log(
+        f"sleep-when-done: this run woke the machine and idle {idle:.0f} min -- suspending to S3"
+    )
     keep_awake(False)
     try:
         ctypes.windll.powrprof.SetSuspendState(0, 0, 0)
@@ -201,7 +218,9 @@ def maybe_sleep(enabled: bool, woke: bool) -> None:
 def run(args: list[str], stage: str, timeout: int = 5400) -> bool:
     log(f"[{stage}] $ {' '.join(args[1:])}")
     try:
-        p = procutil.run(args, cwd=REPO, capture_output=True, text=True, timeout=timeout)
+        p = procutil.run(
+            args, cwd=REPO, capture_output=True, text=True, timeout=timeout
+        )
     except subprocess.TimeoutExpired:
         log(f"[{stage}] TIMEOUT after {timeout}s")
         return False
@@ -229,6 +248,7 @@ def wait_for_network(timeout_s: int = 90) -> bool:
     network". Cheap insurance for a case that only happens unattended.
     """
     import time
+
     deadline = time.monotonic() + timeout_s
     attempt = 0
     while time.monotonic() < deadline:
@@ -331,9 +351,12 @@ def preflight() -> bool:
 
     sys.path.insert(0, str(SCRIPTS))
     try:
-        from nvidia_judge import find_nvidia_key, check_judge_alive, JUDGE_MODEL
+        from nvidia_judge import JUDGE_MODEL, check_judge_alive, find_nvidia_key
+
         if not find_nvidia_key():
-            log("preflight: NVIDIA_API_KEY not resolvable -- aborting (judge would fail)")
+            log(
+                "preflight: NVIDIA_API_KEY not resolvable -- aborting (judge would fail)"
+            )
             return False
     except ImportError as exc:
         log(f"preflight: cannot import judge ({exc}) -- aborting")
@@ -347,21 +370,28 @@ def preflight() -> bool:
     # One call up front converts that silent 13-night hole into a loud abort.
     alive, detail = check_judge_alive()
     if not alive:
-        log(f"preflight: judge model {JUDGE_MODEL} NOT ANSWERING -- aborting ({detail})")
+        log(
+            f"preflight: judge model {JUDGE_MODEL} NOT ANSWERING -- aborting ({detail})"
+        )
         log("preflight: set NVIDIA_JUDGE_MODEL to a live model id; see STATUS.md")
         return False
     log(f"preflight: judge {JUDGE_MODEL} answers")
 
     if not wait_for_network():
-        log("preflight: network unreachable -- aborting (discovery and the judge "
-            "both need it; better to skip a night than half-run one)")
+        log(
+            "preflight: network unreachable -- aborting (discovery and the judge "
+            "both need it; better to skip a night than half-run one)"
+        )
         return False
 
-    dirty = procutil.run(["git", "status", "--porcelain"], cwd=REPO,
-                           capture_output=True, text=True).stdout.strip()
+    dirty = procutil.run(
+        ["git", "status", "--porcelain"], cwd=REPO, capture_output=True, text=True
+    ).stdout.strip()
     if dirty:
-        log(f"preflight: {len(dirty.splitlines())} uncommitted file(s) present -- "
-            "continuing, but the commit stage will stage only runs/ and reports/")
+        log(
+            f"preflight: {len(dirty.splitlines())} uncommitted file(s) present -- "
+            "continuing, but the commit stage will stage only runs/ and reports/"
+        )
     return True
 
 
@@ -374,12 +404,18 @@ def newest_run(before: set[str]) -> Path | None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="unattended llm-autobench run")
-    ap.add_argument("--sleep-when-done", action="store_true",
-                    help="suspend afterwards only if this task woke the PC from sleep "
-                         "(never if it was already awake at start)")
-    ap.add_argument("--baselines-only", action="store_true",
-                    help="baseline/vision refresh night (no discover pull/delete); "
-                         "default is one-subject discovery")
+    ap.add_argument(
+        "--sleep-when-done",
+        action="store_true",
+        help="suspend afterwards only if this task woke the PC from sleep "
+        "(never if it was already awake at start)",
+    )
+    ap.add_argument(
+        "--baselines-only",
+        action="store_true",
+        help="baseline/vision refresh night (no discover pull/delete); "
+        "default is one-subject discovery",
+    )
     args = ap.parse_args()
 
     started = dt.datetime.now(dt.timezone.utc)
@@ -412,8 +448,13 @@ def _run_pipeline(baselines_only: bool = False) -> int:
     # --no-report: the cycle can now judge + aggregate + commit itself (P1.2),
     # but nightly runs those as separate logged stages so a failure names which
     # one broke. Letting both do it would judge the same run twice.
-    cycle_cmd = [sys.executable, str(SCRIPTS / "autobench_cycle.py"),
-                 "--no-report", "--samples", str(SAMPLES)]
+    cycle_cmd = [
+        sys.executable,
+        str(SCRIPTS / "autobench_cycle.py"),
+        "--no-report",
+        "--samples",
+        str(SAMPLES),
+    ]
     if baselines_only:
         cycle_cmd.append("--baselines-only")
     if not run(cycle_cmd, "cycle"):
@@ -426,21 +467,37 @@ def _run_pipeline(baselines_only: bool = False) -> int:
         return 0
     log(f"cycle produced {produced.name}")
 
-    if not run([sys.executable, str(SCRIPTS / "nvidia_judge.py"), str(produced)], "judge"):
-        log("nightly STOPPED: judging failed. The run is on disk but UNSCORED "
-            "and must not be aggregated as if it were scored.")
+    if not run(
+        [sys.executable, str(SCRIPTS / "nvidia_judge.py"), str(produced)], "judge"
+    ):
+        log(
+            "nightly STOPPED: judging failed. The run is on disk but UNSCORED "
+            "and must not be aggregated as if it were scored."
+        )
         return 1
 
     # This is the step that was never automated, and why the README froze in July.
-    if not run([sys.executable, str(SCRIPTS / "aggregate_results.py"),
-                "--inject", "README.md"], "aggregate"):
+    if not run(
+        [
+            sys.executable,
+            str(SCRIPTS / "aggregate_results.py"),
+            "--inject",
+            "README.md",
+        ],
+        "aggregate",
+    ):
         log("nightly STOPPED: aggregation failed")
         return 1
 
-    procutil.run(["git", "add", "runs", "reports", "README.md"], cwd=REPO,
-                   capture_output=True)
-    staged = procutil.run(["git", "diff", "--cached", "--name-only"], cwd=REPO,
-                            capture_output=True, text=True).stdout.strip()
+    procutil.run(
+        ["git", "add", "runs", "reports", "README.md"], cwd=REPO, capture_output=True
+    )
+    staged = procutil.run(
+        ["git", "diff", "--cached", "--name-only"],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     if not staged:
         log("nothing to commit")
         return 0
@@ -458,8 +515,10 @@ def _run_pipeline(baselines_only: bool = False) -> int:
     # branch does not contain origin/master, the push fails loudly instead of
     # publishing unrelated work.
     if not run(["git", "push", "-q", "origin", "HEAD:master"], "push", timeout=300):
-        log("push to master failed (not a fast-forward, or no network) -- the "
-            "commit is local and will go up once the branch contains origin/master")
+        log(
+            "push to master failed (not a fast-forward, or no network) -- the "
+            "commit is local and will go up once the branch contains origin/master"
+        )
         return 1
 
     log("nightly OK")

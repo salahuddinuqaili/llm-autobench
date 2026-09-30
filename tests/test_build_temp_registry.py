@@ -1,11 +1,12 @@
 """build_temp_registry keeps exactly one subject — no baseline co-append."""
+
 import os
 import sys
 
 import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-import autobench_cycle as ac  # noqa: E402
+import autobench_cycle as ac
 
 
 def test_build_temp_registry_subject_only(monkeypatch=None):
@@ -19,12 +20,15 @@ def test_build_temp_registry_subject_only(monkeypatch=None):
     tmp, kept = ac.build_temp_registry(model, watcher={})
     try:
         assert kept == [f"custom:ollama/{model}"], kept
-        data = yaml.safe_load(open(tmp))
+        with open(tmp, encoding="utf-8") as f:
+            data = yaml.safe_load(f)
         entries = data.get("baseline") or []
         assert len(entries) == 1, entries
         assert entries[0]["id"] == f"custom:ollama/{model}"
         # Must not sneak any committed baseline ids into the temp registry.
-        cfg = yaml.safe_load(open(os.path.join(ac.REPO, "models", "registry.yaml")))
+        reg_path = os.path.join(ac.REPO, "models", "registry.yaml")
+        with open(reg_path, encoding="utf-8") as f:
+            cfg = yaml.safe_load(f)
         baseline_ids = {b["id"] for b in cfg.get("baseline", [])}
         assert entries[0]["id"] not in baseline_ids
         assert not (baseline_ids & set(kept))

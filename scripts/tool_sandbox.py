@@ -6,24 +6,38 @@ No network. No writes outside a temp workspace. Tools:
 
 Optional one-shot error injection (SPEC 13.5 error_recovery).
 """
+
 from __future__ import annotations
 
 import ast
-import math
 import os
 import re
 import shutil
 import tempfile
-from typing import Any, Dict, List, Optional, Tuple
-
+from typing import Any
 
 # Safe subset for calc(): numbers, + - * / ** %, parentheses, unary minus.
-_CALC_ALLOWED = tuple(x for x in (
-    ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant,
-    getattr(ast, 'Num', ()),  # removed in 3.14+; Constant covers literals
-    ast.Add, ast.Sub, ast.Mult, ast.Div, ast.FloorDiv, ast.Mod, ast.Pow,
-    ast.USub, ast.UAdd, ast.Load,
-) if x != ())
+_CALC_ALLOWED = tuple(
+    x
+    for x in (
+        ast.Expression,
+        ast.BinOp,
+        ast.UnaryOp,
+        ast.Constant,
+        getattr(ast, "Num", ()),  # removed in 3.14+; Constant covers literals
+        ast.Add,
+        ast.Sub,
+        ast.Mult,
+        ast.Div,
+        ast.FloorDiv,
+        ast.Mod,
+        ast.Pow,
+        ast.USub,
+        ast.UAdd,
+        ast.Load,
+    )
+    if x != ()
+)
 
 
 def _safe_calc(expression: str) -> Any:
@@ -38,7 +52,10 @@ def _safe_calc(expression: str) -> Any:
     tree = ast.parse(expr, mode="eval")
     for node in ast.walk(tree):
         if not isinstance(node, _CALC_ALLOWED):
-            raise ValueError(f"disallowed syntax: {type(node).__name__}")
+            # Stay ValueError so every calc rejection has the same type.
+            raise ValueError(  # noqa: TRY004
+                f"disallowed syntax: {type(node).__name__}"
+            )
     return eval(compile(tree, "<calc>", "eval"), {"__builtins__": {}}, {})
 
 
@@ -57,15 +74,15 @@ class ToolSandbox:
 
     def __init__(
         self,
-        fixture_dir: Optional[str] = None,
-        fixture_files: Optional[Dict[str, str]] = None,
-        inject_error: Optional[Dict[str, Any]] = None,
+        fixture_dir: str | None = None,
+        fixture_files: dict[str, str] | None = None,
+        inject_error: dict[str, Any] | None = None,
     ):
         self.root = tempfile.mkdtemp(prefix="autobench_tools_")
-        self.kv: Dict[str, str] = {}
+        self.kv: dict[str, str] = {}
         self.finished = False
-        self.finish_answer: Optional[str] = None
-        self.calls: List[Dict[str, Any]] = []
+        self.finish_answer: str | None = None
+        self.calls: list[dict[str, Any]] = []
         self._inject = dict(inject_error) if inject_error else None
         self._inject_fired = False
         if fixture_dir and os.path.isdir(fixture_dir):
@@ -87,13 +104,15 @@ class ToolSandbox:
     def close(self) -> None:
         try:
             shutil.rmtree(self.root, ignore_errors=True)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110 - cleanup must not mask the real result
             pass
 
-    def execute(self, name: str, arguments: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def execute(
+        self, name: str, arguments: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """Run one tool call. Returns a JSON-serializable result dict."""
         args = arguments if isinstance(arguments, dict) else {}
-        record: Dict[str, Any] = {"name": name, "arguments": args}
+        record: dict[str, Any] = {"name": name, "arguments": args}
         # Injected soft failure (once) for error_recovery scoring.
         if (
             self._inject
@@ -125,7 +144,11 @@ class ToolSandbox:
                     out = {"ok": True, "key": key, "value": self.kv[key]}
             elif name == "list_files":
                 d = _norm_path(str(args.get("dir", ".") or "."))
-                base = self.root if d in (".", "") else os.path.join(self.root, *d.split("/"))
+                base = (
+                    self.root
+                    if d in (".", "")
+                    else os.path.join(self.root, *d.split("/"))
+                )
                 if not os.path.isdir(base):
                     raise ValueError(f"not a directory: {d}")
                 names = sorted(os.listdir(base))
@@ -144,8 +167,12 @@ class ToolSandbox:
                 self.finish_answer = "" if ans is None else str(ans)
                 out = {"ok": True, "finished": True, "answer": self.finish_answer}
             else:
-                out = {"ok": False, "error": f"unknown tool: {name}", "hallucinated": True}
-        except Exception as e:
+                out = {
+                    "ok": False,
+                    "error": f"unknown tool: {name}",
+                    "hallucinated": True,
+                }
+        except Exception as e:  # noqa: BLE001 - tool failures are results, not crashes
             out = {"ok": False, "error": str(e)}
 
         record["result"] = out
@@ -153,8 +180,9 @@ class ToolSandbox:
         return out
 
 
-def openai_tool_schemas() -> List[Dict[str, Any]]:
+def openai_tool_schemas() -> list[dict[str, Any]]:
     """Standard OpenAI-style tool defs matching SPEC 13.4."""
+
     def fn(name, desc, props, required):
         return {
             "type": "function",
@@ -170,23 +198,59 @@ def openai_tool_schemas() -> List[Dict[str, Any]]:
         }
 
     return [
-        fn("calc", "Evaluate a pure arithmetic expression.", {
-            "expression": {"type": "string", "description": "Arithmetic expression, e.g. 42+17"},
-        }, ["expression"]),
-        fn("kv_set", "Store a string value under a key for later turns.", {
-            "key": {"type": "string"},
-            "value": {"type": "string"},
-        }, ["key", "value"]),
-        fn("kv_get", "Read a previously stored key.", {
-            "key": {"type": "string"},
-        }, ["key"]),
-        fn("list_files", "List files in a sandbox directory (read-only fixtures).", {
-            "dir": {"type": "string", "description": "Relative directory, default ."},
-        }, []),
-        fn("read_file", "Read a text file from the sandbox fixture directory.", {
-            "path": {"type": "string", "description": "Relative file path"},
-        }, ["path"]),
-        fn("finish", "Terminate the episode with the final answer.", {
-            "answer": {"type": "string", "description": "Final answer string"},
-        }, ["answer"]),
+        fn(
+            "calc",
+            "Evaluate a pure arithmetic expression.",
+            {
+                "expression": {
+                    "type": "string",
+                    "description": "Arithmetic expression, e.g. 42+17",
+                },
+            },
+            ["expression"],
+        ),
+        fn(
+            "kv_set",
+            "Store a string value under a key for later turns.",
+            {
+                "key": {"type": "string"},
+                "value": {"type": "string"},
+            },
+            ["key", "value"],
+        ),
+        fn(
+            "kv_get",
+            "Read a previously stored key.",
+            {
+                "key": {"type": "string"},
+            },
+            ["key"],
+        ),
+        fn(
+            "list_files",
+            "List files in a sandbox directory (read-only fixtures).",
+            {
+                "dir": {
+                    "type": "string",
+                    "description": "Relative directory, default .",
+                },
+            },
+            [],
+        ),
+        fn(
+            "read_file",
+            "Read a text file from the sandbox fixture directory.",
+            {
+                "path": {"type": "string", "description": "Relative file path"},
+            },
+            ["path"],
+        ),
+        fn(
+            "finish",
+            "Terminate the episode with the final answer.",
+            {
+                "answer": {"type": "string", "description": "Final answer string"},
+            },
+            ["answer"],
+        ),
     ]

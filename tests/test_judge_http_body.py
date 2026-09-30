@@ -6,16 +6,16 @@ raised Extra data: line 1 column 5 (char 4). That string was written as
 JUDGE_ERROR on every rubric row. A missing/retired model must be named as
 404, not as a JSON parse glitch.
 """
+
 from __future__ import annotations
 
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-import nvidia_judge as nj  # noqa: E402
-
-
 from unittest import mock
+
+import nvidia_judge as nj
 
 
 def test_plain_404_is_named_not_extra_data():

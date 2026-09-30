@@ -26,6 +26,7 @@ Also resolve `ollama.exe` by full path. The 21:00 scheduled task's PATH does
 not include %LOCALAPPDATA%\\Programs\\Ollama even after nightly starts the
 daemon that way; a bare `ollama` then dies with WinError 2.
 """
+
 import os
 import shutil
 import subprocess
@@ -35,9 +36,7 @@ from pathlib import Path
 # CREATE_NO_WINDOW does not exist off Windows, so the whole thing degrades to an
 # empty dict rather than an AttributeError on Linux/macOS.
 NO_WINDOW = (
-    {"creationflags": subprocess.CREATE_NO_WINDOW}
-    if sys.platform == "win32"
-    else {}
+    {"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}
 )
 
 
@@ -47,8 +46,10 @@ def _merged(kwargs):
 
 
 def run(*args, **kwargs):
-    """subprocess.run, windowless."""
-    return subprocess.run(*args, **_merged(kwargs))
+    """subprocess.run, windowless. Default check=False matches subprocess.run."""
+    merged = _merged(kwargs)
+    check = merged.pop("check", False)
+    return subprocess.run(*args, check=check, **merged)
 
 
 def check_output(*args, **kwargs):

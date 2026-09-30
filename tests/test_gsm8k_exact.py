@@ -1,11 +1,12 @@
-﻿"""Offline pass/fail coverage for P2.2 thin GSM8K-style exact slice. No Ollama / judge."""
+"""Offline pass/fail coverage for P2.2 thin GSM8K-style exact slice. No Ollama / judge."""
+
 import os
 import sys
 
 import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-import run_bench  # noqa: E402
+import run_bench
 
 REPO = os.path.join(os.path.dirname(__file__), "..")
 SLICE_IDS = [f"gsm8k_s0{i}" for i in range(1, 6)]
@@ -48,10 +49,7 @@ def test_correct_final_answer_scores_one():
 def test_wrong_final_despite_correct_scratch_scores_zero():
     task = _load("gsm8k_s01")
     # Correct intermediate (70 sold / 14 left) but wrong labelled final.
-    resp = (
-        "Total 84. Sold 70. Left 14.\n"
-        "Final answer: 70\n"
-    )
+    resp = "Total 84. Sold 70. Left 14.\nFinal answer: 70\n"
     assert run_bench.score(task, resp) == 0.0
 
 
@@ -63,7 +61,8 @@ def test_empty_response_scores_zero():
 def test_provenance_committed():
     path = os.path.join(REPO, "tasks", "fixtures", "GSM8K_SLICE_PROVENANCE.md")
     assert os.path.isfile(path)
-    text = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
     assert "Not** a dump" in text or "Not a dump" in text or "**Not** a dump" in text
     assert "original" in text.lower()
 
@@ -78,7 +77,11 @@ def test_registry_wires_gsm8k_tag():
         tags = m.get("tags") or []
         if "reasoning" in tags and "coding" in tags:
             assert "gsm8k" in tags, m["id"]
-        if tags == ["vision", "ocr", "progressive"] or set(tags) <= {"vision", "ocr", "progressive"}:
+        if tags == ["vision", "ocr", "progressive"] or set(tags) <= {
+            "vision",
+            "ocr",
+            "progressive",
+        }:
             assert "gsm8k" not in tags, m["id"]
 
 

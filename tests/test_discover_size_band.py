@@ -1,10 +1,11 @@
 """M0.1: size_band filter + deterministic pick (no prefer-larger)."""
+
 import os
 import sys
 import urllib.request
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-import autobench_cycle as ac  # noqa: E402
+import autobench_cycle as ac
 
 
 class _FakeResp:

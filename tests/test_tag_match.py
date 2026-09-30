@@ -1,9 +1,10 @@
 """Exact-only local tag matching + param parse (M0.2 / M0.3). No ollama required."""
+
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-import autobench_cycle as ac  # noqa: E402
+import autobench_cycle as ac
 
 
 def test_tag_size_b():

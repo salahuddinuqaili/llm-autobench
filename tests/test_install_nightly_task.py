@@ -4,12 +4,16 @@ The live Task Scheduler job must stay on pythonw + nightly.py. A later edit
 must not silently switch Command back to python.exe or a uv interpreter.
 This test does not call Register-ScheduledTask.
 """
+
 from __future__ import annotations
 
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 PS1 = REPO / "scripts" / "install_nightly_task.ps1"
@@ -27,16 +31,16 @@ def test_command_is_venv_pythonw_not_python_exe():
     text = _text()
     assert r".venv\Scripts\pythonw.exe" in text
     # Desired Command is pythonw; python.exe may appear only as a warning.
-    assert "Join-Path $repo \".venv\\Scripts\\pythonw.exe\"" in text
-    assert "Join-Path $repo \".venv\\Scripts\\python.exe\"" not in text
+    assert 'Join-Path $repo ".venv\\Scripts\\pythonw.exe"' in text
+    assert 'Join-Path $repo ".venv\\Scripts\\python.exe"' not in text
     assert "python3.14.exe" not in text
-    assert re.search(r'(?i)uv\.exe|uv run', text) is None
+    assert re.search(r"(?i)uv\.exe|uv run", text) is None
 
 
 def test_arguments_are_nightly_py():
     text = _text()
     assert r"scripts\nightly.py" in text
-    assert "Join-Path $repo \"scripts\\nightly.py\"" in text
+    assert 'Join-Path $repo "scripts\\nightly.py"' in text
 
 
 def test_task_name_and_schedule_and_logon():
@@ -52,7 +56,10 @@ def test_task_name_and_schedule_and_logon():
 def test_empty_working_directory_is_tolerated_without_force():
     text = _text()
     assert "Empty Start-In is tolerated" in text
-    assert "nightly.py locates the repo from __file__" in text or "resolves REPO from __file__" in text
+    assert (
+        "nightly.py locates the repo from __file__" in text
+        or "resolves REPO from __file__" in text
+    )
     assert "-Force rewrites it" in text
     # Must not treat empty WorkingDirectory as a mismatch.
     assert "if ($wd -and ($wd -ne (Get-NormalizedPath $Desired.Repo)))" in text
@@ -63,7 +70,11 @@ def test_no_secrets_embedded():
     assert "NVIDIA_API_KEY" in text  # mentioned as runtime-only
     assert re.search(r"nvapi-[A-Za-z0-9_-]{8,}", text) is None
     assert "sk-" not in text
-    assert "PASSWORD" not in text.upper() or "no stored password" in text.lower() or "Never embed" in text
+    assert (
+        "PASSWORD" not in text.upper()
+        or "no stored password" in text.lower()
+        or "Never embed" in text
+    )
 
 
 def test_register_is_gated_by_mismatch_and_force():
@@ -78,9 +89,23 @@ def test_register_is_gated_by_mismatch_and_force():
     assert dry_idx < reg_idx
 
 
+# Runs the real installer under Windows PowerShell 5.1 (powershell.exe), which
+# only exists on Windows; the nightly task it installs is a Windows Task
+# Scheduler job. Off Windows the subprocess cannot start, so skip there only.
+# The string-contract tests above still run everywhere.
+@pytest.mark.skipif(
+    sys.platform != "win32",
+    reason="needs Windows PowerShell (powershell.exe) and Task Scheduler",
+)
 def test_dry_run_subprocess_is_noop():
     """Invoke -DryRun; must exit 0 and never require a password."""
-    powershell = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")
+    powershell = os.path.join(
+        os.environ.get("SystemRoot", r"C:\Windows"),
+        "System32",
+        "WindowsPowerShell",
+        "v1.0",
+        "powershell.exe",
+    )
     if not os.path.isfile(powershell):
         powershell = "powershell.exe"
     proc = subprocess.run(
@@ -97,10 +122,13 @@ def test_dry_run_subprocess_is_noop():
         text=True,
         timeout=60,
         cwd=str(REPO),
+        check=False,
     )
     out = (proc.stdout or "") + (proc.stderr or "")
     assert proc.returncode == 0, out
-    assert "pythonw" in out.lower() or "already correct" in out.lower() or "DryRun" in out
+    assert (
+        "pythonw" in out.lower() or "already correct" in out.lower() or "DryRun" in out
+    )
     assert "Register-ScheduledTask" in out or "already correct" in out
     assert "password" not in out.lower()
 

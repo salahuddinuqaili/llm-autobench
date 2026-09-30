@@ -16,6 +16,7 @@ spliced between the RESULTS:START / RESULTS:END markers in that file (README).
     python scripts/aggregate_results.py --inject README.md  # update README
     python scripts/aggregate_results.py --out reports/SMOKE_RESULTS.md
 """
+
 import argparse
 import glob
 import json
@@ -49,31 +50,35 @@ AGENTIC_TASKS = {"tool_weather", "tool_multiturn_sum"}
 # ---------------------------------------------------------------------------
 ERAS = [
     {
-        "from": "00000000", "to": "20260726",
+        "from": "00000000",
+        "to": "20260726",
         "label": "pre-credibility-fix",
         "why": "substring scorer (false-positive 1.00), no truncation guard, "
-               "two disagreeing judge paths",
+        "two disagreeing judge paths",
     },
     {
-        "from": "20260727", "to": "20260822",
+        "from": "20260727",
+        "to": "20260822",
         "label": "credibility fixes (`d61170e`)",
         "why": "answer extraction + truncation guard + single judge landed, but "
-               "N=1 per (model, task) with no variance, and the tag gate skipped "
-               "pairs silently so coverage gaps were invisible",
+        "N=1 per (model, task) with no variance, and the tag gate skipped "
+        "pairs silently so coverage gaps were invisible",
     },
     {
-        "from": "20260823", "to": "20260906",
+        "from": "20260823",
+        "to": "20260906",
         "label": "multi-sample + disclosed coverage",
         "why": "N>1 draws per (model, task) with spread reported, every skipped "
-               "pair recorded with its reason, truncation counted from recorded "
-               "`done_reason` instead of estimated from response endings",
+        "pair recorded with its reason, truncation counted from recorded "
+        "`done_reason` instead of estimated from response endings",
     },
     {
-        "from": "20260907", "to": "99999999",
+        "from": "20260907",
+        "to": "99999999",
         "label": "python-exec code_generation",
         "why": "code_generation scored by in-process Python fixture execution "
-               "(method: python-exec) instead of rubric-llm; coding cells have "
-               "mechanical ground truth (M1 / SPEC 5.3 thin path)",
+        "(method: python-exec) instead of rubric-llm; coding cells have "
+        "mechanical ground truth (M1 / SPEC 5.3 thin path)",
     },
 ]
 
@@ -88,9 +93,26 @@ RUN_ID_RE = re.compile(r"^\d{8}_\d{6}$")
 
 # Student t, two-sided 95%, by degrees of freedom. A flat normal 1.96 would
 # quietly understate the interval at the sample sizes this harness produces.
-_T95 = {1: 12.71, 2: 4.303, 3: 3.182, 4: 2.776, 5: 2.571, 6: 2.447, 7: 2.365,
-        8: 2.306, 9: 2.262, 10: 2.228, 12: 2.179, 15: 2.131, 20: 2.086,
-        25: 2.060, 30: 2.042, 40: 2.021, 60: 2.000, 120: 1.980}
+_T95 = {
+    1: 12.71,
+    2: 4.303,
+    3: 3.182,
+    4: 2.776,
+    5: 2.571,
+    6: 2.447,
+    7: 2.365,
+    8: 2.306,
+    9: 2.262,
+    10: 2.228,
+    12: 2.179,
+    15: 2.131,
+    20: 2.086,
+    25: 2.060,
+    30: 2.042,
+    40: 2.021,
+    60: 2.000,
+    120: 1.980,
+}
 
 
 def t95(df):
@@ -165,8 +187,9 @@ def load_rows(include_all=False):
     skipped = {"pre_era": 0, "not_a_run": 0}
     for path in sorted(glob.glob(os.path.join(RUNS_DIR, "*.json"))):
         try:
-            data = json.load(open(path, encoding="utf-8"))
-        except Exception:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:  # noqa: BLE001, S112 - a bad run file is skipped, not fatal
             continue
         rid = data.get("run_id") or os.path.splitext(os.path.basename(path))[0]
         if RUN_ID_RE.match(str(rid)):
@@ -190,8 +213,10 @@ def load_rows(include_all=False):
                 r["_run"] = rid
                 rows.append(r)
     if skipped["pre_era"] or skipped["not_a_run"]:
-        print("aggregate: excluded %d pre-%s run(s) and %d non-run file(s)"
-              % (skipped["pre_era"], ERA_CUTOFF, skipped["not_a_run"]))
+        print(
+            f"aggregate: excluded {skipped['pre_era']} pre-{ERA_CUTOFF} "
+            f"run(s) and {skipped['not_a_run']} non-run file(s)"
+        )
     return rows, run_ids, skips, era_counts
 
 
@@ -200,7 +225,10 @@ def aggregate():
 
     m_scores, m_lat = defaultdict(list), defaultdict(list)
     m_runs, m_tasks, m_rows, m_err = (
-        defaultdict(set), defaultdict(set), defaultdict(int), defaultdict(int),
+        defaultdict(set),
+        defaultdict(set),
+        defaultdict(int),
+        defaultdict(int),
     )
     t_scores, t_models = defaultdict(list), defaultdict(set)
     mt_scores = defaultdict(list)  # (model, task) -> [scores]
@@ -255,7 +283,9 @@ def aggregate():
     # Cross-model averages over different task sets are not comparable; this is
     # the column that is. Vision + agentic regimes are always excluded.
     text_models = [m for m in m_tasks if not (m_tasks[m] <= VISION_TASKS)]
-    shared = set.intersection(*[m_tasks[m] for m in text_models]) if text_models else set()
+    shared = (
+        set.intersection(*[m_tasks[m] for m in text_models]) if text_models else set()
+    )
     shared -= VISION_TASKS
     shared -= AGENTIC_TASKS
 
@@ -263,18 +293,31 @@ def aggregate():
     span = (ids[0][:8], ids[-1][:8]) if ids else ("?", "?")
 
     return {
-        "rows": rows, "n_runs": len(set(run_ids)),
-        "span": span, "skips": skips, "era_counts": era_counts,
-        "m_scores": m_scores, "m_lat": m_lat, "m_runs": m_runs,
-        "m_tasks": m_tasks, "m_rows": m_rows, "m_err": m_err,
-        "t_scores": t_scores, "t_models": t_models, "mt_scores": mt_scores,
-        "zero_rows": zero_rows, "err_rows": err_rows,
+        "rows": rows,
+        "n_runs": len(set(run_ids)),
+        "span": span,
+        "skips": skips,
+        "era_counts": era_counts,
+        "m_scores": m_scores,
+        "m_lat": m_lat,
+        "m_runs": m_runs,
+        "m_tasks": m_tasks,
+        "m_rows": m_rows,
+        "m_err": m_err,
+        "t_scores": t_scores,
+        "t_models": t_models,
+        "mt_scores": mt_scores,
+        "zero_rows": zero_rows,
+        "err_rows": err_rows,
         "unscored_rows": unscored_rows,
-        "trunc_rows": trunc_rows, "retried_rows": retried_rows,
-        "rescued_rows": rescued_rows, "ingest_fail": ingest_fail,
+        "trunc_rows": trunc_rows,
+        "retried_rows": retried_rows,
+        "rescued_rows": rescued_rows,
+        "ingest_fail": ingest_fail,
         "tools_unsupported": tools_unsupported,
         "m_agentic": m_agentic,
-        "shared": shared, "text_models": text_models,
+        "shared": shared,
+        "text_models": text_models,
         "samples_declared": samples_declared,
     }
 
@@ -295,30 +338,40 @@ def render(a):
     smp = a["samples_declared"]
     # Empty aggregate (no current-era runs) must not claim N=1 — that was a
     # display lie when inject ran against a zero-run era (lina note).
-    smp_s = ("/".join(str(x) for x in sorted(smp))) if smp else ("—" if a["n_runs"] == 0 else "1")
+    smp_s = (
+        ("/".join(str(x) for x in sorted(smp)))
+        if smp
+        else ("—" if a["n_runs"] == 0 else "1")
+    )
     md = []
-    md.append(f"_Current-methodology aggregate across **{a['n_runs']} runs** "
-              f"({fmt_date(a['span'][0])} → {fmt_date(a['span'][1])}), "
-              f"**{n_models} models**, **{n_tasks} tasks**, "
-              f"{len(a['rows'])} model×task×sample results "
-              f"(**N={smp_s}** draws per model×task). "
-              f"Sorted by mean for scanability — **not a ranking**. "
-              f"Judge: free NVIDIA NIM. Regenerate: "
-              f"`python scripts/aggregate_results.py --inject README.md`._")
+    md.append(
+        f"_Current-methodology aggregate across **{a['n_runs']} runs** "
+        f"({fmt_date(a['span'][0])} → {fmt_date(a['span'][1])}), "
+        f"**{n_models} models**, **{n_tasks} tasks**, "
+        f"{len(a['rows'])} model×task×sample results "
+        f"(**N={smp_s}** draws per model×task). "
+        f"Sorted by mean for scanability — **not a ranking**. "
+        f"Judge: free NVIDIA NIM. Regenerate: "
+        f"`python scripts/aggregate_results.py --inject README.md`._"
+    )
     md.append("")
     total_rows = len(a["rows"])
     unscored = a.get("unscored_rows", 0)
     if total_rows:
         pct = 100.0 * (total_rows - unscored) / total_rows
-        cov = (f"_Judged coverage: **{total_rows - unscored}/{total_rows} rows scored "
-               f"({pct:.0f}%)**")
+        cov = (
+            f"_Judged coverage: **{total_rows - unscored}/{total_rows} rows scored "
+            f"({pct:.0f}%)**"
+        )
         if unscored:
             # Printed unconditionally so a judge outage can never again hide
             # behind a healthy-looking mean (2026-08-26 → 09-07: the judge model
             # was retired and only mechanically-scored rows survived).
-            cov += (f"; {unscored} row(s) carry no score and are excluded from every "
-                    f"mean above. A large unscored share means the LLM judge did not "
-                    f"run — read the per-run report before trusting these numbers")
+            cov += (
+                f"; {unscored} row(s) carry no score and are excluded from every "
+                f"mean above. A large unscored share means the LLM judge did not "
+                f"run — read the per-run report before trusting these numbers"
+            )
         md.append(cov + "._")
     md.append("")
 
@@ -342,24 +395,32 @@ def render(a):
         latm = statistics.mean(lat) if lat else 0.0
         errp = a["m_err"][m]
         vision_only = bool(a["m_tasks"][m]) and a["m_tasks"][m] <= VISION_TASKS
-        vis = " ·\U0001F441" if vision_only else ""
-        sh_vals = [s for (mm, t), v in a["mt_scores"].items()
-                   if mm == m and t in shared for s in v]
+        vis = " ·\U0001f441" if vision_only else ""
+        sh_vals = [
+            s
+            for (mm, t), v in a["mt_scores"].items()
+            if mm == m and t in shared
+            for s in v
+        ]
         sh_s = f"{statistics.mean(sh_vals):.2f}" if sh_vals else "—"
-        row = (f"| `{short(m)}`{vis} | **{avg:.2f}** | {ci_s} | {sh_s} | "
-               f"{len(sc)} | {len(a['m_runs'][m])} / {len(a['m_tasks'][m])} | "
-               f"{latm:.1f}s |")
+        row = (
+            f"| `{short(m)}`{vis} | **{avg:.2f}** | {ci_s} | {sh_s} | "
+            f"{len(sc)} | {len(a['m_runs'][m])} / {len(a['m_tasks'][m])} | "
+            f"{latm:.1f}s |"
+        )
         if any_err:
             row += f" {errp or '-'} |"
         md.append(row)
     md.append("")
-    md.append(f"> **Avg** is over text/vision tasks a model attempted (agentic "
-              f"excluded — separate regime). **Shared-task avg** is over "
-              f"the {len(shared)} text task(s) every general model attempted "
-              f"({', '.join('`' + t + '`' for t in sorted(shared)) if shared else 'none'})"
-              f" — that column is the like-for-like one. Agentic tool-call scores are "
-              f"**never** folded into Avg or Shared-task (SPEC 13.6). `—` = vision-only "
-              f"model. `\U0001F441` = vision-only coverage (different judging regime).")
+    md.append(
+        f"> **Avg** is over text/vision tasks a model attempted (agentic "
+        f"excluded — separate regime). **Shared-task avg** is over "
+        f"the {len(shared)} text task(s) every general model attempted "
+        f"({', '.join('`' + t + '`' for t in sorted(shared)) if shared else 'none'})"
+        f" — that column is the like-for-like one. Agentic tool-call scores are "
+        f"**never** folded into Avg or Shared-task (SPEC 13.6). `—` = vision-only "
+        f"model. `\U0001f441` = vision-only coverage (different judging regime)."
+    )
     md.append("")
 
     # ---- Agentic regime (SPEC 13.3 / 13.6) — separate from text smoke ----
@@ -376,20 +437,24 @@ def render(a):
                 vals = a["mt_scores"].get((m, t))
                 if vals:
                     any_row = True
-                    md.append(f"| `{short(m)}` | `{t}` | {statistics.mean(vals):.2f} | "
-                              f"{len(vals)} | "
-                              f"{'mechanical trajectory' if t == 'tool_multiturn_sum' else 'mechanical tool-call'} |")
+                    md.append(
+                        f"| `{short(m)}` | `{t}` | {statistics.mean(vals):.2f} | "
+                        f"{len(vals)} | "
+                        f"{'mechanical trajectory' if t == 'tool_multiturn_sum' else 'mechanical tool-call'} |"
+                    )
         if not any_row:
             md.append("| — | — | — | — | no scored agentic rows yet |")
         md.append("")
-        md.append(f"> Agentic regime (SPEC 13.3 single-turn + 13.4/13.5 multi-turn). "
-                  f"Primary multi-turn score is `completed`; full trajectory sub-scores "
-                  f"live on run rows. `tools_unsupported` rows are **unscored** (not 0.0): "
-                  f"{tu} this era. No medals/ranks — smoke framing only.")
+        md.append(
+            f"> Agentic regime (SPEC 13.3 single-turn + 13.4/13.5 multi-turn). "
+            f"Primary multi-turn score is `completed`; full trajectory sub-scores "
+            f"live on run rows. `tools_unsupported` rows are **unscored** (not 0.0): "
+            f"{tu} this era. No medals/ranks — smoke framing only."
+        )
         md.append("")
 
     # ---- Per-task difficulty ----
-    md.append("### \U0001F3AF Task difficulty (mean score across all models)")
+    md.append("### \U0001f3af Task difficulty (mean score across all models)")
     md.append("")
     md.append("| Task | Avg | 95% CI | Results (n) | Models | |")
     md.append("|---|---:|---:|---:|---:|---|")
@@ -398,13 +463,15 @@ def render(a):
         avg = statistics.mean(sc)
         ci_s = ci_str(sc)
         bar = "█" * round(avg * 10) + "░" * (10 - round(avg * 10))
-        vis = " \U0001F441" if t in VISION_TASKS else ""
-        md.append(f"| `{t}`{vis} | {avg:.2f} | {ci_s} | {len(sc)} | "
-                  f"{len(a['t_models'][t])} | `{bar}` |")
+        vis = " \U0001f441" if t in VISION_TASKS else ""
+        md.append(
+            f"| `{t}`{vis} | {avg:.2f} | {ci_s} | {len(sc)} | "
+            f"{len(a['t_models'][t])} | `{bar}` |"
+        )
     md.append("")
 
     # ---- Matrix ----
-    md.append("### \U0001F9EE Model × task score matrix")
+    md.append("### \U0001f9ee Model × task score matrix")
     md.append("")
     # Every cell is mean +/- half-CI over the draws behind it, with n. A cell with
     # n=1 is labelled as such rather than printed like a measurement.
@@ -422,39 +489,55 @@ def render(a):
                 cells.append(f"{v[0]:.2f} <sub>n=1</sub>")
             else:
                 c = ci_str(v)
-                cells.append(f"{statistics.mean(v):.2f} <sub>n={len(v)}</sub>" if c == "exact"
-                             else f"{statistics.mean(v):.2f} <sub>{c}, n={len(v)}</sub>")
+                cells.append(
+                    f"{statistics.mean(v):.2f} <sub>n={len(v)}</sub>"
+                    if c == "exact"
+                    else f"{statistics.mean(v):.2f} <sub>{c}, n={len(v)}</sub>"
+                )
         md.append(f"| `{t}` | " + " | ".join(cells) + " |")
     md.append("")
-    md.append(f"_Showing the {len(mcols)} model(s) with ≥2 scored results. "
-              "`·` = task not attempted (capability tags — see Coverage below). "
-              "Ranges are 95% t-intervals over that cell's draws, clamped to the "
-              "`[0, 1]` score range; a cell whose draws all agreed shows no range._")
+    md.append(
+        f"_Showing the {len(mcols)} model(s) with ≥2 scored results. "
+        "`·` = task not attempted (capability tags — see Coverage below). "
+        "Ranges are 95% t-intervals over that cell's draws, clamped to the "
+        "`[0, 1]` score range; a cell whose draws all agreed shows no range._"
+    )
     md.append("")
 
     # ---- Sampling spread: the direct evidence for why N=1 was not enough ----
-    disagree = [((m, t), v) for (m, t), v in a["mt_scores"].items()
-                if len(v) > 1 and (max(v) - min(v)) > 0]
-    md.append("### \U0001F3B2 Sampling spread (same model, same prompt, repeated draws)")
+    disagree = [
+        ((m, t), v)
+        for (m, t), v in a["mt_scores"].items()
+        if len(v) > 1 and (max(v) - min(v)) > 0
+    ]
+    md.append(
+        "### \U0001f3b2 Sampling spread (same model, same prompt, repeated draws)"
+    )
     md.append("")
     if not disagree:
-        md.append(f"_No (model, task) cell disagreed with itself across its draws "
-                  f"(N={smp_s}). Every repeated pair scored identically every time._")
+        md.append(
+            f"_No (model, task) cell disagreed with itself across its draws "
+            f"(N={smp_s}). Every repeated pair scored identically every time._"
+        )
     else:
         md.append("| Model | Task | Draws | Scores | Mean | Spread |")
         md.append("|---|---|---:|---|---:|---:|")
         for (m, t), v in sorted(disagree, key=lambda kv: -(max(kv[1]) - min(kv[1]))):
-            md.append(f"| `{short(m)}` | `{t}` | {len(v)} | "
-                      f"{', '.join(f'{x:g}' for x in v)} | {statistics.mean(v):.2f} | "
-                      f"{max(v) - min(v):.2f} |")
+            md.append(
+                f"| `{short(m)}` | `{t}` | {len(v)} | "
+                f"{', '.join(f'{x:g}' for x in v)} | {statistics.mean(v):.2f} | "
+                f"{max(v) - min(v):.2f} |"
+            )
         md.append("")
-        md.append(f"_{len(disagree)} cell(s) returned different scores for the **same "
-                  "prompt at the same settings**. Each of those is a number a single-draw "
-                  "run would have published as fact._")
+        md.append(
+            f"_{len(disagree)} cell(s) returned different scores for the **same "
+            "prompt at the same settings**. Each of those is a number a single-draw "
+            "run would have published as fact._"
+        )
     md.append("")
 
     # ---- Coverage: what was NOT run, and why (F1.6/D5) ----
-    md.append("### \U0001F4CB Coverage (what was skipped, and why)")
+    md.append("### \U0001f4cb Coverage (what was skipped, and why)")
     md.append("")
     md.append("| Model | Tasks attempted | Skipped | Reason |")
     md.append("|---|---:|---:|---|")
@@ -464,32 +547,43 @@ def render(a):
     order = sorted(set(list(a["m_tasks"]) + list(by_model_skip)))
     for m in order:
         sk = sorted(set(by_model_skip.get(m, [])))
-        md.append(f"| `{short(m)}` | {len(a['m_tasks'].get(m, ()))} | {len(sk)} | "
-                  f"{'capability tags (no overlap)' if sk else '—'} |")
+        md.append(
+            f"| `{short(m)}` | {len(a['m_tasks'].get(m, ()))} | {len(sk)} | "
+            f"{'capability tags (no overlap)' if sk else '—'} |"
+        )
     md.append("")
     # The task lists live below the table, not inside a cell: a 9-item list in one
     # cell made the rendered table several screens wide on GitHub.
     for m in order:
         sk = sorted(set(by_model_skip.get(m, [])))
         if sk:
-            md.append(f"- `{short(m)}` did not attempt: "
-                      + ", ".join(f"`{t}`" for t in sk) + ".")
+            md.append(
+                f"- `{short(m)}` did not attempt: "
+                + ", ".join(f"`{t}`" for t in sk)
+                + "."
+            )
     if any(by_model_skip.values()):
         md.append("")
-        md.append("_Skipped pairs mean the model's capability tags and the task's "
-                  "tags have no intersection (e.g. text models skip `vision_*`; "
-                  "vision-only models skip the text battery). That is by design, "
-                  "not a harness error._")
+        md.append(
+            "_Skipped pairs mean the model's capability tags and the task's "
+            "tags have no intersection (e.g. text models skip `vision_*`; "
+            "vision-only models skip the text battery). That is by design, "
+            "not a harness error._"
+        )
         md.append("")
     if not a["skips"]:
-        md.append("_No run in this aggregate recorded a skipped pair. Runs from earlier "
-                  "methodology versions skipped pairs silently and cannot be "
-                  "audited this way._")
+        md.append(
+            "_No run in this aggregate recorded a skipped pair. Runs from earlier "
+            "methodology versions skipped pairs silently and cannot be "
+            "audited this way._"
+        )
         md.append("")
 
     # ---- Era history: previous datasets, preserved and excluded ----
-    md.append("### \U0001F5C2 Era history — era = dataset/methodology version "
-              "(previous versions kept but not averaged in)")
+    md.append(
+        "### \U0001f5c2 Era history — era = dataset/methodology version "
+        "(previous versions kept but not averaged in)"
+    )
     md.append("")
     md.append("| Methodology version | Dates | Runs on disk | In this aggregate |")
     md.append("|---|---|---:|---|")
@@ -503,35 +597,50 @@ def render(a):
     for e in ERAS:
         md.append(f"- **{e['label']}** — {e['why']}")
     md.append("")
-    md.append("_Every run above is still committed in `runs/`. A harness change that alters "
-              "what is measured makes old runs a different dataset, not a longer time series, "
-              "so they are cited as history and never averaged with current ones._")
+    md.append(
+        "_Every run above is still committed in `runs/`. A harness change that alters "
+        "what is measured makes old runs a different dataset, not a longer time series, "
+        "so they are cited as history and never averaged with current ones._"
+    )
     md.append("")
 
     # ---- Honest data-quality caveats (derived, not asserted) ----
     zr, er = a["zero_rows"], a["err_rows"]
-    tr, rt, rs, igf = a["trunc_rows"], a["retried_rows"], a["rescued_rows"], a["ingest_fail"]
+    tr, rt, rs, igf = (
+        a["trunc_rows"],
+        a["retried_rows"],
+        a["rescued_rows"],
+        a["ingest_fail"],
+    )
     total = len(a["rows"])
-    md.append("### \U0001F50D Data quality (measured, not estimated)")
+    md.append("### \U0001f50d Data quality (measured, not estimated)")
     md.append("")
     was = "was" if rs == 1 else "were"
     is_are = "is" if tr == 1 else "are"
-    md.append(f"- **Truncation — counted, not guessed.** {rt} of {total} responses hit "
-              f"the token budget and were **retried once at 2× budget**; {rs} then "
-              f"completed and {was} scored, {tr} {is_are} still cut off and therefore "
-              f"**unscored (`null`), never 0.0** — excluded from every mean above. This "
-              f"is read from Ollama's recorded `done_reason`, not inferred from how a "
-              f"response ends.")
-    md.append(f"- **Zero-scores are real zeros.** {zr} of {total} rows scored 0.0 with a "
-              f"complete, untruncated response — answers the scorer or judge rejected, "
-              f"not harness artefacts.")
-    md.append(f"- **Errors:** {er} results errored (Ollama unreachable / model tag failed to "
-              f"pull). Errored rows are excluded from means.")
+    md.append(
+        f"- **Truncation — counted, not guessed.** {rt} of {total} responses hit "
+        f"the token budget and were **retried once at 2× budget**; {rs} then "
+        f"completed and {was} scored, {tr} {is_are} still cut off and therefore "
+        f"**unscored (`null`), never 0.0** — excluded from every mean above. This "
+        f"is read from Ollama's recorded `done_reason`, not inferred from how a "
+        f"response ends."
+    )
+    md.append(
+        f"- **Zero-scores are real zeros.** {zr} of {total} rows scored 0.0 with a "
+        f"complete, untruncated response — answers the scorer or judge rejected, "
+        f"not harness artefacts."
+    )
+    md.append(
+        f"- **Errors:** {er} results errored (Ollama unreachable / model tag failed to "
+        f"pull). Errored rows are excluded from means."
+    )
     if igf:
-        md.append(f"- **Image-ingestion failures:** {igf} vision row(s) where the model "
-                  f"replied that no image was supplied. Those are harness/ingestion "
-                  f"failures, **unscored** rather than published as a vision-capability "
-                  f"score.")
+        md.append(
+            f"- **Image-ingestion failures:** {igf} vision row(s) where the model "
+            f"replied that no image was supplied. Those are harness/ingestion "
+            f"failures, **unscored** rather than published as a vision-capability "
+            f"score."
+        )
     tu = a.get("tools_unsupported", 0)
     if tu:
         md.append(
@@ -540,21 +649,27 @@ def render(a):
             "(SPEC 13.3 / DECISIONS 2026-08-24)."
         )
     cov = ", ".join(f"`{short(m)}` {len(a['m_tasks'][m])}" for m in models)
-    md.append(f"- **Coverage is disclosed, not even.** Tasks attempted: {cov}. Every skipped "
-              f"pair is recorded with its reason (see Coverage) and the table carries a "
-              f"**shared-task column** so cross-model comparison is like-for-like. Vision-only "
-              f"models attempt no text tasks by design — their overall average is not "
-              f"comparable to a text model's and is marked `\U0001F441`.")
-    md.append(f"- **Multi-sample, single judge.** N={smp_s} draws per (model, task) with the "
-              f"spread reported above, so a number here is a mean with an interval rather "
-              f"than one draw. **The judge is still a single NVIDIA NIM pass** — there is "
-              f"no inter-rater agreement, and there will not be while the free-judge + "
-              f"one-GPU constraint holds (a second judge means either another cloud key or "
-              f"evicting the model-under-test from the 12 GB card).")
-    md.append("- **Item count is the real ceiling.** Each task is still **one prompt** graded "
-              "binary. Repeating a draw measures sampling noise; it cannot fix a battery of "
-              "11 items. Retiring that needs suites with mechanical ground truth "
-              "(`IMPROVEMENTS.md` P2.2) — until then these are smoke-test numbers.")
+    md.append(
+        f"- **Coverage is disclosed, not even.** Tasks attempted: {cov}. Every skipped "
+        f"pair is recorded with its reason (see Coverage) and the table carries a "
+        f"**shared-task column** so cross-model comparison is like-for-like. Vision-only "
+        f"models attempt no text tasks by design — their overall average is not "
+        f"comparable to a text model's and is marked `\U0001f441`."
+    )
+    md.append(
+        f"- **Multi-sample, single judge.** N={smp_s} draws per (model, task) with the "
+        f"spread reported above, so a number here is a mean with an interval rather "
+        f"than one draw. **The judge is still a single NVIDIA NIM pass** — there is "
+        f"no inter-rater agreement, and there will not be while the free-judge + "
+        f"one-GPU constraint holds (a second judge means either another cloud key or "
+        f"evicting the model-under-test from the 12 GB card)."
+    )
+    md.append(
+        "- **Item count is the real ceiling.** Each task is still **one prompt** graded "
+        "binary. Repeating a draw measures sampling noise; it cannot fix a battery of "
+        "11 items. Retiring that needs suites with mechanical ground truth "
+        "(`IMPROVEMENTS.md` P2.2) — until then these are smoke-test numbers."
+    )
     md.append("")
     return "\n".join(md)
 
@@ -564,8 +679,9 @@ def inject(target, block):
         text = f.read()
     payload = f"{START}\n{block}\n{END}"
     if START in text and END in text:
-        text = re.sub(re.escape(START) + r".*?" + re.escape(END), payload,
-                      text, flags=re.DOTALL)
+        text = re.sub(
+            re.escape(START) + r".*?" + re.escape(END), payload, text, flags=re.DOTALL
+        )
     else:
         raise SystemExit(f"markers not found in {target}; add:\n{START}\n{END}")
     with open(target, "w", encoding="utf-8") as f:
@@ -575,7 +691,9 @@ def inject(target, block):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--inject", help="splice the block into this file's RESULTS markers")
+    ap.add_argument(
+        "--inject", help="splice the block into this file's RESULTS markers"
+    )
     ap.add_argument("--out", help="write the block to this file")
     args = ap.parse_args()
 
@@ -583,12 +701,17 @@ def main():
     # the block; force UTF-8 so a bare `python aggregate_results.py` never crashes.
     try:
         sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 - reconfigure is missing on some streams
         pass
 
     block = render(aggregate())
     if args.inject:
-        inject(args.inject if os.path.isabs(args.inject) else os.path.join(REPO, args.inject), block)
+        inject(
+            args.inject
+            if os.path.isabs(args.inject)
+            else os.path.join(REPO, args.inject),
+            block,
+        )
     if args.out:
         path = args.out if os.path.isabs(args.out) else os.path.join(REPO, args.out)
         with open(path, "w", encoding="utf-8") as f:

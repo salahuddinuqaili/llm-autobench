@@ -21,6 +21,7 @@ What works today:
 
 Run:  python run_bench.py --tier local,free
 """
+
 import argparse
 import datetime as dt
 import json
@@ -29,9 +30,8 @@ import re
 import sys
 import urllib.request
 
-import yaml
-
 import procutil
+import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -44,11 +44,10 @@ def _judge_model_id() -> str:
     """Same default as nvidia_judge.JUDGE_MODEL (lazy import: no cycle)."""
     try:
         import nvidia_judge as _nj
+
         return _nj.JUDGE_MODEL
-    except Exception:
-        return os.environ.get(
-            "NVIDIA_JUDGE_MODEL", "nvidia/nemotron-3-super-120b-a12b"
-        )
+    except Exception:  # noqa: BLE001 - import failure falls back to the env default
+        return os.environ.get("NVIDIA_JUDGE_MODEL", "nvidia/nemotron-3-super-120b-a12b")
 
 
 def _shell(args, default=""):
@@ -56,7 +55,7 @@ def _shell(args, default=""):
     try:
         p = procutil.run(args, capture_output=True, text=True, timeout=15, cwd=REPO)
         return p.stdout.strip() if p.returncode == 0 else default
-    except Exception:
+    except Exception:  # noqa: BLE001 - provenance capture must not break a run
         return default
 
 
@@ -75,13 +74,15 @@ def build_provenance():
         for name in sorted(os.listdir(tasks_dir)):
             if name.endswith(".yaml"):
                 with open(os.path.join(tasks_dir, name), "rb") as f:
-                    h.update(name.encode()); h.update(f.read())
+                    h.update(name.encode())
+                    h.update(f.read())
         battery = h.hexdigest()[:12]
     except OSError:
         pass
 
-    gpu = _shell(["nvidia-smi", "--query-gpu=name,memory.total",
-                  "--format=csv,noheader"]).splitlines()
+    gpu = _shell(
+        ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader"]
+    ).splitlines()
     try:
         ollama = _shell(procutil.ollama_argv("--version"))
     except FileNotFoundError:
@@ -93,8 +94,9 @@ def build_provenance():
         "pipeline_sha": _shell(["git", "rev-parse", "--short", "HEAD"]),
         "pipeline_dirty": bool(_shell(["git", "status", "--porcelain"])),
         "task_battery_sha": battery,
-        "task_count": len([n for n in os.listdir(tasks_dir)
-                           if n.endswith(".yaml")]) if os.path.isdir(tasks_dir) else None,
+        "task_count": len([n for n in os.listdir(tasks_dir) if n.endswith(".yaml")])
+        if os.path.isdir(tasks_dir)
+        else None,
         # The judge is asserted here so a run can be checked rather than trusted.
         "judge": {"provider": "nvidia_nim", "model": _judge_model_id()},
         "hardware": {"gpu": gpu[0].strip() if gpu else None},
@@ -146,7 +148,11 @@ def call_model(model, prompt, max_tokens, image_path=None, tools=None, messages=
             # remains the default single-turn path used by every other task.
             if messages is not None:
                 chat_messages = list(messages)
-                message = chat_messages[-1] if chat_messages else {"role": "user", "content": prompt}
+                message = (
+                    chat_messages[-1]
+                    if chat_messages
+                    else {"role": "user", "content": prompt}
+                )
             else:
                 message = {"role": "user", "content": prompt}
                 chat_messages = [message]
@@ -176,12 +182,19 @@ def call_model(model, prompt, max_tokens, image_path=None, tools=None, messages=
             # image (not at the payload root). Models without vision simply
             # ignore it / error -> reported via the error path.
             if image_path:
-                img_path = image_path if os.path.isabs(image_path) else os.path.join(REPO, image_path)
+                img_path = (
+                    image_path
+                    if os.path.isabs(image_path)
+                    else os.path.join(REPO, image_path)
+                )
                 try:
                     with open(img_path, "rb") as fh:
                         import base64
-                        message["images"] = [base64.b64encode(fh.read()).decode("utf-8")]
-                except Exception:
+
+                        message["images"] = [
+                            base64.b64encode(fh.read()).decode("utf-8")
+                        ]
+                except Exception:  # noqa: BLE001, S110 - missing image is sent without it
                     # image missing -> let the model answer without it; the
                     # judge will score the (likely wrong) response.
                     pass
@@ -190,9 +203,9 @@ def call_model(model, prompt, max_tokens, image_path=None, tools=None, messages=
                 data=json.dumps(payload).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
             )
-            t0 = dt.datetime.now()
+            t0 = dt.datetime.now(dt.timezone.utc)
             raw = urllib.request.urlopen(req, timeout=600).read().decode("utf-8")
-            latency = (dt.datetime.now() - t0).total_seconds()
+            latency = (dt.datetime.now(dt.timezone.utc) - t0).total_seconds()
             resp = json.loads(raw)
             msg = resp.get("message", {})
             # Qwen3.x / DeepSeek reasoning models may emit thinking tokens in a
@@ -220,7 +233,7 @@ def call_model(model, prompt, max_tokens, image_path=None, tools=None, messages=
                 "tool_calls": msg.get("tool_calls") or [],
             }
             return text, latency, None, meta
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - API failure is a recorded error
             return None, 0.0, f"ollama api error: {e}", {}
     # Anthropic models: call via `claude -p` CLI which uses OAuth / Claude Max
     # quota — no ANTHROPIC_API_KEY env var needed or wanted.
@@ -228,14 +241,19 @@ def call_model(model, prompt, max_tokens, image_path=None, tools=None, messages=
         try:
             model_name = model.get("model_name", "claude-sonnet-4-5")
             cmd = [
-                "claude", "-p", prompt,
-                "--model", model_name,
-                "--max-turns", "1",
-                "--output-format", "json",
+                "claude",
+                "-p",
+                prompt,
+                "--model",
+                model_name,
+                "--max-turns",
+                "1",
+                "--output-format",
+                "json",
             ]
-            t0 = dt.datetime.now()
+            t0 = dt.datetime.now(dt.timezone.utc)
             result = procutil.run(cmd, capture_output=True, text=True, timeout=120)
-            latency = (dt.datetime.now() - t0).total_seconds()
+            latency = (dt.datetime.now(dt.timezone.utc) - t0).total_seconds()
             if result.returncode != 0:
                 return None, latency, f"claude cli error: {result.stderr.strip()}", {}
             data = json.loads(result.stdout)
@@ -243,12 +261,14 @@ def call_model(model, prompt, max_tokens, image_path=None, tools=None, messages=
             # Strip CoT thinking blocks if any
             text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
             return text, latency, None, {}
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - CLI failure is a recorded error
             return None, 0.0, f"claude cli error: {e}", {}
     return None, 0.0, f"provider {model.get('provider')} not wired in skeleton", {}
 
 
-def call_model_guarded(model, prompt, max_tokens, image_path=None, tools=None, messages=None):
+def call_model_guarded(
+    model, prompt, max_tokens, image_path=None, tools=None, messages=None
+):
     """Call the model and guard against token-budget truncation.
 
     If Ollama reports `done_reason == "length"` (the response was cut off before
@@ -258,7 +278,9 @@ def call_model_guarded(model, prompt, max_tokens, image_path=None, tools=None, m
     where `meta["truncated"]` is True only if it was STILL cut off after the retry
     — the caller must then score it `null`, never `0.0`.
     """
-    text, latency, err, meta = call_model(model, prompt, max_tokens, image_path, tools=tools, messages=messages)
+    text, latency, err, meta = call_model(
+        model, prompt, max_tokens, image_path, tools=tools, messages=messages
+    )
     meta = dict(meta or {})
     meta["attempts"] = 1
     meta["max_tokens_used"] = max_tokens
@@ -268,7 +290,9 @@ def call_model_guarded(model, prompt, max_tokens, image_path=None, tools=None, m
     meta["gen_latency_s"] = latency
     if err is None and meta.get("done_reason") == "length":
         bigger = max_tokens * 2
-        text2, latency2, err2, meta2 = call_model(model, prompt, bigger, image_path, tools=tools, messages=messages)
+        text2, latency2, err2, meta2 = call_model(
+            model, prompt, bigger, image_path, tools=tools, messages=messages
+        )
         latency += latency2  # report total wall-clock incl. the wasted first attempt
         if err2 is None:
             text, err = text2, err2
@@ -296,7 +320,7 @@ _TIME_RE = re.compile(r"(?<![\d:])(\d{1,2}):(\d{2})(?![\d:])")
 _NUM_RE = re.compile(r"(?<![\w.])-?\d[\d,]*(?:\.\d+)?(?![\w])")
 # The model is asked to end with "Final answer: X"; we score THAT, not an
 # intermediate value mentioned mid-working.
-_FINAL_RE = re.compile(r"final\s*answer", re.I)
+_FINAL_RE = re.compile(r"final\s*answer", re.IGNORECASE)
 
 
 def _norm_time(s):
@@ -317,7 +341,7 @@ _NO_IMAGE_RE = re.compile(
     r"(not|n't|no)\s+(been\s+)?(provided|attached|given|uploaded|include)"
     r"|need\s+an?\s+image|cannot\s+see\s+(an?\s+)?image|unable\s+to\s+see"
     r"|please\s+(provide|upload|share)\s+(the|an?)\s+(image|picture|photo)",
-    re.I,
+    re.IGNORECASE,
 )
 
 
@@ -340,7 +364,7 @@ def _answer_region(response):
     WRONG final answer must not score. Falls back to the whole response when the
     model omitted the label."""
     hits = list(_FINAL_RE.finditer(response))
-    return response[hits[-1].end():] if hits else response
+    return response[hits[-1].end() :] if hits else response
 
 
 def score_exact(expected, response):
@@ -369,8 +393,9 @@ def score_exact(expected, response):
     # where `exp` itself ends in a word char (so "C++"/".NET"/"(a)" still match).
     left = r"(?<!\w)" if exp[:1].isalnum() else ""
     right = r"(?!\w)" if exp[-1:].isalnum() else ""
-    return 1.0 if re.search(left + re.escape(exp) + right, region, re.I) else 0.0
-
+    return (
+        1.0 if re.search(left + re.escape(exp) + right, region, re.IGNORECASE) else 0.0
+    )
 
 
 def _normalize_tool_calls(raw):
@@ -387,7 +412,7 @@ def _normalize_tool_calls(raw):
         if isinstance(args, str):
             try:
                 args = json.loads(args) if args.strip() else {}
-            except Exception:
+            except Exception:  # noqa: BLE001 - malformed tool args become {}
                 args = {}
         if not isinstance(args, dict):
             args = {}
@@ -436,7 +461,6 @@ def score_tool_call(task, tool_calls):
     return 0.0
 
 
-
 def _answer_equal(got, want):
     """Compare finish answers: strip, casefold strings, numeric coercion."""
     if got is None or want is None:
@@ -444,7 +468,9 @@ def _answer_equal(got, want):
     if _arg_equal(got, want):
         return True
     try:
-        return float(str(got).strip().replace(",", "")) == float(str(want).strip().replace(",", ""))
+        return float(str(got).strip().replace(",", "")) == float(
+            str(want).strip().replace(",", "")
+        )
     except (TypeError, ValueError):
         return str(got).strip().casefold() == str(want).strip().casefold()
 
@@ -458,8 +484,9 @@ def _calc_expr_equal(got, want):
         return True
     try:
         import tool_sandbox as _ts
+
         return _ts._safe_calc(got) == _ts._safe_calc(want)
-    except Exception:
+    except Exception:  # noqa: BLE001 - unevaluable calc expressions are not equal
         return False
 
 
@@ -506,7 +533,9 @@ def score_trajectory(task, sandbox, trajectory, turn_cap):
         if n:
             allowed.add(n)
     if not allowed:
-        allowed = set(__import__("tool_sandbox", fromlist=["ToolSandbox"]).ToolSandbox.TOOL_NAMES)
+        allowed = set(
+            __import__("tool_sandbox", fromlist=["ToolSandbox"]).ToolSandbox.TOOL_NAMES
+        )
 
     all_calls = []
     for turn in trajectory or []:
@@ -604,7 +633,8 @@ def run_tool_loop(model, task, call_fn=None):
 
     def _default_call(model, messages, max_tokens, tools):
         return call_model_guarded(
-            model, task["prompt"], max_tokens, tools=tools, messages=messages)
+            model, task["prompt"], max_tokens, tools=tools, messages=messages
+        )
 
     call = call_fn or _default_call
 
@@ -630,7 +660,6 @@ def run_tool_loop(model, task, call_fn=None):
 
             # Turn 0 with no tool_calls => model cannot / will not use tools.
             if turn_i == 0 and not norm:
-                sc = None
                 return {
                     "text": text,
                     "latency_s": total_latency,
@@ -656,7 +685,13 @@ def run_tool_loop(model, task, call_fn=None):
 
             for tc, nrm in zip(raw_calls, norm):
                 result = sandbox.execute(nrm["name"], nrm["arguments"])
-                flat_calls.append({"name": nrm["name"], "arguments": nrm["arguments"], "result": result})
+                flat_calls.append(
+                    {
+                        "name": nrm["name"],
+                        "arguments": nrm["arguments"],
+                        "result": result,
+                    }
+                )
                 # Ollama accepts role:tool with content string; include name when known.
                 tool_msg = {
                     "role": "tool",
@@ -707,7 +742,7 @@ def score(task, response, tool_calls=None):
             exp = json.loads(expected)
             got = json.loads(response)
             return 1.0 if got == exp else 0.0
-        except Exception:
+        except Exception:  # noqa: BLE001 - unparseable JSON is a wrong answer
             return 0.0
 
     if method == "python-exec":
@@ -739,31 +774,39 @@ def _record_telemetry(tracker, run_id, model, task, latency, meta, err):
     (meta) rather than a streaming wrapper, so it adds no extra model call."""
     try:
         import telemetry
+
         prov = model.get("provider", "") or ""
         provider = "ollama" if prov.startswith("custom") else (prov or "unknown")
         prompt_toks = meta.get("prompt_tokens") or 0
         completion_toks = meta.get("completion_tokens") or 0
         gen_latency = meta.get("gen_latency_s") or latency
         tps = (completion_toks / gen_latency) if gen_latency > 0 else 0.0
-        tracker.record(telemetry.TelemetryRecord(
-            timestamp=dt.datetime.now().isoformat(),
-            run_id=run_id,
-            model_id=model["id"],
-            model_provider=provider,
-            task_id=task["id"],
-            task_category=task.get("category", ""),
-            prompt_tokens=prompt_toks,
-            completion_tokens=completion_toks,
-            total_tokens=prompt_toks + completion_toks,
-            latency_seconds=latency,
-            ttft_seconds=None,
-            tokens_per_second=tps,
-            vram_peak_mib=telemetry.get_vram_used_mib(),
-            vram_delta_mib=None,
-            cost_usd=telemetry.calculate_cost(model["id"], prompt_toks, completion_toks),
-            success=(err is None),
-            error=err,
-        ))
+        tracker.record(
+            telemetry.TelemetryRecord(
+                timestamp=dt.datetime.now(dt.timezone.utc)
+                .astimezone()
+                .replace(tzinfo=None)
+                .isoformat(),
+                run_id=run_id,
+                model_id=model["id"],
+                model_provider=provider,
+                task_id=task["id"],
+                task_category=task.get("category", ""),
+                prompt_tokens=prompt_toks,
+                completion_tokens=completion_toks,
+                total_tokens=prompt_toks + completion_toks,
+                latency_seconds=latency,
+                ttft_seconds=None,
+                tokens_per_second=tps,
+                vram_peak_mib=telemetry.get_vram_used_mib(),
+                vram_delta_mib=None,
+                cost_usd=telemetry.calculate_cost(
+                    model["id"], prompt_toks, completion_toks
+                ),
+                success=(err is None),
+                error=err,
+            )
+        )
     except Exception as e:  # noqa: BLE001 — telemetry must never break a run
         print(f"[{run_id}] telemetry record failed: {e}", file=sys.stderr)
 
@@ -773,11 +816,17 @@ def main():
     ap.add_argument("--registry", default=os.path.join(REPO, "models", "registry.yaml"))
     ap.add_argument("--tasks", default=os.path.join(REPO, "tasks"))
     ap.add_argument("--out", default=os.path.join(REPO, "runs"))
-    ap.add_argument("--tier", default=None, help="comma list to filter, e.g. local,free")
+    ap.add_argument(
+        "--tier", default=None, help="comma list to filter, e.g. local,free"
+    )
     # N=1 was structural, not a setting: there was no sample loop at all, so every
     # published number was a single draw with no way to tell signal from noise.
-    ap.add_argument("--samples", type=int, default=1,
-                    help="draws per (model, task); >1 makes variance measurable")
+    ap.add_argument(
+        "--samples",
+        type=int,
+        default=1,
+        help="draws per (model, task); >1 makes variance measurable",
+    )
     args = ap.parse_args()
     if args.samples < 1:
         raise SystemExit("--samples must be >= 1")
@@ -789,13 +838,14 @@ def main():
         models = [m for m in models if m.get("tier") in wanted]
     models = [m for m in models if m.get("enabled", True)]
 
-    run_id = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_id = dt.datetime.now(dt.timezone.utc).astimezone().strftime("%Y%m%d_%H%M%S")
 
     # Telemetry (tokens / tok-per-s / VRAM / cost) — optional; a broken import
     # must never take down a bench run, so it is best-effort.
     tracker = None
     try:
         import telemetry
+
         tracker = telemetry.TelemetryTracker(run_id)
     except Exception as e:  # noqa: BLE001
         print(f"[{run_id}] telemetry disabled: {e}", file=sys.stderr)
@@ -810,13 +860,15 @@ def main():
         for task in tasks:
             ttags = set(task.get("tags", []))
             if not (mtags & ttags) and not task.get("requires_frontier"):
-                skipped.append({
-                    "model": model["id"],
-                    "task": task["id"],
-                    "reason": "tag mismatch: model tags do not intersect task tags",
-                    "model_tags": sorted(mtags),
-                    "task_tags": sorted(ttags),
-                })
+                skipped.append(
+                    {
+                        "model": model["id"],
+                        "task": task["id"],
+                        "reason": "tag mismatch: model tags do not intersect task tags",
+                        "model_tags": sorted(mtags),
+                        "task_tags": sorted(ttags),
+                    }
+                )
                 print(f"[{run_id}] {model['id']} x {task['id']}: SKIP (tag mismatch)")
                 continue
             for sample_i in range(args.samples):
@@ -837,17 +889,18 @@ def main():
                     trajectory = loop.get("trajectory")
                     trajectory_scores = loop.get("trajectory_scores")
                     sandbox_calls = loop.get("sandbox_calls")
-                    if truncated:
-                        sc = None
-                    elif tools_unsupported:
+                    if truncated or tools_unsupported:
                         sc = None
                     else:
                         sc = loop.get("score")
                 else:
                     text, latency, err, meta = call_model_guarded(
-                        model, task["prompt"], task.get("max_tokens", 512),
+                        model,
+                        task["prompt"],
+                        task.get("max_tokens", 512),
                         image_path=task.get("image"),
-                        tools=task.get("tools"))
+                        tools=task.get("tools"),
+                    )
                     # A response cut off at the token budget is a non-answer: score it
                     # `null` (unscored), NEVER 0.0 - a truncated CoT is not a wrong answer.
                     truncated = bool(meta.get("truncated"))
@@ -868,64 +921,103 @@ def main():
                 gen_latency = meta.get("gen_latency_s") or latency
                 if meta.get("completion_tokens") and gen_latency > 0:
                     tps = round(meta["completion_tokens"] / gen_latency, 1)
-                results.append({
-                    "model": model["id"], "task": task["id"],
-                    # Which draw this is. Rows are only comparable within a
-                    # (model, task, run); the aggregate uses these to compute
-                    # spread instead of asserting a single draw is the truth.
-                    "sample": sample_i,
-                    "samples": args.samples,
-                    "response": text, "latency_s": latency,
-                    "score": sc, "error": err,
-                    "image": task.get("image"),
-                    "truncated": truncated,
-                    "done_reason": meta.get("done_reason"),
-                    "attempts": meta.get("attempts", 1),
-                    "max_tokens_used": meta.get("max_tokens_used", task.get("max_tokens", 512)),
-                    "prompt_tokens": meta.get("prompt_tokens"),
-                    "completion_tokens": meta.get("completion_tokens"),
-                    "tokens_per_s": tps,
-                    "thinking_chars": meta.get("thinking_chars"),
-                    "think_disabled": meta.get("think_disabled"),
-                    "ingestion_failed": bool(
-                        task.get("image") and looks_like_ingestion_failure(text)),
-                    # SPEC 13.3: recorded even when empty so reports can distinguish
-                    # "cannot use tools" from "used tools wrongly".
-                    "tool_calls": tool_calls if (task.get("tools") or method == "tool-trajectory") else None,
-                    "tools_unsupported": tools_unsupported,
-                    "trajectory": trajectory,
-                    "trajectory_scores": trajectory_scores,
-                    "sandbox_calls": sandbox_calls,
-                })
+                results.append(
+                    {
+                        "model": model["id"],
+                        "task": task["id"],
+                        # Which draw this is. Rows are only comparable within a
+                        # (model, task, run); the aggregate uses these to compute
+                        # spread instead of asserting a single draw is the truth.
+                        "sample": sample_i,
+                        "samples": args.samples,
+                        "response": text,
+                        "latency_s": latency,
+                        "score": sc,
+                        "error": err,
+                        "image": task.get("image"),
+                        "truncated": truncated,
+                        "done_reason": meta.get("done_reason"),
+                        "attempts": meta.get("attempts", 1),
+                        "max_tokens_used": meta.get(
+                            "max_tokens_used", task.get("max_tokens", 512)
+                        ),
+                        "prompt_tokens": meta.get("prompt_tokens"),
+                        "completion_tokens": meta.get("completion_tokens"),
+                        "tokens_per_s": tps,
+                        "thinking_chars": meta.get("thinking_chars"),
+                        "think_disabled": meta.get("think_disabled"),
+                        "ingestion_failed": bool(
+                            task.get("image") and looks_like_ingestion_failure(text)
+                        ),
+                        # SPEC 13.3: recorded even when empty so reports can distinguish
+                        # "cannot use tools" from "used tools wrongly".
+                        "tool_calls": tool_calls
+                        if (task.get("tools") or method == "tool-trajectory")
+                        else None,
+                        "tools_unsupported": tools_unsupported,
+                        "trajectory": trajectory,
+                        "trajectory_scores": trajectory_scores,
+                        "sandbox_calls": sandbox_calls,
+                    }
+                )
                 if tracker is not None:
                     _record_telemetry(tracker, run_id, model, task, latency, meta, err)
-                flag = ("ERR" if err else
-                        ("TRUNC/unscored" if truncated else
-                         ("INGEST-FAIL/unscored" if results[-1]["ingestion_failed"] else
-                          ("TOOLS-UNSUPPORTED/unscored" if tools_unsupported else
-                           ("score=" + str(sc) if sc is not None else "unscored")))))
-                tag = (f" [sample {sample_i + 1}/{args.samples}]"
-                       if args.samples > 1 else "")
-                print(f"[{run_id}] {model['id']} x {task['id']}{tag}: {flag}"
-                      + (f" (attempts={meta.get('attempts')})" if meta.get("attempts", 1) > 1 else ""))
+                flag = (
+                    "ERR"
+                    if err
+                    else (
+                        "TRUNC/unscored"
+                        if truncated
+                        else (
+                            "INGEST-FAIL/unscored"
+                            if results[-1]["ingestion_failed"]
+                            else (
+                                "TOOLS-UNSUPPORTED/unscored"
+                                if tools_unsupported
+                                else (
+                                    "score=" + str(sc) if sc is not None else "unscored"
+                                )
+                            )
+                        )
+                    )
+                )
+                tag = (
+                    f" [sample {sample_i + 1}/{args.samples}]"
+                    if args.samples > 1
+                    else ""
+                )
+                print(
+                    f"[{run_id}] {model['id']} x {task['id']}{tag}: {flag}"
+                    + (
+                        f" (attempts={meta.get('attempts')})"
+                        if meta.get("attempts", 1) > 1
+                        else ""
+                    )
+                )
 
     os.makedirs(args.out, exist_ok=True)
     with open(os.path.join(args.out, f"{run_id}.json"), "w") as f:
         prov = build_provenance()
         prov["samples_per_pair"] = args.samples
-        json.dump({
-            "run_id": run_id,
-            "provenance": prov,
-            "results": results,
-            # What this run did NOT measure, and why. A reader can now tell a
-            # coverage gap from a capability gap without reading the registry.
-            "skipped": skipped,
-        }, f, indent=2)
+        json.dump(
+            {
+                "run_id": run_id,
+                "provenance": prov,
+                "results": results,
+                # What this run did NOT measure, and why. A reader can now tell a
+                # coverage gap from a capability gap without reading the registry.
+                "skipped": skipped,
+            },
+            f,
+            indent=2,
+        )
     # TODO: generate reports/<run_id>.md from results (leaderboard + cost split).
     pairs = len({(r["model"], r["task"]) for r in results})
-    print(f"Wrote {args.out}/{run_id}.json  ({pairs} model/task pairs x "
-          f"{args.samples} sample(s) = {len(results)} rows; "
-          f"{len(skipped)} pair(s) skipped)")
+    print(
+        f"Wrote {args.out}/{run_id}.json  ({pairs} model/task pairs x "
+        f"{args.samples} sample(s) = {len(results)} rows; "
+        f"{len(skipped)} pair(s) skipped)"
+    )
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@
 called bare `ollama` and died with WinError 2 in 4s. Resolution must not
 depend on PATH.
 """
+
 from __future__ import annotations
 
 import os
@@ -13,8 +14,8 @@ from pathlib import Path
 from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-import autobench_cycle as ac  # noqa: E402
-import procutil  # noqa: E402
+import autobench_cycle as ac
+import procutil
 
 
 def test_ollama_exe_prefers_localappdata_when_path_empty(tmp_path, monkeypatch=None):
@@ -74,14 +75,16 @@ def test_cycle_pull_list_rm_use_resolved_exe():
         seen.append(list(args))
         return mock.Mock(returncode=0, stdout="", stderr="")
 
-    with mock.patch.object(procutil, "ollama_exe", return_value=fake):
-        with mock.patch.object(ac.procutil, "run", capture):
-            with mock.patch.object(
-                ac.procutil, "check_output", lambda args, **k: "qwen3.5:9b\n"
-            ):
-                ac.pull("qwen3.5:9b")
-                ac.delete("qwen3.5:9b")
-                tags = ac._local_tags()
+    with (
+        mock.patch.object(procutil, "ollama_exe", return_value=fake),
+        mock.patch.object(ac.procutil, "run", capture),
+        mock.patch.object(
+            ac.procutil, "check_output", lambda args, **k: "qwen3.5:9b\n"
+        ),
+    ):
+        ac.pull("qwen3.5:9b")
+        ac.delete("qwen3.5:9b")
+        tags = ac._local_tags()
     assert tags == ["qwen3.5:9b"]
     assert seen, "pull/delete must call procutil.run"
     for argv in seen:

@@ -2,23 +2,25 @@
 
 No Ollama. Hand-written trajectories exercise the sandbox and scorer.
 """
-import json
+
 import os
 import sys
 
 import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-import aggregate_results as agg  # noqa: E402
-import nvidia_judge as nj  # noqa: E402
-import run_bench  # noqa: E402
-import tool_sandbox as ts  # noqa: E402
+import aggregate_results as agg
+import nvidia_judge as nj
+import run_bench
+import tool_sandbox as ts
 
 REPO = os.path.join(os.path.dirname(__file__), "..")
 
 
 def _task():
-    with open(os.path.join(REPO, "tasks", "tool_multiturn_sum.yaml"), encoding="utf-8") as f:
+    with open(
+        os.path.join(REPO, "tasks", "tool_multiturn_sum.yaml"), encoding="utf-8"
+    ) as f:
         task = yaml.safe_load(f)
     task["tools"] = ts.openai_tool_schemas()
     return task
@@ -40,7 +42,9 @@ def test_sandbox_calc_and_files():
     sb = ts.ToolSandbox(fixture_dir=fixture)
     try:
         assert sb.execute("list_files", {"dir": "notes"})["files"] == ["n.txt"]
-        assert sb.execute("read_file", {"path": "notes/n.txt"})["content"].strip() == "42"
+        assert (
+            sb.execute("read_file", {"path": "notes/n.txt"})["content"].strip() == "42"
+        )
         assert sb.execute("calc", {"expression": "42+17"})["value"] == 59
         sb.execute("kv_set", {"key": "x", "value": "59"})
         assert sb.execute("kv_get", {"key": "x"})["value"] == "59"
@@ -54,7 +58,10 @@ def test_sandbox_rejects_escape_and_names():
     sb = ts.ToolSandbox()
     try:
         assert sb.execute("read_file", {"path": "../secret"})["ok"] is False
-        assert sb.execute("calc", {"expression": "__import__('os').system('x')"})["ok"] is False
+        assert (
+            sb.execute("calc", {"expression": "__import__('os').system('x')"})["ok"]
+            is False
+        )
         assert sb.execute("nope", {})["hallucinated"] is True
     finally:
         sb.close()
@@ -104,7 +111,9 @@ def test_perfect_trajectory_all_subscores_one():
         ("calc", [_tc("calc", expression="42 + 17")]),
         ("done", [_tc("finish", answer="59")]),
     ]
-    out = run_bench.run_tool_loop({"id": "dummy", "provider": "custom"}, task, call_fn=_perfect_call_fn(script))
+    out = run_bench.run_tool_loop(
+        {"id": "dummy", "provider": "custom"}, task, call_fn=_perfect_call_fn(script)
+    )
     assert out["tools_unsupported"] is False
     assert out["score"] == 1.0
     subs = out["trajectory_scores"]
@@ -127,7 +136,9 @@ def test_cap_hit_terminated_zero():
         ("b", [_tc("calc", expression="2+2")]),
         ("c", [_tc("calc", expression="3+3")]),
     ]
-    out = run_bench.run_tool_loop({"id": "dummy", "provider": "custom"}, task, call_fn=_perfect_call_fn(script))
+    out = run_bench.run_tool_loop(
+        {"id": "dummy", "provider": "custom"}, task, call_fn=_perfect_call_fn(script)
+    )
     assert out["score"] == 0.0
     subs = out["trajectory_scores"]
     assert subs["terminated"] == 0.0
@@ -139,7 +150,9 @@ def test_cap_hit_terminated_zero():
 def test_tools_unsupported_unscored():
     task = _task()
     script = [("I cannot use tools, the answer is 59.", [])]
-    out = run_bench.run_tool_loop({"id": "dummy", "provider": "custom"}, task, call_fn=_perfect_call_fn(script))
+    out = run_bench.run_tool_loop(
+        {"id": "dummy", "provider": "custom"}, task, call_fn=_perfect_call_fn(script)
+    )
     assert out["tools_unsupported"] is True
     assert out["score"] is None
     assert out["trajectory_scores"] is None
@@ -151,7 +164,9 @@ def test_hallucinated_tool_subscore():
         ("x", [_tc("launch_missiles", target="moon")]),
         ("y", [_tc("finish", answer="59")]),
     ]
-    out = run_bench.run_tool_loop({"id": "dummy", "provider": "custom"}, task, call_fn=_perfect_call_fn(script))
+    out = run_bench.run_tool_loop(
+        {"id": "dummy", "provider": "custom"}, task, call_fn=_perfect_call_fn(script)
+    )
     assert out["trajectory_scores"]["no_hallucinated_tools"] == 0.0
 
 
@@ -163,7 +178,9 @@ def test_wrong_finish_completed_zero():
         ("c", [_tc("calc", expression="42+17")]),
         ("f", [_tc("finish", answer="0")]),
     ]
-    out = run_bench.run_tool_loop({"id": "dummy", "provider": "custom"}, task, call_fn=_perfect_call_fn(script))
+    out = run_bench.run_tool_loop(
+        {"id": "dummy", "provider": "custom"}, task, call_fn=_perfect_call_fn(script)
+    )
     assert out["score"] == 0.0
     assert out["trajectory_scores"]["completed"] == 0.0
     assert out["trajectory_scores"]["terminated"] == 1.0
