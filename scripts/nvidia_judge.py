@@ -27,13 +27,14 @@ cron passes (unless --retry-judge-errors). Optional --self-consistency re-asks t
 same judge N times at temperature 0 and takes the median — disclosed as
 self-consistency, never as inter-rater kappa.
 """
+
+import base64
 import json
-import statistics
 import os
 import re
+import statistics
 import sys
 import time
-import base64
 import urllib.request
 from pathlib import Path
 
@@ -57,6 +58,8 @@ def _redact(text: str, api_key: str = "") -> str:
     if api_key:
         text = text.replace(api_key, "<REDACTED>")
     return re.sub(r"nvapi-[A-Za-z0-9_\-]{8,}", "<REDACTED>", text)
+
+
 # Two-stage vision judging (per user direction):
 #   1. ONE good local vision model looks at the image ONCE and writes a detailed
 #      factual description (ground truth). We use the benchmark's best vision
@@ -82,14 +85,15 @@ def find_nvidia_key() -> str:
     # tool reinstalling or relocating its config cannot take the judge down.
     local_appdata = os.environ.get("LOCALAPPDATA")
     candidates = [
-        Path(local_appdata) / "llm-autobench" / ".env" if local_appdata
+        Path(local_appdata) / "llm-autobench" / ".env"
+        if local_appdata
         else Path.home() / "AppData" / "Local" / "llm-autobench" / ".env",
-        Path.home() / ".config" / "llm-autobench" / ".env",            # POSIX
+        Path.home() / ".config" / "llm-autobench" / ".env",  # POSIX
         # Legacy Hermes locations, kept so an existing box keeps working.
-        Path.home() / "AppData" / "Local" / "hermes" / ".env",         # Windows
-        Path.home() / ".local" / "share" / "hermes" / ".env",          # Linux XDG
-        Path.home() / ".config" / "hermes" / ".env",                   # Linux alt
-        Path.home() / ".hermes" / ".env",                              # generic
+        Path.home() / "AppData" / "Local" / "hermes" / ".env",  # Windows
+        Path.home() / ".local" / "share" / "hermes" / ".env",  # Linux XDG
+        Path.home() / ".config" / "hermes" / ".env",  # Linux alt
+        Path.home() / ".hermes" / ".env",  # generic
     ]
     for cand in candidates:
         if cand.exists():
@@ -121,25 +125,30 @@ def decode_judge_response(out: str) -> dict:
             ) from e
         raise ValueError(f"judge API body is not JSON: {e}: {text[:200]}") from e
     if not isinstance(data, dict):
-        raise ValueError(
+        # Callers and tests catch ValueError; TypeError would change that contract.
+        raise ValueError(  # noqa: TRY004
             f"judge API returned {type(data).__name__}, not an object: {text[:200]}"
         )
     if "choices" not in data:
-        detail = (data.get("detail") or data.get("title")
-                  or data.get("error") or text[:300])
+        detail = (
+            data.get("detail") or data.get("title") or data.get("error") or text[:300]
+        )
         raise ValueError(f"judge API said: {detail}")
     return data
 
 
-def call_judge(prompt: str, api_key: str, max_retries: int = 4,
-               max_tokens: int = JUDGE_MAX_TOKENS) -> str:
+def call_judge(
+    prompt: str, api_key: str, max_retries: int = 4, max_tokens: int = JUDGE_MAX_TOKENS
+) -> str:
     """Call NVIDIA directly via curl with exponential backoff retry."""
-    payload = json.dumps({
-        "model": JUDGE_MODEL,
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": max_tokens,
-        "temperature": 0.0,
-    })
+    payload = json.dumps(
+        {
+            "model": JUDGE_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+            "temperature": 0.0,
+        }
+    )
     last_err = ""
     for attempt in range(1, max_retries + 1):
         try:
@@ -148,12 +157,25 @@ def call_judge(prompt: str, api_key: str, max_retries: int = 4,
             # the whole command in their message -- which is returned below as
             # an ERROR string and committed into runs/ and reports/.
             cmd = [
-                "curl", "-s", "--max-time", "180", NVIDIA_URL,
-                "-H", "Content-Type: application/json",
-                "-d", payload, "--config", "-",
+                "curl",
+                "-s",
+                "--max-time",
+                "180",
+                NVIDIA_URL,
+                "-H",
+                "Content-Type: application/json",
+                "-d",
+                payload,
+                "--config",
+                "-",
             ]
-            res = procutil.run(cmd, capture_output=True, text=True, timeout=200,
-                               input=f'header = "Authorization: Bearer {api_key}"\n')
+            res = procutil.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=200,
+                input=f'header = "Authorization: Bearer {api_key}"\n',
+            )
             out = res.stdout.strip()
             if not out:
                 last_err = f"empty response (HTTP {res.returncode})"
@@ -170,9 +192,12 @@ def call_judge(prompt: str, api_key: str, max_retries: int = 4,
         except Exception as e:  # noqa: BLE001
             last_err = _redact(str(e), api_key)
             if attempt < max_retries:
-                backoff = 2 ** attempt
-                print(f"    retry {attempt}/{max_retries} after {backoff}s ({last_err})",
-                      file=sys.stderr, flush=True)
+                backoff = 2**attempt
+                print(
+                    f"    retry {attempt}/{max_retries} after {backoff}s ({last_err})",
+                    file=sys.stderr,
+                    flush=True,
+                )
                 time.sleep(backoff)
     return f"ERROR: {last_err}"
 
@@ -191,7 +216,7 @@ def check_judge_alive(api_key: str = "") -> tuple[bool, str]:
         return False, "no API key resolvable"
     reply = call_judge("Reply with exactly: OK", api_key, max_retries=1, max_tokens=8)
     if reply.startswith("ERROR:"):
-        return False, _redact(reply[len("ERROR:"):].strip(), api_key)
+        return False, _redact(reply[len("ERROR:") :].strip(), api_key)
     return True, reply.strip()[:40]
 
 
@@ -212,39 +237,56 @@ def describe_image(img_path: str, max_retries: int = 2) -> str:
     # model so the benchmark never calls a vision model per run.
     desc_path = os.path.splitext(img_path)[0] + ".desc.txt"
     if os.path.exists(desc_path):
-        desc = open(desc_path, encoding="utf-8").read().strip()
+        with open(desc_path, encoding="utf-8") as f:
+            desc = f.read().strip()
         if desc:
             cache[img_path] = desc
             return desc
-    prompt = ("Describe this image in thorough, factual detail: every object, "
-              "its color and position, any text/labels, the scene type, and "
-              "overall lighting. Be specific and literal; do not speculate.")
+    prompt = (
+        "Describe this image in thorough, factual detail: every object, "
+        "its color and position, any text/labels, the scene type, and "
+        "overall lighting. Be specific and literal; do not speculate."
+    )
     # Preferred: Claude CLI (Max quota, zero marginal cost, top vision).
     try:
-        cmd = ["claude", "-p", prompt, "--model", "claude-sonnet-4-5",
-               "--max-turns", "1", "--output-format", "text"]
+        cmd = [
+            "claude",
+            "-p",
+            prompt,
+            "--model",
+            "claude-sonnet-4-5",
+            "--max-turns",
+            "1",
+            "--output-format",
+            "text",
+        ]
         # pass the image as a file argument Claude can read
-        res = procutil.run(cmd + [img_path], capture_output=True, text=True,
-                      timeout=180)
+        res = procutil.run(
+            cmd + [img_path], capture_output=True, text=True, timeout=180
+        )
         if res.returncode == 0 and res.stdout.strip():
             desc = res.stdout.strip()
             cache[img_path] = desc
             return desc
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 - Claude CLI is best-effort; Ollama is next
         pass
     # Fallback: local vision model via Ollama.
     try:
         with open(img_path, "rb") as fh:
             b64 = base64.b64encode(fh.read()).decode()
-        payload = json.dumps({
-            "model": VISION_DESCRIBER,
-            "messages": [{"role": "user", "content": prompt,
-                          "images": [b64]}],
-            "stream": False, "options": {"num_predict": 400},
-        })
+        payload = json.dumps(
+            {
+                "model": VISION_DESCRIBER,
+                "messages": [{"role": "user", "content": prompt, "images": [b64]}],
+                "stream": False,
+                "options": {"num_predict": 400},
+            }
+        )
         req = urllib.request.Request(
-            VISION_DESCRIBER_URL, data=payload.encode(),
-            headers={"Content-Type": "application/json"})
+            VISION_DESCRIBER_URL,
+            data=payload.encode(),
+            headers={"Content-Type": "application/json"},
+        )
         out = json.loads(urllib.request.urlopen(req, timeout=180).read().decode())
         desc = out.get("message", {}).get("content", "").strip()
         if desc:
@@ -254,8 +296,10 @@ def describe_image(img_path: str, max_retries: int = 2) -> str:
         # This used to be `except Exception: pass`, which swallowed a NameError:
         # urllib was never imported, so the local-describer fallback could not
         # work at all and failed silently into the text-only judge path.
-        print(f"  [warn] local vision describer failed: "
-              f"{exc.__class__.__name__}: {exc}", file=sys.stderr)
+        print(
+            f"  [warn] local vision describer failed: {exc.__class__.__name__}: {exc}",
+            file=sys.stderr,
+        )
     return ""
 
 
@@ -290,7 +334,7 @@ _PROSE_CHARS = 220
 
 def parse_score(text: str):
     # Prefer an explicit "score: 0.85" or "0.85/1.0" form, else a bare float.
-    m = re.search(r"score[\"']?\s*[:=]\s*(0(?:\.\d+)?|1(?:\.0+)?)", text, re.I)
+    m = re.search(r"score[\"']?\s*[:=]\s*(0(?:\.\d+)?|1(?:\.0+)?)", text, re.IGNORECASE)
     if m:
         return max(0.0, min(1.0, float(m.group(1))))
     m = re.search(r"(0(?:\.\d+)?|1(?:\.0+)?)\s*/\s*1", text)
@@ -317,7 +361,11 @@ def is_error_output(text: str) -> bool:
 
 def median_score(scores):
     """Median of numeric scores, or None if empty."""
-    vals = [float(s) for s in scores if isinstance(s, (int, float)) and not isinstance(s, bool)]
+    vals = [
+        float(s)
+        for s in scores
+        if isinstance(s, (int, float)) and not isinstance(s, bool)
+    ]
     if not vals:
         return None
     return float(statistics.median(vals))
@@ -344,9 +392,13 @@ def should_skip_judge(row, *, retry_judge_errors: bool = False) -> str | None:
 
 def mark_judge_error(row, raw: str, *, judge_label: str) -> None:
     """Record a persistent judge failure: score stays null, cron will not retry."""
-    reason = raw if is_error_output(raw) else f"JUDGE_ERROR: unparseable judge output: {(raw or '')[:200]}"
+    reason = (
+        raw
+        if is_error_output(raw)
+        else f"JUDGE_ERROR: unparseable judge output: {(raw or '')[:200]}"
+    )
     if not reason.startswith("JUDGE_ERROR") and reason.startswith("ERROR:"):
-        reason = "JUDGE_ERROR: " + reason[len("ERROR:"):].lstrip()
+        reason = "JUDGE_ERROR: " + reason[len("ERROR:") :].lstrip()
     elif not reason.startswith("JUDGE_ERROR"):
         reason = f"JUDGE_ERROR: {reason}"
     row["score"] = None
@@ -356,8 +408,9 @@ def mark_judge_error(row, raw: str, *, judge_label: str) -> None:
     row["score_reason"] = reason[:300]
 
 
-def apply_parsed_score(row, score, raw: str, *, judge_label: str,
-                       judge_draws=None) -> None:
+def apply_parsed_score(
+    row, score, raw: str, *, judge_label: str, judge_draws=None
+) -> None:
     """Write a successful (or partially successful) judge outcome onto the row."""
     row["score"] = score
     row["judge"] = judge_label
@@ -369,8 +422,14 @@ def apply_parsed_score(row, score, raw: str, *, judge_label: str,
         row["judge_aggregation"] = "self-consistency-median"
 
 
-def judge_rubric(prompt: str, api_key: str, *, max_retries: int = 4,
-                 self_consistency_n: int = 1, call_fn=None) -> tuple:
+def judge_rubric(
+    prompt: str,
+    api_key: str,
+    *,
+    max_retries: int = 4,
+    self_consistency_n: int = 1,
+    call_fn=None,
+) -> tuple:
     """Call the judge once, or N times for self-consistency.
 
     Returns (score_or_None, raw_summary, draws_or_None).
@@ -398,8 +457,16 @@ def judge_rubric(prompt: str, api_key: str, *, max_retries: int = 4,
     raw_summary = " | ".join((r or "")[:80] for r in raws)
     if not parsed:
         # All draws failed or unparseable — surface the first ERROR if any.
-        err = next((r for r in raws if is_error_output(r)), raws[0] if raws else "ERROR: empty")
-        return None, err if is_error_output(err) else f"ERROR: no parseable self-consistency draws ({raw_summary})", draws
+        err = next(
+            (r for r in raws if is_error_output(r)), raws[0] if raws else "ERROR: empty"
+        )
+        return (
+            None,
+            err
+            if is_error_output(err)
+            else f"ERROR: no parseable self-consistency draws ({raw_summary})",
+            draws,
+        )
     return median_score(parsed), raw_summary, draws
 
 
@@ -438,7 +505,9 @@ def load_scoring_method(task_id):
     return m.group(1).strip() if m else "rubric-llm"
 
 
-_MECHANICAL = frozenset({"exact", "json-exact", "python-exec", "tool-call", "tool-trajectory"})
+_MECHANICAL = frozenset(
+    {"exact", "json-exact", "python-exec", "tool-call", "tool-trajectory"}
+)
 # Agentic tasks (SPEC 13.3/13.6) — separate regime; never fold into text avg.
 AGENTIC_TASKS = frozenset({"tool_weather", "tool_multiturn_sum"})
 
@@ -457,6 +526,7 @@ def _mechanical_score(task_id, response, tool_calls=None):
     if scripts not in sys.path:
         sys.path.insert(0, scripts)
     import run_bench
+
     return run_bench.score(task, response or "", tool_calls=tool_calls)
 
 
@@ -473,7 +543,7 @@ def _writeback(envelope, results, scored, run_path):
     # (exact / json-exact) but the judge loop had not yet walked past - so a
     # mid-judge crash lost them entirely. `scored` grows in iteration order and
     # every row is appended exactly once, so the remainder is the tail.
-    pending = results[len(scored):]
+    pending = results[len(scored) :]
     data = dict(envelope)
     data["results"] = scored + pending
     # Stamp the judge that actually scored this write, not a hardcoded id.
@@ -507,9 +577,11 @@ def build_report(run_stem, scored, *, self_consistency_n: int = 1):
 
     def avg_of(rows):
         # SPEC 13.6: agentic is a separate regime — do not fold into text avg.
-        vals = [r["score"] for r in rows
-                if _is_num(r.get("score"))
-                and r.get("task") not in AGENTIC_TASKS]
+        vals = [
+            r["score"]
+            for r in rows
+            if _is_num(r.get("score")) and r.get("task") not in AGENTIC_TASKS
+        ]
         return (sum(vals) / len(vals)) if vals else None
 
     models = list(by_model)
@@ -520,8 +592,10 @@ def build_report(run_stem, scored, *, self_consistency_n: int = 1):
     lines.append(f"**Models:** {', '.join('`' + m + '`' for m in models)}  ")
     judge_note = f"**Judge:** `{JUDGE_MODEL}` (NIM text judge) + Claude vision describer (stage 1)"
     if self_consistency_n and self_consistency_n > 1:
-        judge_note += (f"  \n**Self-consistency:** median of {self_consistency_n} draws at "
-                       f"temperature 0 (same judge — **not** inter-rater kappa)")
+        judge_note += (
+            f"  \n**Self-consistency:** median of {self_consistency_n} draws at "
+            f"temperature 0 (same judge — **not** inter-rater kappa)"
+        )
     lines.append(judge_note + "  ")
     lines.append("")
 
@@ -531,7 +605,9 @@ def build_report(run_stem, scored, *, self_consistency_n: int = 1):
     # Tasks and draws are different numbers once a run samples N times per pair.
     # This column used to print len(rows) under a "Tasks" header, which read as
     # "qwen attempted 27 tasks" for a 9-task battery drawn 3 times.
-    lines.append("| Model | Avg score | Tasks | Draws | Scored | Unscored | Avg latency |")
+    lines.append(
+        "| Model | Avg score | Tasks | Draws | Scored | Unscored | Avg latency |"
+    )
     lines.append("|---|---:|---:|---:|---:|---:|---:|")
     lb = []
     for m, rows in by_model.items():
@@ -547,8 +623,10 @@ def build_report(run_stem, scored, *, self_consistency_n: int = 1):
     lb.sort(key=lambda x: (x[1] is None, -(x[1] or 0)))  # best avg first, None last
     for m, avg, ntasks, ndraws, scored_n, unscored, latm in lb:
         avg_s = f"{avg:.2f}" if avg is not None else "—"
-        lines.append(f"| `{m}` | {avg_s} | {ntasks} | {ndraws} | {scored_n} | "
-                     f"{unscored or '—'} | {latm:.1f}s |")
+        lines.append(
+            f"| `{m}` | {avg_s} | {ntasks} | {ndraws} | {scored_n} | "
+            f"{unscored or '—'} | {latm:.1f}s |"
+        )
     lines.append("")
 
     # ---- Per-model detail ----
@@ -559,21 +637,32 @@ def build_report(run_stem, scored, *, self_consistency_n: int = 1):
         lines.append("|---|---:|---|---|---|")
         for r in rows:
             sc = r.get("score")
-            sc_s = (f"{sc:.2f}" if _is_num(sc)
-                    else ("trunc" if r.get("truncated")
-                          else ("no-image" if r.get("ingestion_failed") else "—")))
+            sc_s = (
+                f"{sc:.2f}"
+                if _is_num(sc)
+                else (
+                    "trunc"
+                    if r.get("truncated")
+                    else ("no-image" if r.get("ingestion_failed") else "—")
+                )
+            )
             lat = r.get("latency_s", 0) or 0
             reason = (r.get("judge_raw", "") or "")[:120].replace("\n", " ")
-            draw = (f"{r['sample'] + 1}/{r['samples']}"
-                    if r.get("samples") else "1/1")
+            draw = f"{r['sample'] + 1}/{r['samples']}" if r.get("samples") else "1/1"
             lines.append(f"| {r['task']} | {draw} | {sc_s} | {lat:.1f}s | {reason} |")
         lines.append("")
 
     # ---- Failures: derived from outcomes only (P0.5 / M2.3 — never hard-coded) ----
-    fails = [r for r in scored
-             if r.get("error") or r.get("truncated") or r.get("ingestion_failed")
-             or r.get("tools_unsupported")
-             or r.get("judge_error") or not _is_num(r.get("score"))]
+    fails = [
+        r
+        for r in scored
+        if r.get("error")
+        or r.get("truncated")
+        or r.get("ingestion_failed")
+        or r.get("tools_unsupported")
+        or r.get("judge_error")
+        or not _is_num(r.get("score"))
+    ]
     lines.append("## Failures")
     lines.append("")
     if not fails:
@@ -585,31 +674,44 @@ def build_report(run_stem, scored, *, self_consistency_n: int = 1):
             elif r.get("truncated"):
                 why = "truncated at token budget (unscored, not 0.0)"
             elif r.get("ingestion_failed"):
-                why = ("model reported no image was supplied — ingestion failure, "
-                       "NOT a vision-capability score (unscored, not 0.0)")
+                why = (
+                    "model reported no image was supplied — ingestion failure, "
+                    "NOT a vision-capability score (unscored, not 0.0)"
+                )
             elif r.get("tools_unsupported"):
-                why = ("no tool_calls emitted — tools_unsupported "
-                       "(unscored, not 0.0; cannot vs wrong are different findings)")
+                why = (
+                    "no tool_calls emitted — tools_unsupported "
+                    "(unscored, not 0.0; cannot vs wrong are different findings)"
+                )
             elif r.get("judge_error"):
-                why = (r.get("score_reason")
-                       or r.get("judge_raw")
-                       or "JUDGE_ERROR (persistent; not retried by cron)")
+                why = (
+                    r.get("score_reason")
+                    or r.get("judge_raw")
+                    or "JUDGE_ERROR (persistent; not retried by cron)"
+                )
             else:
                 why = "unscored (judge returned no parseable score)"
             lines.append(f"- **{r.get('model')} × {r.get('task')}**: {why}")
     lines.append("")
 
     # Derived judge status (M2.3 / F0.5): never hard-code "judge ran: yes".
-    judged_ok = sum(1 for r in scored
-                    if _is_num(r.get("score")) and str(r.get("judge", "")).startswith("nvidia/"))
+    judged_ok = sum(
+        1
+        for r in scored
+        if _is_num(r.get("score")) and str(r.get("judge", "")).startswith("nvidia/")
+    )
     judged_err = sum(1 for r in scored if r.get("judge_error"))
     lines.append("## Judge status")
     lines.append("")
     lines.append(f"- Rubric rows scored by NVIDIA judge: **{judged_ok}**")
-    lines.append(f"- Persistent judge_error (capped; cron will not re-burn RPM): **{judged_err}**")
+    lines.append(
+        f"- Persistent judge_error (capped; cron will not re-burn RPM): **{judged_err}**"
+    )
     if self_consistency_n and self_consistency_n > 1:
-        lines.append(f"- Aggregation: self-consistency median of {self_consistency_n} "
-                     f"temperature-0 draws (same judge — not kappa)")
+        lines.append(
+            f"- Aggregation: self-consistency median of {self_consistency_n} "
+            f"temperature-0 draws (same judge — not kappa)"
+        )
     lines.append("")
 
     # ---- Lifecycle ----
@@ -618,35 +720,59 @@ def build_report(run_stem, scored, *, self_consistency_n: int = 1):
     # This used to read "Model pulled, benchmarked on Ollama, then deleted." on
     # every report, including --baselines-only runs where nothing was pulled or
     # deleted. The judge cannot observe the lifecycle, so it no longer asserts one.
-    lines.append("- Model-under-test ran locally on Ollama; the judge ran in the cloud, "
-                 "so the GPU never hosted both.")
-    lines.append(f"- Judge: `{JUDGE_MODEL}` (NVIDIA NIM, free tier, "
-                 "direct API). No paid API spend.")
-    lines.append("- Pull/delete is handled by `autobench_cycle.py` and recorded in its "
-                 "commit, not observable from this run file.")
+    lines.append(
+        "- Model-under-test ran locally on Ollama; the judge ran in the cloud, "
+        "so the GPU never hosted both."
+    )
+    lines.append(
+        f"- Judge: `{JUDGE_MODEL}` (NVIDIA NIM, free tier, "
+        "direct API). No paid API spend."
+    )
+    lines.append(
+        "- Pull/delete is handled by `autobench_cycle.py` and recorded in its "
+        "commit, not observable from this run file."
+    )
     lines.append("")
     return "\n".join(lines)
 
 
 def main(argv=None, call_fn=None):
     import argparse
+
     ap = argparse.ArgumentParser()
     ap.add_argument("run_file")
     ap.add_argument("--key", help="NVIDIA API key (else env/.env)")
-    ap.add_argument("--max-retries", type=int, default=4,
-                    help="per-call transport retries with exp backoff (default 4)")
-    ap.add_argument("--self-consistency", action="store_true",
-                    help="ask the same judge N times at temp 0; score = median "
-                         "(disclosed as self-consistency, never kappa)")
-    ap.add_argument("--self-consistency-n", type=int, default=3,
-                    help="draw count when --self-consistency is set (default 3)")
-    ap.add_argument("--retry-judge-errors", action="store_true",
-                    help="re-attempt rows previously marked judge_error (default: skip)")
+    ap.add_argument(
+        "--max-retries",
+        type=int,
+        default=4,
+        help="per-call transport retries with exp backoff (default 4)",
+    )
+    ap.add_argument(
+        "--self-consistency",
+        action="store_true",
+        help="ask the same judge N times at temp 0; score = median "
+        "(disclosed as self-consistency, never kappa)",
+    )
+    ap.add_argument(
+        "--self-consistency-n",
+        type=int,
+        default=3,
+        help="draw count when --self-consistency is set (default 3)",
+    )
+    ap.add_argument(
+        "--retry-judge-errors",
+        action="store_true",
+        help="re-attempt rows previously marked judge_error (default: skip)",
+    )
     args = ap.parse_args(argv)
 
     api_key = args.key or find_nvidia_key()
     if not api_key:
-        print("ERROR: NVIDIA_API_KEY not found (env, Hermes .env, or --key)", file=sys.stderr)
+        print(
+            "ERROR: NVIDIA_API_KEY not found (env, Hermes .env, or --key)",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     sc_n = args.self_consistency_n if args.self_consistency else 1
@@ -681,8 +807,11 @@ def main(argv=None, call_fn=None):
             continue
         if skip == "judge_error":
             # M2.1: persistent failure already recorded — do not burn RPM again.
-            print(f"  [skip] judge_error capped for {r.get('task')}",
-                  file=sys.stderr, flush=True)
+            print(
+                f"  [skip] judge_error capped for {r.get('task')}",
+                file=sys.stderr,
+                flush=True,
+            )
             scored.append(r)
             continue
 
@@ -698,27 +827,36 @@ def main(argv=None, call_fn=None):
                     r["score"] = None
                     r["judge"] = "tool-trajectory"
                     r.setdefault("judge_raw", "tools_unsupported/unscored")
-                    print(f"  [{method}] {task_id} ... tools_unsupported",
-                          file=sys.stderr, flush=True)
+                    print(
+                        f"  [{method}] {task_id} ... tools_unsupported",
+                        file=sys.stderr,
+                        flush=True,
+                    )
                 else:
                     r["judge"] = method
                     r.pop("judge_error", None)
-                    print(f"  [{method}] {task_id} ... {r.get('score')}",
-                          file=sys.stderr, flush=True)
+                    print(
+                        f"  [{method}] {task_id} ... {r.get('score')}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
                 scored.append(r)
                 _writeback(data, results, scored, run_path)
                 continue
             sc = _mechanical_score(
-                task_id, r.get("response", ""),
-                tool_calls=r.get("tool_calls"))
+                task_id, r.get("response", ""), tool_calls=r.get("tool_calls")
+            )
             # tool-call with no calls must stay tools_unsupported, never 0.0
             if method == "tool-call" and sc is None:
                 r["score"] = None
                 r["tools_unsupported"] = True
                 r["judge"] = "tool-call"
                 r.setdefault("judge_raw", "tools_unsupported/unscored")
-                print(f"  [{method}] {task_id} ... tools_unsupported",
-                      file=sys.stderr, flush=True)
+                print(
+                    f"  [{method}] {task_id} ... tools_unsupported",
+                    file=sys.stderr,
+                    flush=True,
+                )
             else:
                 r["score"] = sc
                 r["judge"] = method
@@ -744,17 +882,23 @@ def main(argv=None, call_fn=None):
             try:
                 description = describe_image(img_path, max_retries=args.max_retries)
                 if not description:
-                    print(f"  [warn] image description failed for {task_id}; "
-                          f"falling back to text judge", file=sys.stderr)
+                    print(
+                        f"  [warn] image description failed for {task_id}; "
+                        f"falling back to text judge",
+                        file=sys.stderr,
+                    )
                     prompt = build_judge_prompt(task_id, rubric, r.get("response", ""))
                 else:
                     prompt = build_described_judge_prompt(
-                        task_id, rubric, r.get("response", ""), description)
+                        task_id, rubric, r.get("response", ""), description
+                    )
                     vision_suffix = "+claude-vision"
                 tag = "judge+vision"
             except Exception as e:  # noqa: BLE001
-                print(f"  [warn] vision describe failed ({e}); text judge",
-                      file=sys.stderr)
+                print(
+                    f"  [warn] vision describe failed ({e}); text judge",
+                    file=sys.stderr,
+                )
                 prompt = None
                 tag = "judge"
         if prompt is None:
@@ -764,8 +908,12 @@ def main(argv=None, call_fn=None):
         sc_tag = f"+sc{sc_n}" if sc_n > 1 else ""
         print(f"  [{tag}{sc_tag}] {task_id} ...", end=" ", flush=True)
         score, out, draws = judge_rubric(
-            prompt, api_key, max_retries=args.max_retries,
-            self_consistency_n=sc_n, call_fn=call_fn)
+            prompt,
+            api_key,
+            max_retries=args.max_retries,
+            self_consistency_n=sc_n,
+            call_fn=call_fn,
+        )
         label = judge_label + vision_suffix
         if sc_n > 1:
             label = label + f"+self-consistency-{sc_n}"

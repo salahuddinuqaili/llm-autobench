@@ -5,14 +5,13 @@ llm-autobench — Telemetry & Token Usage Tracker
 Tracks tokens, latency, VRAM, cost for ALL models (local Ollama + cloud OpenRouter).
 Persists to telemetry/usage_YYYYMMDD.jsonl for analysis.
 """
+
 import json
-import os
 import threading
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import procutil
 
@@ -33,13 +32,13 @@ class TelemetryRecord:
     completion_tokens: int
     total_tokens: int
     latency_seconds: float
-    ttft_seconds: Optional[float]  # time to first token (streaming)
+    ttft_seconds: float | None  # time to first token (streaming)
     tokens_per_second: float
-    vram_peak_mib: Optional[int]
-    vram_delta_mib: Optional[int]
+    vram_peak_mib: int | None
+    vram_delta_mib: int | None
     cost_usd: float  # 0 for local/free, calculated for paid
     success: bool
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class TelemetryTracker:
@@ -57,9 +56,8 @@ class TelemetryTracker:
         self._vram_baseline = get_vram_used_mib()
 
     def record(self, record: TelemetryRecord):
-        with self._lock:
-            with open(self.file_path, "a") as f:
-                f.write(json.dumps(asdict(record)) + "\n")
+        with self._lock, open(self.file_path, "a") as f:
+            f.write(json.dumps(asdict(record)) + "\n")
 
     def get_session_summary(self) -> dict:
         """Aggregate stats for this run_id."""
@@ -72,7 +70,7 @@ class TelemetryTracker:
                     r = json.loads(line)
                     if r.get("run_id") == self.run_id:
                         records.append(r)
-                except Exception:
+                except Exception:  # noqa: BLE001, S110 - a bad JSONL line is skipped
                     pass
         if not records:
             return {}
@@ -84,34 +82,38 @@ class TelemetryTracker:
             "avg_latency": sum(r["latency_seconds"] for r in records) / len(records),
             "avg_tps": sum(r["tokens_per_second"] for r in records) / len(records),
             "max_vram_mib": max((r["vram_peak_mib"] or 0) for r in records),
-            "models_used": list(set(r["model_id"] for r in records)),
+            "models_used": list({r["model_id"] for r in records}),
             "errors": sum(1 for r in records if not r["success"]),
         }
 
 
 # VRAM tracking
-def get_vram_used_mib() -> Optional[int]:
+def get_vram_used_mib() -> int | None:
     """Return used VRAM in MiB via nvidia-smi."""
     try:
         import subprocess
+
         out = procutil.check_output(
             ["nvidia-smi", "--query-gpu=memory.used", "--format=csv,noheader,nounits"],
-            text=True, stderr=subprocess.DEVNULL,
+            text=True,
+            stderr=subprocess.DEVNULL,
         )
         return int(out.strip().split("\n")[0])
-    except Exception:
+    except Exception:  # noqa: BLE001 - nvidia-smi missing or unusable
         return None
 
 
-def get_vram_free_mib() -> Optional[int]:
+def get_vram_free_mib() -> int | None:
     try:
         import subprocess
+
         out = procutil.check_output(
             ["nvidia-smi", "--query-gpu=memory.free", "--format=csv,noheader,nounits"],
-            text=True, stderr=subprocess.DEVNULL,
+            text=True,
+            stderr=subprocess.DEVNULL,
         )
         return int(out.strip().split("\n")[0])
-    except Exception:
+    except Exception:  # noqa: BLE001 - nvidia-smi missing or unusable
         return None
 
 
@@ -139,8 +141,14 @@ def calculate_cost(model_id: str, prompt_tokens: int, completion_tokens: int) ->
 class TrackedCall:
     """Context manager that tracks a single model call."""
 
-    def __init__(self, tracker: TelemetryTracker, model_id: str, provider: str,
-                 task_id: str, task_category: str):
+    def __init__(
+        self,
+        tracker: TelemetryTracker,
+        model_id: str,
+        provider: str,
+        task_id: str,
+        task_category: str,
+    ):
         self.tracker = tracker
         self.model_id = model_id
         self.provider = provider
@@ -206,10 +214,10 @@ class TrackedCall:
 
 
 # Global tracker instance (set by run_bench.py)
-_current_tracker: Optional[TelemetryTracker] = None
+_current_tracker: TelemetryTracker | None = None
 
 
-def get_tracker() -> Optional[TelemetryTracker]:
+def get_tracker() -> TelemetryTracker | None:
     return _current_tracker
 
 
@@ -222,8 +230,13 @@ if __name__ == "__main__":
     # Demo
     tracker = TelemetryTracker("test_run")
     set_tracker(tracker)
-    with TrackedCall(tracker, "custom:ollama/qwen3.5:9b", "ollama",
-                     "arithmetic_reasoning", "reasoning") as call:
+    with TrackedCall(
+        tracker,
+        "custom:ollama/qwen3.5:9b",
+        "ollama",
+        "arithmetic_reasoning",
+        "reasoning",
+    ) as call:
         call.set_usage(100, 50)
         call.success = True
     print("Session summary:", tracker.get_session_summary())

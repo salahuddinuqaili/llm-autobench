@@ -1,4 +1,5 @@
 """Offline pass/fail coverage for M1 python-exec scoring. No Ollama / judge."""
+
 import os
 import sys
 import textwrap
@@ -6,14 +7,16 @@ import textwrap
 import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-import code_exec  # noqa: E402
-import run_bench  # noqa: E402
+import code_exec
+import run_bench
 
 REPO = os.path.join(os.path.dirname(__file__), "..")
 
 
 def _task():
-    with open(os.path.join(REPO, "tasks", "code_generation.yaml"), encoding="utf-8") as f:
+    with open(
+        os.path.join(REPO, "tasks", "code_generation.yaml"), encoding="utf-8"
+    ) as f:
         return yaml.safe_load(f)
 
 
@@ -95,12 +98,12 @@ WRONG_SLICE = textwrap.dedent(
 PROSE_ONLY = "Sure! Here is a careful design for chunk_text without any code."
 
 SYNTAX_BAD = textwrap.dedent(
-    '''\
+    """\
     ```python
     def chunk_text(text: str, max_chars: int) -> list[str]
         return []
     ```
-    '''
+    """
 )
 
 

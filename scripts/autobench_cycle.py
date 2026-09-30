@@ -21,6 +21,7 @@ Run manually:
     python autobench_cycle.py --model qwen3.5:9b --no-delete   # keep for inspection
     python autobench_cycle.py --baselines-only --samples 3     # no pull, N=3 draws
 """
+
 import argparse
 import concurrent.futures
 import datetime as dt
@@ -31,17 +32,20 @@ import subprocess
 import sys
 import urllib.request
 
-import yaml
-
 import procutil
+import yaml
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Curated fallback models (untested, VRAM-friendly) used only if the live
 # library scrape fails entirely. These are full "name:tag" strings.
 FALLBACK_MODELS = [
-    "llama3.2:3b", "qwen2.5:7b", "mistral:7b",
-    "cogito:14b", "deepcoder:14b", "gemma2:9b",
+    "llama3.2:3b",
+    "qwen2.5:7b",
+    "mistral:7b",
+    "cogito:14b",
+    "deepcoder:14b",
+    "gemma2:9b",
 ]
 
 _UA = {"User-Agent": "llm-autobench/1.0"}
@@ -63,7 +67,7 @@ def get_vram_free_mib():
         )
         # Take the first GPU (assume single GPU)
         return int(out.strip().split("\n")[0])
-    except Exception:
+    except Exception:  # noqa: BLE001 - probe failure returns None; caller fails closed
         return None
 
 
@@ -81,9 +85,11 @@ def has_vram_headroom(required_mib, buffer_mib=1024):
     """
     free = get_vram_free_mib()
     if free is None:
-        print("[autobench] VRAM probe failed (nvidia-smi unavailable); "
-              "failing CLOSED — skipping pull to protect the shared GPU",
-              file=sys.stderr)
+        print(
+            "[autobench] VRAM probe failed (nvidia-smi unavailable); "
+            "failing CLOSED — skipping pull to protect the shared GPU",
+            file=sys.stderr,
+        )
         return False
     return free >= (required_mib + buffer_mib)
 
@@ -107,7 +113,7 @@ def _local_tags():
             procutil.ollama_argv("list"), text=True, stderr=subprocess.DEVNULL
         )
         return [line.split()[0] for line in out.splitlines() if line.split()]
-    except Exception:
+    except Exception:  # noqa: BLE001 - ollama list failure means "not present"
         return []
 
 
@@ -191,7 +197,7 @@ def discover(watcher):
                         m = r.get("model", "")
                         if m.startswith("custom:ollama/"):
                             tested.add(m.split("/", 1)[1])
-                except Exception:
+                except Exception:  # noqa: BLE001, S110 - unreadable run JSON is skipped
                     pass
 
     # Also exclude baseline
@@ -223,18 +229,28 @@ def discover(watcher):
     names = []
     try:
         req = urllib.request.Request("https://ollama.com/library", headers=_UA)
-        html = urllib.request.urlopen(req, timeout=15).read().decode("utf-8", errors="ignore")
+        html = (
+            urllib.request.urlopen(req, timeout=15)
+            .read()
+            .decode("utf-8", errors="ignore")
+        )
         names = sorted(set(re.findall(r"/library/([a-z0-9_.-]+)", html)))
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - network/parse failure falls back to curated tags
         print(f"[discover] warning: library query failed: {e}", file=sys.stderr)
 
     def fetch_tags(name):
         try:
-            h = urllib.request.urlopen(
-                urllib.request.Request("https://ollama.com/library/" + name, headers=_UA),
-                timeout=15,
-            ).read().decode("utf-8", errors="ignore")
-        except Exception:
+            h = (
+                urllib.request.urlopen(
+                    urllib.request.Request(
+                        "https://ollama.com/library/" + name, headers=_UA
+                    ),
+                    timeout=15,
+                )
+                .read()
+                .decode("utf-8", errors="ignore")
+            )
+        except Exception:  # noqa: BLE001 - one library page failing skips that model
             return []
         out = []
         for tg in re.findall(r"/library/" + re.escape(name) + r":([a-z0-9_.-]+)", h):
@@ -252,7 +268,7 @@ def discover(watcher):
             try:
                 for pb, full in f.result():
                     consider(full, pb)
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - one tag fetch failing is not fatal
                 pass
 
     # Always consider curated fallbacks (they are full "name:tag" strings).
@@ -266,9 +282,11 @@ def discover(watcher):
         band_note = ""
         if band_min is not None or band_max is not None:
             band_note = f" in size_band [{band_min},{band_max}]"
-        print(f"[discover] {len(cands)} candidate(s){band_note}; "
-              f"picking untested (deterministic): {cands[0][1]}",
-              file=sys.stderr)
+        print(
+            f"[discover] {len(cands)} candidate(s){band_note}; "
+            f"picking untested (deterministic): {cands[0][1]}",
+            file=sys.stderr,
+        )
         return cands[0][1]
     return None
 
@@ -281,7 +299,8 @@ def build_temp_registry(model, watcher):
     path; no pull/delete of baselines). `watcher` is accepted for call-site
     compatibility and unused. Returns (path, kept_ids).
     """
-    cfg = yaml.safe_load(open(os.path.join(REPO, "models", "registry.yaml")))
+    with open(os.path.join(REPO, "models", "registry.yaml"), encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
 
     disc = {
         "id": "custom:ollama/" + model,
@@ -299,7 +318,8 @@ def build_temp_registry(model, watcher):
     if not disc["tags"]:
         raise SystemExit(
             "registry.yaml is missing `battery_tags`; refusing to run rather than "
-            "silently benchmark the discovered model on zero tasks.")
+            "silently benchmark the discovered model on zero tasks."
+        )
 
     keep = [disc]
     tmp = os.path.join(REPO, ".autobench_tmp_registry.yaml")
@@ -315,7 +335,10 @@ def pull(model):
 
 def _runs_snapshot():
     import glob
-    return {os.path.basename(p) for p in glob.glob(os.path.join(REPO, "runs", "*.json"))}
+
+    return {
+        os.path.basename(p) for p in glob.glob(os.path.join(REPO, "runs", "*.json"))
+    }
 
 
 def _new_run_since(before):
@@ -364,10 +387,14 @@ def bench_baselines(tier="local", samples=1):
         [
             sys.executable,
             os.path.join(REPO, "scripts", "run_bench.py"),
-            "--tier", tier,
-            "--registry", os.path.join(REPO, "models", "registry.yaml"),
-            "--out", os.path.join(REPO, "runs"),
-            "--samples", str(samples),
+            "--tier",
+            tier,
+            "--registry",
+            os.path.join(REPO, "models", "registry.yaml"),
+            "--out",
+            os.path.join(REPO, "runs"),
+            "--samples",
+            str(samples),
         ],
         check=True,
     )
@@ -389,15 +416,25 @@ def report(run_path):
         return False
     print(f"[autobench] judge {os.path.basename(run_path)}")
     j = procutil.run(
-        [sys.executable, os.path.join(REPO, "scripts", "score_run.py"), run_path])
+        [sys.executable, os.path.join(REPO, "scripts", "score_run.py"), run_path]
+    )
     if j.returncode != 0:
-        print("[autobench] JUDGE FAILED - run is on disk but UNSCORED; refusing to "
-              "aggregate it as if it were scored", file=sys.stderr)
+        print(
+            "[autobench] JUDGE FAILED - run is on disk but UNSCORED; refusing to "
+            "aggregate it as if it were scored",
+            file=sys.stderr,
+        )
         return False
     print("[autobench] aggregate -> README.md")
     a = procutil.run(
-        [sys.executable, os.path.join(REPO, "scripts", "aggregate_results.py"),
-         "--inject", "README.md"], cwd=REPO)
+        [
+            sys.executable,
+            os.path.join(REPO, "scripts", "aggregate_results.py"),
+            "--inject",
+            "README.md",
+        ],
+        cwd=REPO,
+    )
     return a.returncode == 0
 
 
@@ -409,10 +446,14 @@ def delete(model):
 def commit(msg):
     # README carries the injected aggregate, so it is part of the run product,
     # not an unrelated edit that happens to be dirty.
-    procutil.run(["git", "-C", REPO, "add", "runs/", "reports/", "README.md"],
-                   check=True)
-    staged = procutil.run(["git", "-C", REPO, "diff", "--cached", "--name-only"],
-                            capture_output=True, text=True).stdout.strip()
+    procutil.run(
+        ["git", "-C", REPO, "add", "runs/", "reports/", "README.md"], check=True
+    )
+    staged = procutil.run(
+        ["git", "-C", REPO, "diff", "--cached", "--name-only"],
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
     if not staged:
         print("[autobench] nothing staged; skipping commit")
         return
@@ -423,14 +464,23 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", help="test a specific model (skip discover())")
     ap.add_argument("--no-delete", action="store_true")
-    ap.add_argument("--baselines-only", action="store_true",
-                    help="bench the registry baselines only: no discover, no pull, "
-                         "no delete")
-    ap.add_argument("--samples", type=int, default=1,
-                    help="draws per (model, task); >1 makes variance measurable")
-    ap.add_argument("--no-report", action="store_true",
-                    help="skip judge+aggregate+commit (nightly.py runs those "
-                         "itself, with per-stage logging)")
+    ap.add_argument(
+        "--baselines-only",
+        action="store_true",
+        help="bench the registry baselines only: no discover, no pull, no delete",
+    )
+    ap.add_argument(
+        "--samples",
+        type=int,
+        default=1,
+        help="draws per (model, task); >1 makes variance measurable",
+    )
+    ap.add_argument(
+        "--no-report",
+        action="store_true",
+        help="skip judge+aggregate+commit (nightly.py runs those "
+        "itself, with per-stage logging)",
+    )
     args = ap.parse_args()
 
     watcher, _baseline = load_watcher()
@@ -442,8 +492,10 @@ def main():
             return
         if not report(run_path):
             raise SystemExit(1)
-        commit(f"autobench: baselines @ {dt.datetime.now():%Y%m%d_%H%M%S} "
-               f"(N={args.samples})")
+        commit(
+            f"autobench: baselines @ {dt.datetime.now():%Y%m%d_%H%M%S} "
+            f"(N={args.samples})"
+        )
         return
 
     model = args.model or discover(watcher)
@@ -461,10 +513,14 @@ def main():
             note = ""
             other = _other_size_local(model)
             if other:
-                note = (f" (note: '{other}' is present locally but is a different "
-                        f"size and is NOT a substitute for '{model}')")
-            print(f"[autobench] SKIP {model}: insufficient VRAM headroom "
-                  f"(need ~{required}MiB){note}")
+                note = (
+                    f" (note: '{other}' is present locally but is a different "
+                    f"size and is NOT a substitute for '{model}')"
+                )
+            print(
+                f"[autobench] SKIP {model}: insufficient VRAM headroom "
+                f"(need ~{required}MiB){note}"
+            )
             return
         print(f"[autobench] VRAM check OK: {model} (~{required}MiB)")
         print(f"[autobench] pull {model}")
@@ -480,7 +536,7 @@ def main():
         print(f"[autobench] delete {model}")
         delete(model)
     elif not pulled:
-        print(f"[autobench] skipping delete — model was pre-existing locally")
+        print("[autobench] skipping delete — model was pre-existing locally")
     if args.no_report:
         return
     if not report(run_path):

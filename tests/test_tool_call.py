@@ -1,13 +1,14 @@
 """Offline tests for M4 / SPEC 13.3 single-turn tool-call scoring. No Ollama."""
+
 import os
 import sys
 
 import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
-import aggregate_results as agg  # noqa: E402
-import nvidia_judge as nj  # noqa: E402
-import run_bench  # noqa: E402
+import aggregate_results as agg
+import nvidia_judge as nj
+import run_bench
 
 REPO = os.path.join(os.path.dirname(__file__), "..")
 

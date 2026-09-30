@@ -9,7 +9,7 @@ Usage:
     python scripts/score_run.py runs/<run_id>.json
     python scripts/score_run.py            # defaults to latest run in runs/
 """
-import os
+
 import sys
 from pathlib import Path
 
@@ -38,7 +38,7 @@ def main() -> int:
     # Delegate to the NVIDIA judge (handles scoring + report writing).
     import nvidia_judge
 
-    nvidia_judge.main.__globals__  # no-op to ensure import side effects
+    nvidia_judge.main.__globals__  # noqa: B018 - keep the import live for its side effects
     # Re-run main() with the chosen run file by re-invoking via subprocess so
     # the judge's own arg parsing is authoritative.
 

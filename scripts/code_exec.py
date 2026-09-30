@@ -6,6 +6,7 @@ fixtures from the task YAML, and returns 1.0 / 0.0. Unparseable submissions
 return None (unscored) — same honesty rule as truncation. Not a HumanEval
 suite port: one battery item, fixture-driven.
 """
+
 from __future__ import annotations
 
 import json
@@ -36,11 +37,11 @@ def extract_python(response: str) -> str | None:
         return textwrap.dedent(fences[0]).strip() or None
     m = _DEF_RE.search(response)
     if m:
-        return textwrap.dedent(response[m.start():]).strip() or None
+        return textwrap.dedent(response[m.start() :]).strip() or None
     return None
 
 
-_HARNESS = '''# auto-generated mechanical check harness — do not edit
+_HARNESS = """# auto-generated mechanical check harness — do not edit
 import json
 import sys
 from pathlib import Path
@@ -84,7 +85,7 @@ for i, check in enumerate(CHECKS):
         sys.exit(0)
 
 print(json.dumps({{"status": "pass"}}))
-'''
+"""
 
 
 def score_python_exec(task: dict, response: str) -> float | None:
@@ -110,7 +111,8 @@ def score_python_exec(task: dict, response: str) -> float | None:
         tdir = Path(td)
         (tdir / "submission.py").write_text(code, encoding="utf-8")
         (tdir / "checks.json").write_text(
-            json.dumps(checks, ensure_ascii=False), encoding="utf-8")
+            json.dumps(checks, ensure_ascii=False), encoding="utf-8"
+        )
         harness = _HARNESS.format(func_name=func_name)
         (tdir / "harness.py").write_text(harness, encoding="utf-8")
         try:
@@ -120,6 +122,7 @@ def score_python_exec(task: dict, response: str) -> float | None:
                 text=True,
                 timeout=timeout,
                 cwd=str(tdir),
+                check=False,
             )
         except subprocess.TimeoutExpired:
             return 0.0
