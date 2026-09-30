@@ -9,7 +9,10 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 PS1 = REPO / "scripts" / "install_nightly_task.ps1"
@@ -78,6 +81,11 @@ def test_register_is_gated_by_mismatch_and_force():
     assert dry_idx < reg_idx
 
 
+# Runs the real installer under Windows PowerShell 5.1 (powershell.exe), which
+# only exists on Windows; the nightly task it installs is a Windows Task
+# Scheduler job. Off Windows the subprocess cannot start, so skip there only.
+# The string-contract tests above still run everywhere.
+@pytest.mark.skipif(sys.platform != "win32", reason="needs Windows PowerShell (powershell.exe) and Task Scheduler")
 def test_dry_run_subprocess_is_noop():
     """Invoke -DryRun; must exit 0 and never require a password."""
     powershell = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "WindowsPowerShell", "v1.0", "powershell.exe")

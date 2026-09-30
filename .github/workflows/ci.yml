@@ -47,6 +47,8 @@ jobs:
           persist-credentials: false
       - name: Retired Sapne root must not re-enter the tree
         shell: pwsh
+        env:
+          SAPNE_RETIRED_ROOT: 'C:\projects' # retired path; the check fails if it re-enters the tree
         run: ./tools/check-sapne-root.ps1
 
   gitleaks:
