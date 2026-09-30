@@ -203,9 +203,9 @@ def call_model(model, prompt, max_tokens, image_path=None, tools=None, messages=
                 data=json.dumps(payload).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
             )
-            t0 = dt.datetime.now()
+            t0 = dt.datetime.now(dt.timezone.utc)
             raw = urllib.request.urlopen(req, timeout=600).read().decode("utf-8")
-            latency = (dt.datetime.now() - t0).total_seconds()
+            latency = (dt.datetime.now(dt.timezone.utc) - t0).total_seconds()
             resp = json.loads(raw)
             msg = resp.get("message", {})
             # Qwen3.x / DeepSeek reasoning models may emit thinking tokens in a
@@ -251,9 +251,9 @@ def call_model(model, prompt, max_tokens, image_path=None, tools=None, messages=
                 "--output-format",
                 "json",
             ]
-            t0 = dt.datetime.now()
+            t0 = dt.datetime.now(dt.timezone.utc)
             result = procutil.run(cmd, capture_output=True, text=True, timeout=120)
-            latency = (dt.datetime.now() - t0).total_seconds()
+            latency = (dt.datetime.now(dt.timezone.utc) - t0).total_seconds()
             if result.returncode != 0:
                 return None, latency, f"claude cli error: {result.stderr.strip()}", {}
             data = json.loads(result.stdout)
@@ -783,7 +783,10 @@ def _record_telemetry(tracker, run_id, model, task, latency, meta, err):
         tps = (completion_toks / gen_latency) if gen_latency > 0 else 0.0
         tracker.record(
             telemetry.TelemetryRecord(
-                timestamp=dt.datetime.now().isoformat(),
+                timestamp=dt.datetime.now(dt.timezone.utc)
+                .astimezone()
+                .replace(tzinfo=None)
+                .isoformat(),
                 run_id=run_id,
                 model_id=model["id"],
                 model_provider=provider,
@@ -835,7 +838,7 @@ def main():
         models = [m for m in models if m.get("tier") in wanted]
     models = [m for m in models if m.get("enabled", True)]
 
-    run_id = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_id = dt.datetime.now(dt.timezone.utc).astimezone().strftime("%Y%m%d_%H%M%S")
 
     # Telemetry (tokens / tok-per-s / VRAM / cost) — optional; a broken import
     # must never take down a bench run, so it is best-effort.

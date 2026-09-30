@@ -10,7 +10,7 @@ import json
 import threading
 import time
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import procutil
@@ -46,7 +46,7 @@ class TelemetryTracker:
 
     def __init__(self, run_id: str):
         self.run_id = run_id
-        self.date_str = datetime.now().strftime("%Y%m%d")
+        self.date_str = datetime.now(timezone.utc).astimezone().strftime("%Y%m%d")
         self.file_path = TELEMETRY_DIR / f"usage_{self.date_str}.jsonl"
         self._lock = threading.Lock()
         self._vram_baseline = None
@@ -191,7 +191,10 @@ class TrackedCall:
         cost = calculate_cost(self.model_id, self.prompt_tokens, self.completion_tokens)
 
         record = TelemetryRecord(
-            timestamp=datetime.now().isoformat(),
+            timestamp=datetime.now(timezone.utc)
+            .astimezone()
+            .replace(tzinfo=None)
+            .isoformat(),
             run_id=self.tracker.run_id,
             model_id=self.model_id,
             model_provider=self.provider,

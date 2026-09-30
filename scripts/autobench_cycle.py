@@ -493,7 +493,7 @@ def main():
         if not report(run_path):
             raise SystemExit(1)
         commit(
-            f"autobench: baselines @ {dt.datetime.now():%Y%m%d_%H%M%S} "
+            f"autobench: baselines @ {dt.datetime.now(dt.timezone.utc).astimezone():%Y%m%d_%H%M%S} "
             f"(N={args.samples})"
         )
         return
@@ -541,7 +541,9 @@ def main():
         return
     if not report(run_path):
         raise SystemExit(1)
-    commit(f"autobench: {model} @ {dt.datetime.now():%Y%m%d_%H%M%S}")
+    commit(
+        f"autobench: {model} @ {dt.datetime.now(dt.timezone.utc).astimezone():%Y%m%d_%H%M%S}"
+    )
 
 
 if __name__ == "__main__":

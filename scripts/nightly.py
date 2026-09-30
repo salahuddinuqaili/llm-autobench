@@ -52,7 +52,9 @@ IDLE_BEFORE_SLEEP_MIN = 10
 
 
 def log(msg: str) -> None:
-    line = f"{dt.datetime.now().isoformat(timespec='seconds')}  {msg}"
+    # Local wall clock, same YYYY-MM-DDTHH:MM:SS shape as naive isoformat(timespec="seconds").
+    local_now = dt.datetime.now(dt.timezone.utc).astimezone()
+    line = f"{local_now.strftime('%Y-%m-%dT%H:%M:%S')}  {msg}"
     print(line, flush=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     # Local calendar date. A UTC date would rename this log across midnight.
