@@ -1,0 +1,4 @@
+# gitleaks config: default rules. Add path allowlists here ONLY for
+# reviewed false positives, with a comment saying why (see familiar/.gitleaks.toml).
+[extend]
+useDefault = true
