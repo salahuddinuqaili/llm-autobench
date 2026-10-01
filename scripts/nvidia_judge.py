@@ -226,7 +226,7 @@ def describe_image(img_path: str, max_retries: int = 2) -> str:
 
     PREFERRED: a stored description file next to the image
     (<image>.desc.txt), baked in ONCE by a strong vision model (e.g. Claude via
-    the `claude` CLI, Max quota, $0). This keeps the benchmark free of per-run
+    the `claude` CLI, Pro quota; not free, it draws on Sal's shared 5h/weekly limits). This keeps the benchmark free of per-run
     vision calls. Falls back to a fresh Claude CLI call, then to the local
     VISION_DESCRIBER (Ollama). Descriptions are cached per path."""
     cache = describe_image._cache
@@ -247,7 +247,7 @@ def describe_image(img_path: str, max_retries: int = 2) -> str:
         "its color and position, any text/labels, the scene type, and "
         "overall lighting. Be specific and literal; do not speculate."
     )
-    # Preferred: Claude CLI (Max quota, zero marginal cost, top vision).
+    # Preferred: Claude CLI (Pro quota; not free, it draws on Sal's shared 5h/weekly limits, top vision).
     try:
         cmd = [
             "claude",

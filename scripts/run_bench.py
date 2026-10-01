@@ -16,7 +16,7 @@ What works today:
     rows leave score=None here and are graded by nvidia_judge via score_run.py.
   - Truncation / ingestion_failed / unparseable python-exec / tools_unsupported
     stay unscored (null), never fake 0.0.
-  - The Anthropic (Claude Max) path remains stubbed: wire it to Hermes OAuth or
+  - The Anthropic (Claude subscription/Pro) path remains stubbed: wire it to Hermes OAuth or
     the Anthropic SDK with `auth=oauth`, NOT an API key.
 
 Run:  python run_bench.py --tier local,free
@@ -235,7 +235,7 @@ def call_model(model, prompt, max_tokens, image_path=None, tools=None, messages=
             return text, latency, None, meta
         except Exception as e:  # noqa: BLE001 - API failure is a recorded error
             return None, 0.0, f"ollama api error: {e}", {}
-    # Anthropic models: call via `claude -p` CLI which uses OAuth / Claude Max
+    # Anthropic models: call via `claude -p` CLI which uses OAuth / Claude Pro
     # quota — no ANTHROPIC_API_KEY env var needed or wanted.
     if model.get("provider") == "anthropic":
         try:

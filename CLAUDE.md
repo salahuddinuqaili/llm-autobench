@@ -26,7 +26,7 @@ a fixed task battery, reports results, and deletes the model to keep the machine
    `--no-delete`). Disk and VRAM stay free for the next cycle. This is the repo's core promise.
 7. **Reproducibility.** Each run is timestamped `run_id` (YYYYMMDD_HHMMSS). Raw JSON in `runs/`,
    markdown in `reports/`, both committed so runs are diffable over time.
-8. **No `ANTHROPIC_API_KEY`.** Claude (if ever used) routes via OAuth against the Max quota.
+8. **No `ANTHROPIC_API_KEY`.** Claude (if ever used) routes via OAuth against Sal's Claude Pro quota (shared with his chat; see usage policy).
    For this public repo, prefer the free NIM judge; paid APIs are unnecessary and off-policy.
 9. **Honesty in reporting.** Empty/garbage output is reported as such, never scored as correct.
    Uncertain scores marked `±` with reason.
